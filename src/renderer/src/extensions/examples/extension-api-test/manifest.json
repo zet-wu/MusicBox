@@ -1,0 +1,35 @@
+{
+  "id": "extension-api-test",
+  "name": "API Test Extension",
+  "displayName": "API 测试扩展",
+  "version": "1.0.0",
+  "description": "用于测试新的模块化 API 系统",
+  "publisher": "MusicBox",
+  "main": "test.js",
+  "module": "extensionApiTestExtension",
+  "canDisable": true,
+  "activationEvents": [
+    "onStartUp"
+  ],
+  "permissions": [
+    "player.read",
+    "library.read",
+    "ui.notification",
+    "ui.webview",
+    "storage.read",
+    "storage.write",
+    "settings.read",
+    "settings.write",
+    "network.request",
+    "system.info"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "test.command",
+        "title": "测试命令",
+        "category": "测试"
+      }
+    ]
+  }
+}

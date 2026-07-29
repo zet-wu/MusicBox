@@ -4,10 +4,12 @@
  */
 
 import {app} from 'electron';
+import * as fs from 'fs';
 import {ServiceContainer} from './ServiceContainer';
 import {WindowManager} from './WindowManager';
 import {ConfigManager} from './ConfigManager';
 import {BaseController} from '../decorators/IpcHandler';
+import {registerAudioStreamProtocol} from '../services/audio/AudioStreamProtocol';
 
 /**
  * 性能计时器
@@ -48,12 +50,14 @@ export class Application {
     private configManager: ConfigManager;
     private controllers: BaseController[] = [];
     private isInitialized = false;
+    private isConfigured = false;
     private perfTimer = new PerformanceTimer();
 
     constructor() {
         this.container = new ServiceContainer();
         this.configManager = new ConfigManager();
         this.windowManager = new WindowManager();
+        this.applyConfiguration();
     }
 
     /**
@@ -78,9 +82,10 @@ export class Application {
             await this.initializeCoreServices();
             this.perfTimer.mark('services');
 
-            // 3. 注册关键控制器（仅窗口创建必需的）
-            await this.registerCriticalControllers();
-            this.perfTimer.mark('critical-controllers');
+            // 3. 注册启动 IPC 控制器
+            // 渲染进程加载后会立即调用 preload 暴露的多个 IPC，因此 handler 必须先于窗口创建完成。
+            await this.registerStartupControllers();
+            this.perfTimer.mark('startup-controllers');
 
             // 4. 创建主窗口
             // 优先显示界面
@@ -93,18 +98,42 @@ export class Application {
             console.log('✅ 应用窗口已显示');
             console.log(`📊 启动性能: ${windowTime}ms`);
 
-            // 5. 后台注册其余控制器
-            this.registerNonCriticalControllers().catch(e => console.error('❌ 非关键控制器注册失败:', e));
+            if (!this.isBenchmarkMode()) {
+                // 5. 后台初始化重型服务
+                this.initializeHeavyServices().catch(e => console.error('❌ 后台服务初始化失败:', e));
 
-            // 6. 后台初始化重型服务
-            this.initializeHeavyServices().catch(e => console.error('❌ 后台服务初始化失败:', e));
+                // 6. 启动自动扫描调度器
+                this.startAutoScanner().catch(e => console.error('❌ 自动扫描调度器启动失败:', e));
+            }
 
-            // 7. 启动自动扫描调度器
-            this.startAutoScanner().catch(e => console.error('❌ 自动扫描调度器启动失败:', e));
+            this.runBenchmarkScriptIfRequested().catch(e => console.error('❌ Benchmark脚本执行失败:', e));
         } catch (error) {
             console.error('❌ 应用启动失败:', error);
             throw error;
         }
+    }
+
+    private isBenchmarkMode(): boolean {
+        return Boolean(
+            process.env.MUSICBOX_BENCHMARK_SCRIPT ||
+            process.argv.some(arg => arg.startsWith('--benchmark-script='))
+        );
+    }
+
+    private async runBenchmarkScriptIfRequested(): Promise<void> {
+        const scriptArg = process.argv.find(arg => arg.startsWith('--benchmark-script='));
+        const scriptPath = scriptArg ? scriptArg.slice('--benchmark-script='.length) : process.env.MUSICBOX_BENCHMARK_SCRIPT;
+        if (!scriptPath) return;
+
+        const win = this.windowManager.getMainWindow();
+        if (!win || win.isDestroyed()) {
+            throw new Error('主窗口不可用，无法执行benchmark脚本');
+        }
+
+        const script = await fs.promises.readFile(scriptPath, 'utf8');
+        await win.webContents.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1000))');
+        const result = await win.webContents.executeJavaScript(script, true);
+        console.log(`__MUSICBOX_BENCHMARK_RESULT__${JSON.stringify(result)}`);
     }
 
     private async startAutoScanner(): Promise<void> {
@@ -143,19 +172,28 @@ export class Application {
      * 应用配置
      */
     private applyConfiguration(): void {
+        if (this.isConfigured) {
+            return;
+        }
+
         console.log('🔧 应用配置...');
 
         // 硬件加速设置
         const hardwareAcceleration = this.configManager.loadHardwareAccelerationSettings();
         if (!hardwareAcceleration) {
             console.log('🔧 禁用硬件加速');
-            app.disableHardwareAcceleration();
+            if (app.isReady()) {
+                console.warn('⚠️ 硬件加速只能在 app ready 前禁用，本次启动已跳过');
+            } else {
+                app.disableHardwareAcceleration();
+            }
         } else {
             console.log('✅ 硬件加速已启用');
         }
 
         // GC 标志
         app.commandLine.appendSwitch('js-flags', '--expose-gc');
+        this.isConfigured = true;
     }
 
     /**
@@ -219,6 +257,9 @@ export class Application {
         const {ExtensionInstaller} = await import('../services/extensions/ExtensionInstaller');
         this.container.register('extensionInstaller', () => new ExtensionInstaller());
 
+        const {ExtensionStorageService} = await import('../services/extensions/ExtensionStorageService');
+        this.container.register('extensionStorageService', () => new ExtensionStorageService());
+
         console.log(`✅ 核心服务注册完成 (${this.container.getStats().registered} 个)`);
     }
 
@@ -240,21 +281,69 @@ export class Application {
     }
 
     /**
-     * 注册关键控制器（窗口创建前必需）
+     * 注册启动 IPC 控制器（窗口创建前必需）
      */
-    private async registerCriticalControllers(): Promise<void> {
-        console.log('🎮 注册关键控制器...');
+    private async registerStartupControllers(): Promise<void> {
+        const startTime = Date.now();
+        console.log('🎮 注册启动 IPC 控制器...');
 
-        // 加载关键控制器模块
-        const {WindowController} = await import('../controllers/WindowController');
-        const {AppController} = await import('../controllers/AppController');
-        const {DialogController} = await import('../controllers/DialogController');
-        const {AudioController} = await import('../controllers/AudioController');
-        const {NativeAudioController} = await import('../controllers/NativeAudioController');
-        const {parseMetadata} = await import('../utils/metadata');
+        const [
+            {WindowController},
+            {AppController},
+            {DialogController},
+            {AudioController},
+            {NativeAudioController},
+            {FileController},
+            {BenchmarkController},
+            {DesktopLyricsController},
+            {NetworkController},
+            {LibraryController},
+            {SystemController},
+            {SettingsController},
+            {MemoryController},
+            {UserDataController},
+            {HardwareAccelerationController},
+            {GlobalShortcutsController},
+            {ExtensionsController},
+            {CoversController},
+            {EqualizerPresetController},
+            {LyricsController},
+            {TrayController},
+            {HttpServerController},
+            {parseMetadata}
+        ] = await Promise.all([
+            import('../controllers/WindowController'),
+            import('../controllers/AppController'),
+            import('../controllers/DialogController'),
+            import('../controllers/AudioController'),
+            import('../controllers/NativeAudioController'),
+            import('../controllers/FileController'),
+            import('../controllers/BenchmarkController'),
+            import('../controllers/DesktopLyricsController'),
+            import('../controllers/NetworkController'),
+            import('../controllers/LibraryController'),
+            import('../controllers/SystemController'),
+            import('../controllers/SettingsController'),
+            import('../controllers/MemoryController'),
+            import('../controllers/UserDataController'),
+            import('../controllers/HardwareAccelerationController'),
+            import('../controllers/GlobalShortcutsController'),
+            import('../controllers/ExtensionsController'),
+            import('../controllers/CoversController'),
+            import('../controllers/EqualizerPresetController'),
+            import('../controllers/LyricsController'),
+            import('../controllers/TrayController'),
+            import('../controllers/HttpServerController'),
+            import('../utils/metadata')
+        ]);
 
-        // 获取必需的服务（轻量级）
+        const networkDriveManager = await this.container.get<any>('networkDriveManager');
         const networkFileAdapter = await this.container.get<any>('networkFileAdapter');
+        const libraryCacheManager = await this.container.get<any>('libraryCacheManager');
+        const metadataHandler = await this.container.get<any>('metadataHandler');
+        const extensionInstaller = await this.container.get<any>('extensionInstaller');
+        const extensionStorageService = await this.container.get<any>('extensionStorageService');
+        registerAudioStreamProtocol(networkFileAdapter);
 
         const boundParseMetadata = (filePath: string) =>
             parseMetadata(filePath, networkFileAdapter.isNetworkPath(filePath) ? networkFileAdapter : null, {skipCover: true});
@@ -267,75 +356,18 @@ export class Application {
             console.warn('⚠️ 原生音频模块未找到，NativeAudio功能不可用');
         }
 
-        const criticalControllers = [
+        const audioController = new AudioController(boundParseMetadata);
+        const trayController = new TrayController(this.windowManager);
+        this.windowManager.setTraySettingsGetter(() => trayController.getSettings());
+
+        const startupControllers = [
             new WindowController(this.windowManager),
             new AppController(this.windowManager),
             new DialogController(this.windowManager),
-            new AudioController(boundParseMetadata),
-            new NativeAudioController(nativeAudioModule, this.windowManager, networkFileAdapter)
-        ];
-
-        for (const controller of criticalControllers) {
-            controller.register();
-            this.controllers.push(controller);
-        }
-
-        console.log(`✅ 关键控制器注册完成 (${criticalControllers.length} 个)`);
-    }
-
-    /**
-     * 注册非关键控制器（窗口显示后后台加载）
-     */
-    private async registerNonCriticalControllers(): Promise<void> {
-        const startTime = Date.now();
-        console.log('🔄 后台注册非关键控制器...');
-
-        // 动态加载控制器模块
-        const [
-            {DesktopLyricsController},
-            {NetworkController},
-            {LibraryController},
-            {SystemController},
-            {SettingsController},
-            {MemoryController},
-            {UserDataController},
-            {HardwareAccelerationController},
-            {GlobalShortcutsController},
-            {ExtensionsController},
-            {CoversController},
-            {LyricsController},
-            {TrayController},
-            {HttpServerController},
-            {parseMetadata}
-        ] = await Promise.all([
-            import('../controllers/DesktopLyricsController'),
-            import('../controllers/NetworkController'),
-            import('../controllers/LibraryController'),
-            import('../controllers/SystemController'),
-            import('../controllers/SettingsController'),
-            import('../controllers/MemoryController'),
-            import('../controllers/UserDataController'),
-            import('../controllers/HardwareAccelerationController'),
-            import('../controllers/GlobalShortcutsController'),
-            import('../controllers/ExtensionsController'),
-            import('../controllers/CoversController'),
-            import('../controllers/LyricsController'),
-            import('../controllers/TrayController'),
-            import('../controllers/HttpServerController'),
-            import('../utils/metadata')
-        ]);
-
-        // 获取服务（按需实例化）
-        const networkDriveManager = await this.container.get<any>('networkDriveManager');
-        const networkFileAdapter = await this.container.get<any>('networkFileAdapter');
-        const libraryCacheManager = await this.container.get<any>('libraryCacheManager');
-        const metadataHandler = await this.container.get<any>('metadataHandler');
-        const extensionInstaller = await this.container.get<any>('extensionInstaller');
-
-        // 获取已注册的 AudioController
-        const audioController = this.controllers.find(c => c.constructor.name === 'AudioController') as any;
-
-        const nonCriticalControllers = [
+            audioController,
+            new NativeAudioController(nativeAudioModule, this.windowManager, networkFileAdapter),
+            new FileController(networkFileAdapter),
+            new BenchmarkController(),
             new DesktopLyricsController(this.windowManager),
             new NetworkController(networkDriveManager, networkFileAdapter, this.windowManager),
             new LibraryController(
@@ -348,24 +380,21 @@ export class Application {
             new UserDataController(),
             new HardwareAccelerationController(),
             new GlobalShortcutsController(this.windowManager),
-            new ExtensionsController(extensionInstaller, this.windowManager),
+            new ExtensionsController(extensionInstaller, extensionStorageService, this.windowManager),
             new CoversController(),
+            new EqualizerPresetController(this.windowManager),
             new LyricsController(networkFileAdapter),
-            (() => {
-                const trayCtrl = new TrayController(this.windowManager);
-                this.windowManager.setTraySettingsGetter(() => trayCtrl.getSettings());
-                return trayCtrl;
-            })(),
+            trayController,
             new HttpServerController()
         ];
 
-        for (const controller of nonCriticalControllers) {
+        for (const controller of startupControllers) {
             controller.register();
             this.controllers.push(controller);
         }
 
         const duration = Date.now() - startTime;
-        console.log(`✅ 非关键控制器注册完成 (${nonCriticalControllers.length} 个, ${duration}ms)`);
+        console.log(`✅ 启动 IPC 控制器注册完成 (${startupControllers.length} 个, ${duration}ms)`);
     }
 
     /**

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, normalizePath } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import path from 'path';
 
@@ -58,7 +58,7 @@ export default defineConfig({
           }
 
           // 共享工具类
-          if (id.includes('services/CacheManager') || id.includes('utils/md5')) {
+          if (id.includes('shared/cache/CacheManager') || id.includes('utils/md5')) {
             return 'shared-utils';
           }
 
@@ -67,8 +67,8 @@ export default defineConfig({
             return 'extensions';
           }
 
-          // 组件
-          if (id.includes('components/') || id.includes('WasapiEngine')) {
+          // UI 组件
+          if (id.includes('ui/') || id.includes('WasapiEngine')) {
             return 'components';
           }
         }
@@ -84,14 +84,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
-      '@js': path.resolve(__dirname, 'src/js'),
-      '@core': path.resolve(__dirname, 'src/js/core'),
-      '@services': path.resolve(__dirname, 'src/js/services'),
-      '@utils': path.resolve(__dirname, 'src/js/utils'),
-      '@api': path.resolve(__dirname, 'src/js/api'),
-      '@pages': path.resolve(__dirname, 'src/js/pages'),
-      '@components': path.resolve(__dirname, 'src/js/components'),
-      '@extensions': path.resolve(__dirname, 'src/js/extensions'),
+      '@utils': path.resolve(__dirname, 'src/utils'),
+      '@api': path.resolve(__dirname, 'src/api'),
+      '@ui': path.resolve(__dirname, 'src/ui'),
+      '@extensions': path.resolve(__dirname, 'src/extensions'),
       '@styles': path.resolve(__dirname, 'src/styles'),
       '@assets': path.resolve(__dirname, 'src/assets'),
     }
@@ -114,8 +110,8 @@ export default defineConfig({
       targets: [
         // 复制内置插件
         {
-          src: 'js/extensions/builtin',
-          dest: 'js/extensions'
+          src: 'extensions/builtin',
+          dest: '.'
         },
         // 复制 favicon
         {
@@ -124,7 +120,7 @@ export default defineConfig({
         },
         {
           src: 'assets/images/favicon.ico',
-          dest: './assets/images'
+          dest: '.'
         }
       ]
     })

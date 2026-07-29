@@ -6,6 +6,7 @@ import * as os from 'os';
 import {BaseController, Controller, IpcHandle} from '../decorators/IpcHandler';
 import {WindowManager} from '../core/WindowManager';
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
+import {assertReadableAudioFilePath} from '../utils/audioFileSecurity';
 
 @Controller('native-audio')
 export class NativeAudioController extends BaseController {
@@ -60,11 +61,31 @@ export class NativeAudioController extends BaseController {
     }
 
     @IpcHandle('native-audio:initialize')
-    async initialize(): Promise<any> {
+    async initialize(shareMode?: string): Promise<any> {
         try {
             if (!this.nativeAudioModule?.NativeAudioEngine) return {success: false, error: 'NativeAudioEngine类不存在'};
+            if (this.engine) {
+                console.log('ℹ️ Native音频引擎已初始化，复用现有实例');
+                if (shareMode === 'exclusive' || shareMode === 'shared') {
+                    const currentModeResult = this.engine.getShareMode?.();
+                    const currentMode = typeof currentModeResult === 'string' ? currentModeResult : currentModeResult?.mode;
+                    if (currentMode && currentMode !== shareMode) {
+                        const switchResult = await this.engine.switchShareMode(shareMode);
+                        if (!switchResult?.success) return switchResult;
+                    }
+                }
+                this.startPolling();
+                return {success: true};
+            }
+
             this.engine = new this.nativeAudioModule.NativeAudioEngine();
-            const result = await this.engine.initialize();
+            const result = await this.engine.initialize(shareMode);
+            if (!result?.success) {
+                this.engine = null;
+                this.stopPolling();
+                return result;
+            }
+
             this.startPolling();
             console.log('✅ Native音频引擎初始化成功');
             return result;
@@ -79,10 +100,12 @@ export class NativeAudioController extends BaseController {
         try {
             if (!this.engine) return {success: false, error: '引擎未初始化'};
             const oldTemp = this.currentTempFilePath;
-            this.currentTempFilePath = null;
             let actualPath = filePath;
+            const isNetworkPath = this.networkFileAdapter.isNetworkPath(filePath);
+            assertReadableAudioFilePath(filePath, isNetworkPath);
+            this.currentTempFilePath = null;
 
-            if (this.networkFileAdapter.isNetworkPath(filePath)) {
+            if (isNetworkPath) {
                 const ext = path.extname(filePath);
                 const tempPath = path.join(os.tmpdir(), `musicbox_native_audio_${Date.now()}${ext}`);
                 try {
@@ -135,9 +158,9 @@ export class NativeAudioController extends BaseController {
     }
 
     @IpcHandle('native-audio:seek')
-    async seek(position: number): Promise<any> {
+    seek(position: number): any {
         try {
-            return this.engine ? await this.engine.seek(position) : {success: false, error: '引擎未初始化'};
+            return this.engine ? this.engine.seek(position) : {success: false, error: '引擎未初始化'};
         } catch (e: any) {
             return {success: false, error: e.message};
         }
@@ -158,6 +181,24 @@ export class NativeAudioController extends BaseController {
             return this.engine ? await this.engine.getPosition() : {success: false, error: '引擎未初始化', position: 0};
         } catch (e: any) {
             return {success: false, error: e.message, position: 0};
+        }
+    }
+
+    @IpcHandle('native-audio:get-render-stats')
+    async getRenderStats(): Promise<any> {
+        try {
+            return this.engine ? await this.engine.getRenderStats() : {success: false, error: '引擎未初始化'};
+        } catch (e: any) {
+            return {success: false, error: e.message};
+        }
+    }
+
+    @IpcHandle('native-audio:reset-render-stats')
+    async resetRenderStats(): Promise<any> {
+        try {
+            return this.engine ? await this.engine.resetRenderStats() : {success: false, error: '引擎未初始化'};
+        } catch (e: any) {
+            return {success: false, error: e.message};
         }
     }
 
@@ -332,6 +373,7 @@ export class NativeAudioController extends BaseController {
     parametricSetEnabled(enabled: boolean): any {
         try {
             if (!this.engine) return {success: false, error: '引擎未初始化'};
+            this.engine.setEqualizerMode(enabled ? 'parametric' : 'graphic');
             this.engine.parametricSetEnabled(enabled);
             return {success: true};
         } catch (e: any) {

@@ -1,6 +1,6 @@
 // 窗口控制器
 
-import { ipcMain } from 'electron';
+import { ipcMain, screen } from 'electron';
 import {BaseController, Controller, IpcHandle} from '../decorators/IpcHandler';
 import {WindowManager} from '../core/WindowManager';
 
@@ -10,6 +10,27 @@ export class WindowController extends BaseController {
 
     constructor(private windowManager: WindowManager) {
         super();
+    }
+
+    private clamp(value: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, Math.round(value)));
+    }
+
+    private fitBoundsToDisplay(
+        bounds: Electron.Rectangle,
+        minWidth = 400,
+        minHeight = 120
+    ): Electron.Rectangle {
+        const display = screen.getDisplayMatching(bounds);
+        const {workArea} = display;
+        const widthMin = Math.min(minWidth, workArea.width);
+        const heightMin = Math.min(minHeight, workArea.height);
+        const width = this.clamp(bounds.width, widthMin, workArea.width);
+        const height = this.clamp(bounds.height, heightMin, workArea.height);
+        const x = this.clamp(bounds.x, workArea.x, workArea.x + Math.max(0, workArea.width - width));
+        const y = this.clamp(bounds.y, workArea.y, workArea.y + Math.max(0, workArea.height - height));
+
+        return {x, y, width, height};
     }
 
     override register(): void {
@@ -25,12 +46,18 @@ export class WindowController extends BaseController {
                 const y = Math.round(res.appY);
                 const targetWidth = this.cachedOriginalSize ? this.cachedOriginalSize.width : win.getSize()[0];
                 const targetHeight = this.cachedOriginalSize ? this.cachedOriginalSize.height : win.getSize()[1];
-                win.setBounds({ x, y, width: targetWidth, height: targetHeight });
+                win.setBounds(this.fitBoundsToDisplay({ x, y, width: targetWidth, height: targetHeight }));
                 setTimeout(() => {
                     if (!win || win.isDestroyed()) return;
                     const [afterWidth, afterHeight] = win.getSize();
                     if (afterWidth !== targetWidth || afterHeight !== targetHeight) {
-                        try { win.setSize(targetWidth, targetHeight); } catch { }
+                        try {
+                            win.setBounds(this.fitBoundsToDisplay({
+                                ...win.getBounds(),
+                                width: targetWidth,
+                                height: targetHeight
+                            }));
+                        } catch { }
                     }
                 }, 0);
             }
@@ -80,10 +107,13 @@ export class WindowController extends BaseController {
         const win = this.windowManager.getMainWindow();
         if (win && !win.isMaximized()) {
             try {
-                const w = Math.max(400, Math.min(3840, Math.round(width)));
-                const h = Math.max(120, Math.min(2160, Math.round(height)));
-                win.setSize(w, h);
-                return {success: true, width: w, height: h};
+                const fittedBounds = this.fitBoundsToDisplay({
+                    ...win.getBounds(),
+                    width: Math.round(width),
+                    height: Math.round(height)
+                });
+                win.setBounds(fittedBounds);
+                return {success: true, width: fittedBounds.width, height: fittedBounds.height};
             } catch (error: any) {
                 return {success: false, error: error.message};
             }
@@ -96,7 +126,7 @@ export class WindowController extends BaseController {
         const win = this.windowManager.getMainWindow();
         if (win) {
             try {
-                win.setBounds(bounds);
+                win.setBounds(this.fitBoundsToDisplay(bounds));
                 return {success: true};
             } catch (error: any) {
                 return {success: false, error: error.message};
@@ -121,12 +151,111 @@ export class WindowController extends BaseController {
         return false;
     }
 
+    @IpcHandle('window:setMaximizable')
+    setMaximizable(maximizable: boolean): boolean {
+        const win = this.windowManager.getMainWindow();
+        if (win) {
+            win.setMaximizable(maximizable);
+            return true;
+        }
+        return false;
+    }
+
+    @IpcHandle('window:setMaximumSize')
+    setMaximumSize(width: number, height: number): boolean {
+        const win = this.windowManager.getMainWindow();
+        if (win) {
+            try {
+                win.setMaximumSize(width, height);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    @IpcHandle('window:setMiniModeWindowState')
+    setMiniModeWindowState(options: {
+        enabled: boolean;
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
+    }): { success: boolean; size?: number[]; minimumSize?: number[]; maximumSize?: number[]; error?: string } {
+        const win = this.windowManager.getMainWindow();
+        if (!win) {
+            return {success: false, error: '窗口不可用'};
+        }
+
+        try {
+            if (win.isMaximized()) {
+                win.unmaximize();
+            }
+
+            if (options.enabled) {
+                const x = Math.round(options.x ?? win.getBounds().x);
+                const y = Math.round(options.y ?? win.getBounds().y);
+                const width = 400;
+                const height = 145;
+
+                this.cachedOriginalSize = null;
+                win.setResizable(true);
+                win.setMaximizable(false);
+                win.setMinimumSize(width, height);
+                win.setMaximumSize(width, height);
+                win.setBounds(this.fitBoundsToDisplay({x, y, width, height}, width, height));
+                win.setResizable(false);
+                win.setSkipTaskbar(true);
+                win.setAlwaysOnTop(true);
+            } else {
+                const display = screen.getDisplayMatching(win.getBounds());
+                const {workArea} = display;
+                const minWidth = Math.min(1080, workArea.width);
+                const minHeight = Math.min(720, workArea.height);
+                const maxWidth = Math.max(3840, workArea.width);
+                const maxHeight = Math.max(2160, workArea.height);
+                const width = this.clamp(Math.round(options.width ?? 1440), minWidth, workArea.width);
+                const height = this.clamp(Math.round(options.height ?? 900), minHeight, workArea.height);
+                const fittedBounds = this.fitBoundsToDisplay(
+                    {...win.getBounds(), width, height},
+                    minWidth,
+                    minHeight
+                );
+
+                this.cachedOriginalSize = null;
+                win.setResizable(true);
+                win.setMaximizable(true);
+                win.setMinimumSize(1, 1);
+                win.setMaximumSize(maxWidth, maxHeight);
+                win.setMinimumSize(minWidth, minHeight);
+                win.setSkipTaskbar(false);
+                win.setAlwaysOnTop(false);
+                win.setBounds(fittedBounds);
+            }
+
+            return {
+                success: true,
+                size: win.getSize(),
+                minimumSize: win.getMinimumSize(),
+                maximumSize: win.getMaximumSize()
+            };
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
     @IpcHandle('window:setPosition')
     setPosition(x: number, y: number): { success: boolean; error?: string } {
         const win = this.windowManager.getMainWindow();
         if (win && !win.isMaximized()) {
             try {
-                win.setPosition(Math.round(x), Math.round(y));
+                const fittedBounds = this.fitBoundsToDisplay({
+                    ...win.getBounds(),
+                    x: Math.round(x),
+                    y: Math.round(y)
+                });
+                win.setBounds(fittedBounds);
                 return {success: true};
             } catch (error: any) {
                 return {success: false, error: error.message};

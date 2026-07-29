@@ -16,17 +16,14 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"],
-      "@js/*": ["src/js/*"],
-      "@core/*": ["src/js/core/*"],
-      "@services/*": ["src/js/services/*"],
-      "@utils/*": ["src/js/utils/*"],
-      "@api/*": ["src/js/api/*"],
-      "@pages/*": ["src/js/pages/*"],
-      "@components/*": ["src/js/components/*"],
-      "@extensions/*": ["src/js/extensions/*"],
+      "@utils/*": ["src/utils/*"],
+      "@api/*": ["src/api/*"],
+      "@ui/*": ["src/ui/*"],
+      "@extensions/*": ["src/extensions/*"],
       "@styles/*": ["src/styles/*"],
       "@assets/*": ["src/assets/*"]
     }

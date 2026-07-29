@@ -3,7 +3,7 @@
  * 负责创建和管理应用窗口
  */
 
-import {app, BrowserWindow} from 'electron';
+import {app, BrowserWindow, screen} from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -86,6 +86,25 @@ export class WindowManager {
         );
     }
 
+    private clamp(value: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, Math.round(value)));
+    }
+
+    private getMainWindowBounds(config: SavedWindowConfig): Electron.Rectangle {
+        const {workArea} = screen.getPrimaryDisplay();
+        const minWidth = Math.min(config.minWidth || 1080, workArea.width);
+        const minHeight = Math.min(config.minHeight || 720, workArea.height);
+        const width = this.clamp(config.width, minWidth, workArea.width);
+        const height = this.clamp(config.height, minHeight, workArea.height);
+
+        return {
+            x: Math.round(workArea.x + Math.max(0, (workArea.width - width) / 2)),
+            y: Math.round(workArea.y + Math.max(0, (workArea.height - height) / 2)),
+            width,
+            height
+        };
+    }
+
     /**
      * 创建主窗口
      */
@@ -96,12 +115,15 @@ export class WindowManager {
         }
 
         const windowConfig = await this.loadWindowConfig();
+        const mainBounds = this.getMainWindowBounds(windowConfig);
 
         this.mainWindow = new BrowserWindow({
-            width: windowConfig.width,
-            height: windowConfig.height,
-            minWidth: windowConfig.minWidth || 1080,
-            minHeight: windowConfig.minHeight || 720,
+            x: mainBounds.x,
+            y: mainBounds.y,
+            width: mainBounds.width,
+            height: mainBounds.height,
+            minWidth: Math.min(windowConfig.minWidth || 1080, mainBounds.width),
+            minHeight: Math.min(windowConfig.minHeight || 720, mainBounds.height),
             titleBarStyle: 'hidden',
             frame: false,
             show: false,
@@ -115,6 +137,10 @@ export class WindowManager {
         });
 
         // 加载页面
+        if (this.isBenchmarkMode()) {
+            console.log('📊 Benchmark模式 - Loading minimal benchmark page');
+            await this.mainWindow.loadURL('data:text/html;charset=utf-8,<html><body>MusicBox Benchmark</body></html>');
+        } else {
         const isDev = !app.isPackaged;
         let htmlPath: string;
         if (isDev) {
@@ -137,6 +163,7 @@ export class WindowManager {
             } catch (fallbackError: any) {
                 console.error(`❌ 备用路径也失败: ${fallbackError.message}`);
             }
+        }
         }
 
         // 窗口准备好后显示
@@ -203,6 +230,13 @@ export class WindowManager {
         return this.mainWindow;
     }
 
+    private isBenchmarkMode(): boolean {
+        return Boolean(
+            process.env.MUSICBOX_BENCHMARK_SCRIPT ||
+            process.argv.some(arg => arg.startsWith('--benchmark-script='))
+        );
+    }
+
     /**
      * 创建桌面歌词窗口
      */
@@ -236,6 +270,8 @@ export class WindowManager {
             y: lyricsY,
             frame: false,
             transparent: true,
+            backgroundColor: '#00000000',
+            hasShadow: false,
             alwaysOnTop: true,
             skipTaskbar: true,
             resizable: false,
@@ -253,6 +289,9 @@ export class WindowManager {
                 contextIsolation: true
             }
         });
+        this.desktopLyricsWindow.setBackgroundColor('#00000000');
+        this.desktopLyricsWindow.setHasShadow(false);
+        this.desktopLyricsWindow.setIgnoreMouseEvents(true, {forward: true});
 
         // 加载桌面歌词页面
         const lyricsHtmlPath = path.join(__dirname, '../../../src/renderer/public/DesktopLyrics.html');
@@ -260,7 +299,7 @@ export class WindowManager {
 
         // 页面加载完成后显示
         this.desktopLyricsWindow.once('ready-to-show', () => {
-            // this.desktopLyricsWindow?.webContents.openDevTools({mode: 'detach'});
+            this.desktopLyricsWindow?.webContents.openDevTools({mode: 'detach'});
             this.desktopLyricsWindow?.show();
         });
 

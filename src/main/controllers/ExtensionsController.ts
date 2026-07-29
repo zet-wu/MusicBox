@@ -3,12 +3,14 @@
 import {dialog} from 'electron';
 import {BaseController, Controller, IpcHandle} from '../decorators/IpcHandler';
 import {ExtensionInstaller} from '../services/extensions/ExtensionInstaller';
+import {ExtensionStorageScope, ExtensionStorageService} from '../services/extensions/ExtensionStorageService';
 import {WindowManager} from '../core/WindowManager';
 
 @Controller('extensions')
 export class ExtensionsController extends BaseController {
     constructor(
         private extensionInstaller: ExtensionInstaller,
+        private extensionStorageService: ExtensionStorageService,
         private windowManager: WindowManager
     ) {
         super();
@@ -77,12 +79,12 @@ export class ExtensionsController extends BaseController {
     }
 
     @IpcHandle('extensions:getInstalled')
-    getInstalled(): any[] {
+    getInstalled(): { success: boolean; extensions: any[]; error?: string } {
         try {
-            return this.extensionInstaller.getInstalledExtensions();
-        } catch (error) {
+            return {success: true, extensions: this.extensionInstaller.getInstalledExtensions()};
+        } catch (error: any) {
             console.error('❌ extensions:getInstalled 错误:', error);
-            return [];
+            return {success: false, extensions: [], error: error.message};
         }
     }
 
@@ -107,5 +109,28 @@ export class ExtensionsController extends BaseController {
         } catch (error: any) {
             return {success: false, error: error.message};
         }
+    }
+
+    @IpcHandle('extensions:storageGetState')
+    async storageGetState(
+        extensionId: string,
+        scope: ExtensionStorageScope
+    ): Promise<{ success: boolean; data: Record<string, unknown>; error?: string }> {
+        try {
+            const data = await this.extensionStorageService.getState(extensionId, scope);
+            return {success: true, data};
+        } catch (error: any) {
+            return {success: false, data: {}, error: error.message};
+        }
+    }
+
+    @IpcHandle('extensions:storageUpdate')
+    async storageUpdate(
+        extensionId: string,
+        scope: ExtensionStorageScope,
+        key: string,
+        value: unknown
+    ): Promise<{ success: boolean; error?: string }> {
+        return await this.extensionStorageService.updateValue(extensionId, scope, key, value);
     }
 }

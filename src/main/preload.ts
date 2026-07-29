@@ -11,6 +11,7 @@ const PATH_ALLOWED = [
 const FS_ALLOWED = [
     'stat', 'lstat', 'readdir', 'readFile', 'realpath', 'access'
 ];
+const ENABLE_LEGACY_NODE_APIS = process.env.MUSICBOX_ENABLE_LEGACY_NODE_APIS === '1';
 
 const osApi: Record<string, (...args: any[]) => Promise<any>> = {};
 const pathApi: Record<string, (...args: any[]) => Promise<any>> = {};
@@ -25,8 +26,22 @@ for (const prop of FS_ALLOWED) {
     fsApi[prop] = (...args) => ipcRenderer.invoke('fs:call', {prop, args});
 }
 
+const legacyNodeApis = ENABLE_LEGACY_NODE_APIS
+    ? {
+        // 文件系统API
+        fs: {
+            stat: (filePath: string) => ipcRenderer.invoke('fs:stat', filePath),
+            readFile: (filePath: string, encoding: string) => ipcRenderer.invoke('fs:readFile', filePath, encoding),
+            writeFile: (filePath: string, data: unknown, encoding: string) => ipcRenderer.invoke('fs:writeFile', filePath, data, encoding)
+        },
+        os: osApi,
+        path: pathApi
+    }
+    : {};
+
 // 暴露安全的IPC方法给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
+    ...legacyNodeApis,
     // 应用信息
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
@@ -38,6 +53,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ensureDirectoryExists: (dirPath: string) => ipcRenderer.invoke('app:ensureDirectoryExists', dirPath),
     openDevTools: () => ipcRenderer.invoke('app:openDevTools'),
     openPath: (path: string) => ipcRenderer.invoke('app:openPath', path),
+    openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
 
     // 文件对话框
     openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
@@ -45,23 +61,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
     openImageFile: () => ipcRenderer.invoke('dialog:openImageFile'),
 
+    media: {
+        readAudioFile: (filePath: string) => ipcRenderer.invoke('file:readAudio', filePath),
+        createAudioStreamUrl: (filePath: string) => ipcRenderer.invoke('file:createAudioStreamUrl', filePath),
+        selectImageData: (maxSizeBytes: number) => ipcRenderer.invoke('media:selectImageData', maxSizeBytes)
+    },
+
     // 对话框API
     dialog: {
         showOpenDialog: (options: unknown) => ipcRenderer.invoke('dialog:showOpenDialog', options),
         openFile: (options: unknown) => ipcRenderer.invoke('dialog:openFile', options),
         saveFile: (options: unknown) => ipcRenderer.invoke('dialog:saveFile', options),
     },
-
-    // 文件系统API
-    fs: {
-        stat: (filePath: string) => ipcRenderer.invoke('fs:stat', filePath),
-        readFile: (filePath: string, encoding: string) => ipcRenderer.invoke('fs:readFile', filePath, encoding),
-        writeFile: (filePath: string, data: unknown, encoding: string) => ipcRenderer.invoke('fs:writeFile', filePath, data, encoding)
-    },
-
-    // 系统API
-    os: osApi,
-    path: pathApi,
 
     // HTTP服务器API
     httpServer: {
@@ -142,10 +153,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
 
-    // Native音频引擎（WASAPI独占模式）
+    // Native音频引擎（WASAPI shared/exclusive）
     nativeAudio: {
         // 初始化Native音频引擎
-        initialize: () => ipcRenderer.invoke('native-audio:initialize'),
+        initialize: (shareMode?: string) => ipcRenderer.invoke('native-audio:initialize', shareMode),
 
         // 播放控制
         loadTrack: (filePath: string) => ipcRenderer.invoke('native-audio:load-track', filePath),
@@ -159,6 +170,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         // 播放状态查询
         getPosition: () => ipcRenderer.invoke('native-audio:get-position'),
+        getRenderStats: () => ipcRenderer.invoke('native-audio:get-render-stats'),
+        resetRenderStats: () => ipcRenderer.invoke('native-audio:reset-render-stats'),
 
         // 均衡器控制
         setEqualizerEnabled: (enabled: boolean) => ipcRenderer.invoke('native-audio:set-equalizer-enabled', enabled),
@@ -199,6 +212,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         destroy: () => ipcRenderer.invoke('native-audio:destroy'),
     },
 
+    benchmark: {
+        ping: (payload: unknown) => ipcRenderer.invoke('benchmark:ping', payload),
+        getProcessSnapshot: () => ipcRenderer.invoke('benchmark:getProcessSnapshot'),
+        forceGc: () => ipcRenderer.invoke('benchmark:forceGc'),
+    },
+
     // Native音频引擎事件监听
     onNativeAudioEvent: (eventName: string, callback: (data: any) => void) => {
         const channel = `native-audio:${eventName}`;
@@ -225,6 +244,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         // Metadata
         getTrackMetadata: (filePath: string) => ipcRenderer.invoke('library:getTrackMetadata', filePath),
+        getTrackPlaybackMetadata: (filePath: string) => ipcRenderer.invoke('library:getTrackPlaybackMetadata', filePath),
         updateTrackMetadata: (trackId: string, metadata: any) => ipcRenderer.invoke('library:updateTrackMetadata', trackId, metadata),
 
         // Playlists
@@ -271,9 +291,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return () => ipcRenderer.removeListener('cover-updated', wrapper);
         }
     },
-
-    // 音乐文件操作
-    readAudioFile: (filePath: string) => ipcRenderer.invoke('file:readAudio', filePath),
 
     // 设置
     settings: {
@@ -345,7 +362,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         checkLocalCover: (coverDir: string, title: string, artist: string, album: string, isAlbum = false) =>
             ipcRenderer.invoke('covers:checkLocalCover', coverDir, title, artist, album, isAlbum),
         saveCoverFile: (coverDir: string, fileName: string, imageData: any, dataType: string) =>
-            ipcRenderer.invoke('covers:saveCoverFile', coverDir, fileName, imageData, dataType)
+            ipcRenderer.invoke('covers:saveCoverFile', coverDir, fileName, imageData, dataType),
+        readCoverImage: (filePath: string) => ipcRenderer.invoke('covers:readCoverImage', filePath)
+    },
+
+    // 均衡器预设文件
+    equalizerPresets: {
+        exportPreset: (defaultName: string, content: string) =>
+            ipcRenderer.invoke('equalizer-presets:export', defaultName, content),
+        importPreset: () => ipcRenderer.invoke('equalizer-presets:import')
     },
 
     // 全局快捷键
@@ -384,6 +409,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         setBounds: (bounds: any) => ipcRenderer.invoke('window:setBounds', bounds),
         getBounds: () => ipcRenderer.invoke('window:getBounds'),
         setResizable: (resizable: boolean) => ipcRenderer.invoke('window:setResizable', resizable),
+        setMaximizable: (maximizable: boolean) => ipcRenderer.invoke('window:setMaximizable', maximizable),
+        setMaximumSize: (width: number, height: number) => ipcRenderer.invoke('window:setMaximumSize', width, height),
+        setMiniModeWindowState: (options: any) => ipcRenderer.invoke('window:setMiniModeWindowState', options),
         setPosition: (x: number, y: number) => ipcRenderer.invoke('window:setPosition', x, y),
         setSkipTaskbar: (skip: boolean) => ipcRenderer.invoke('window:setSkipTaskbar', skip),
         setMinimumSize: (width: number, height: number) => ipcRenderer.invoke('window:setMinimumSize', width, height),
@@ -471,6 +499,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         getInstalled: () => ipcRenderer.invoke('extensions:getInstalled'),
         scanUserExtensions: () => ipcRenderer.invoke('extensions:scanUserExtensions'),
         readExtensionFile: (extensionId: string, filePath: string) => ipcRenderer.invoke('extensions:readExtensionFile', extensionId, filePath),
+        storageGetState: (extensionId: string, scope: string) =>
+            ipcRenderer.invoke('extensions:storageGetState', extensionId, scope),
+        storageUpdate: (extensionId: string, scope: string, key: string, value: unknown) =>
+            ipcRenderer.invoke('extensions:storageUpdate', extensionId, scope, key, value),
     },
 
     userdata: {
