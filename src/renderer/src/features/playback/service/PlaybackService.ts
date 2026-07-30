@@ -1,4 +1,9 @@
-import type {PlaybackStateSnapshot, PlayMode} from '@api/types/playback';
+import type {
+    PlaybackQueueSnapshot,
+    PlaybackStateSnapshot,
+    PlayMode,
+    QueueMutationResult
+} from '@api/types/playback';
 import type {WasapiShareMode} from '@api/types/settings';
 import type {Track} from '@api/types/track';
 import type {PlaybackState, PlaybackStoreChange, Unsubscribe} from '../PlaybackStore';
@@ -105,6 +110,22 @@ export class PlaybackService {
         return await playbackApiAdapter.setPlaylist(tracks, startIndex);
     }
 
+    async appendToQueue(tracks: Track[]): Promise<QueueMutationResult> {
+        return await playbackApiAdapter.appendToQueue(tracks);
+    }
+
+    async playNext(tracks: Track[]): Promise<QueueMutationResult> {
+        return await playbackApiAdapter.playNext(tracks);
+    }
+
+    moveQueueEntry(queueId: string, targetIndex: number): boolean {
+        return playbackApiAdapter.moveQueueEntry(queueId, targetIndex);
+    }
+
+    async restorePlaybackQueue(snapshot: PlaybackQueueSnapshot): Promise<boolean> {
+        return await playbackApiAdapter.restorePlaybackQueue(snapshot);
+    }
+
     async getPosition(): Promise<number> {
         return await playbackApiAdapter.getPosition();
     }
@@ -149,6 +170,7 @@ export class PlaybackService {
             playlist: state.playlist,
             currentIndex: state.currentIndex,
             playMode: state.playMode,
+            queue: playbackApiAdapter.getPlaybackQueueSnapshot(),
             timestamp: Date.now()
         };
     }

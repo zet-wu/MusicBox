@@ -45,6 +45,7 @@ export interface AudioEngineManagerBridge {
     onPositionChanged?: (position: number) => void | Promise<void>;
     onVolumeChanged?: (volume: number) => void;
     onDurationChanged?: (filePath: string, duration: number) => void;
+    onTrackEnded?: () => void | Promise<void>;
 }
 
 interface AudioEngineAdapterOptions {

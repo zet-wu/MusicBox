@@ -1,4 +1,4 @@
-import type {PlayMode} from '@api/types/playback';
+import type {PlaybackQueueSnapshot, PlayMode, QueueMutationResult} from '@api/types/playback';
 import type {WasapiShareMode} from '@api/types/settings';
 import type {Track} from '@api/types/track';
 import type {PlaybackState, Unsubscribe} from '../PlaybackStore';
@@ -90,6 +90,26 @@ export class PlaybackApiAdapter {
     async setPlaylist(tracks: Track[], startIndex = -1): Promise<boolean> {
         const api = this.getRuntime();
         return await api.setPlaylist(tracks, startIndex);
+    }
+
+    async appendToQueue(tracks: Track[]): Promise<QueueMutationResult> {
+        return await this.getRuntime().appendToQueue(tracks);
+    }
+
+    async playNext(tracks: Track[]): Promise<QueueMutationResult> {
+        return await this.getRuntime().playNext(tracks);
+    }
+
+    moveQueueEntry(queueId: string, targetIndex: number): boolean {
+        return this.getRuntime().moveQueueEntry(queueId, targetIndex);
+    }
+
+    getPlaybackQueueSnapshot(): PlaybackQueueSnapshot {
+        return this.getRuntime().getPlaybackQueueSnapshot();
+    }
+
+    async restorePlaybackQueue(snapshot: PlaybackQueueSnapshot): Promise<boolean> {
+        return await this.getRuntime().restorePlaybackQueue(snapshot);
     }
 
     async getPosition(): Promise<number> {

@@ -1,5 +1,5 @@
 import {cacheManager} from "@/shared/cache";
-import type {PlaybackStateSnapshot} from '@api/types/playback';
+import type {PlaybackQueueSnapshot, PlaybackStateSnapshot} from '@api/types/playback';
 import type {MusicBoxSettings} from '@api/types/settings';
 import type {Track} from '@api/types/track';
 
@@ -18,6 +18,7 @@ interface PlaybackAppControllerOptions {
 interface PlaybackAppIntegrations {
     getLibraryTracks(): Promise<Track[]>;
     setPlaylist(tracks: Track[], startIndex?: number): Promise<boolean>;
+    restorePlaybackQueue(snapshot: PlaybackQueueSnapshot): Promise<boolean>;
     loadTrack(filePath: string): Promise<boolean>;
     play(): Promise<boolean>;
     setPosition(position: number): Promise<boolean>;
@@ -115,6 +116,10 @@ export class PlaybackAppController {
                     this.integrations.setPlayMode(playMode);
                 }
 
+                if (playbackState.queue) {
+                    await this.integrations.restorePlaybackQueue(playbackState.queue);
+                }
+
                 if (playlist && playlist.length > 0) {
                     const validTracks: Track[] = [];
                     let validCurrentIndex = -1;
@@ -130,7 +135,9 @@ export class PlaybackAppController {
                     }
 
                     if (validTracks.length > 0) {
-                        await this.integrations.setPlaylist(validTracks, validCurrentIndex);
+                        if (!playbackState.queue) {
+                            await this.integrations.setPlaylist(validTracks, validCurrentIndex);
+                        }
 
                         if (validCurrentIndex >= 0 && validTracks[validCurrentIndex]) {
                             const trackToLoad = validTracks[validCurrentIndex];

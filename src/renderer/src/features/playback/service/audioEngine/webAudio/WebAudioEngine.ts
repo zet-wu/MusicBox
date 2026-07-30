@@ -28,6 +28,7 @@ class WebAudioEngine {
     public onPlaybackStateChanged: ((isPlaying: boolean) => void | Promise<void>) | null;
     public onPositionChanged: ((position: number) => void | Promise<void>) | null;
     public onVolumeChanged: ((volume: number) => void) | null;
+    public onTrackEnded: (() => void | Promise<void>) | null;
     public getNextTrackIndex: (() => number) | null;
     public getPreviousTrackIndex: (() => number) | null;
     private preloadCoordinator: WebAudioPreloadCoordinator | null;
@@ -52,6 +53,7 @@ class WebAudioEngine {
         this.onPlaybackStateChanged = null;
         this.onPositionChanged = null;
         this.onVolumeChanged = null;
+        this.onTrackEnded = null;
 
         // 播放模式回调：用于获取下一首/上一首的索引
         this.getNextTrackIndex = null;
@@ -69,7 +71,7 @@ class WebAudioEngine {
             getMediaElement: () => this.mediaElement,
             getDuration: () => this.currentTrackStore.getDuration(),
             connectSourceToChain: (sourceNode) => this.mixerController.connectSource(sourceNode),
-            onTrackEnded: () => this.onTrackEnded(),
+            onTrackEnded: () => this.handleTrackEnded(),
             getPlaybackStateChangedCallback: () => this.onPlaybackStateChanged,
             getPositionChangedCallback: () => this.onPositionChanged
         });
@@ -340,22 +342,12 @@ class WebAudioEngine {
     }
 
     // 歌曲播放结束处理
-    onTrackEnded(): void {
-        // console.log('🔚 歌曲播放结束');
-
-        // 自动播放下一首
-        if (this.playlist.length > 0) {
-            if (this.getGaplessPlayback()) {
-                // 无间隙播放
-                setTimeout(async () => {
-                    await this.nextTrack();
-                }, 0);
-            } else {
-                // 普通播放
-                setTimeout(async () => {
-                    await this.nextTrack();
-                }, 500);
-            }
+    handleTrackEnded(): void {
+        if (this.playlist.length > 0 && this.onTrackEnded) {
+            const delay = this.getGaplessPlayback() ? 0 : 500;
+            setTimeout(() => {
+                void this.onTrackEnded?.();
+            }, delay);
         }
     }
 

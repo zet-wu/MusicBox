@@ -23,6 +23,7 @@ class AudioEngineManager {
     public onPlaybackStateChanged: ((isPlaying: boolean) => void | Promise<void>) | null;
     public onPositionChanged: ((position: number) => void | Promise<void>) | null;
     public onVolumeChanged: ((volume: number) => void) | null;
+    public onTrackEnded: (() => void | Promise<void>) | null;
     public getNextTrackIndex: (() => number) | null;
     public getPreviousTrackIndex: (() => number) | null;
 
@@ -38,6 +39,7 @@ class AudioEngineManager {
         this.onPlaybackStateChanged = null;
         this.onPositionChanged = null;
         this.onVolumeChanged = null;
+        this.onTrackEnded = null;
         this.getNextTrackIndex = null;
         this.getPreviousTrackIndex = null;
     }
@@ -111,6 +113,10 @@ class AudioEngineManager {
 
         this.currentEngine.onVolumeChanged = (volume) => {
             if (this.onVolumeChanged) this.onVolumeChanged(volume);
+        };
+
+        this.currentEngine.onTrackEnded = () => {
+            if (this.onTrackEnded) this.onTrackEnded();
         };
 
         this.currentEngine.getNextTrackIndex = () => {

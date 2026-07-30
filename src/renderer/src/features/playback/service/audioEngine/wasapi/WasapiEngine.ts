@@ -42,6 +42,7 @@ class WasapiEngine {
     public onPlaybackStateChanged: ((isPlaying: boolean) => void | Promise<void>) | null;
     public onPositionChanged: ((position: number) => void | Promise<void>) | null;
     public onVolumeChanged: ((volume: number) => void) | null;
+    public onTrackEnded: (() => void | Promise<void>) | null;
     public getNextTrackIndex: (() => number) | null;
     public getPreviousTrackIndex: (() => number) | null;
     private progressTimer: ReturnType<typeof setInterval> | null;
@@ -74,6 +75,7 @@ class WasapiEngine {
         this.onPlaybackStateChanged = null;
         this.onPositionChanged = null;
         this.onVolumeChanged = null;
+        this.onTrackEnded = null;
         this.getNextTrackIndex = null;
         this.getPreviousTrackIndex = null;
 
@@ -116,7 +118,7 @@ class WasapiEngine {
     setupEventListeners(): void {
         // 监听播放结束事件
         audioDriverController.onNativeAudioEvent('track-ended', () => {
-            this.onTrackEnded();
+            this.handleTrackEnded();
         });
 
         // 监听错误事件
@@ -432,7 +434,7 @@ class WasapiEngine {
         return this.gaplessPlaybackEnabled;
     }
 
-    onTrackEnded(): void {
+    handleTrackEnded(): void {
         // 如果正在加载新曲目，忽略finished事件（这是旧曲目的finished事件）
         if (this.isLoadingNewTrack) {
             return;
@@ -448,10 +450,9 @@ class WasapiEngine {
         this.isPlaying = false;
         this.isPaused = false;
 
-        // 自动播放下一首
-        if (this.playlist.length > 0) {
-            setTimeout(async () => {
-                await this.nextTrack();
+        if (this.playlist.length > 0 && this.onTrackEnded) {
+            setTimeout(() => {
+                void this.onTrackEnded?.();
             }, this.gaplessPlaybackEnabled ? 0 : 500);
         }
     }

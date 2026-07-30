@@ -12,7 +12,14 @@ import {DesktopLyricsSync} from '@/features/desktopLyrics/service/DesktopLyricsS
 import {LibraryBridge} from '@/features/library/service/LibraryBridge';
 import type {Result} from '@api/types/common';
 import type {CacheValidationResult} from '@api/types/events';
-import type {DesktopLyricsPlaybackState, PlayMode, PlaybackStateName} from '@api/types/playback';
+import type {
+    DesktopLyricsPlaybackState,
+    PlaybackQueueSnapshot,
+    PlayMode,
+    QueueAdvanceReason,
+    QueueMutationResult,
+    PlaybackStateName
+} from '@api/types/playback';
 import type {LyricLine} from '@api/types/lyrics';
 import type {DesktopLyricsSettings, MusicBoxSettings, WasapiShareMode} from '@api/types/settings';
 import type {Track} from '@api/types/track';
@@ -48,7 +55,10 @@ export class MusicBoxAPI extends EventEmitter {
             runtimeState: this.playbackRuntimeState
         });
         this.playbackPersistence = new PlaybackPersistence({
-            getPlaybackState: () => this.playbackRuntimeState.toPlaybackStateSnapshot()
+            getPlaybackState: () => ({
+                ...this.playbackRuntimeState.toPlaybackStateSnapshot(),
+                queue: this.queue.getSnapshot()
+            })
         });
         this.playbackPositionUpdates = new PlaybackPositionUpdateCoordinator({
             emitPositionChanged: (position) => this.emit('positionChanged', position),
@@ -99,6 +109,7 @@ export class MusicBoxAPI extends EventEmitter {
             audioEngine.onTrackChanged = async (track: unknown) => {
                 const state = await audioEngine.getStateSnapshot();
                 const syncResult = this.playbackStateSynchronizer.applyTrackChangedState(track, state);
+                this.queue.commitCurrentIndex(state.currentIndex);
 
                 // 只有在引擎索引与API索引不一致时才同步（说明是引擎主动切换的，如自动播放下一首）
                 if (syncResult.indexChanged) {
@@ -132,6 +143,10 @@ export class MusicBoxAPI extends EventEmitter {
                 console.log('🎵 API: 音频时长更新:', filePath, duration.toFixed(2) + 's');
                 this.updateTrackDuration(filePath, duration);
                 this.emit('trackDurationUpdated', {filePath, duration});
+            };
+
+            audioEngine.onTrackEnded = async () => {
+                await this.nextTrack('track-ended');
             };
         } else {
             console.warn('⚠️ API: 音频引擎不可用，无法设置事件监听器');
@@ -516,17 +531,18 @@ export class MusicBoxAPI extends EventEmitter {
         try {
             console.log(`🔄 API: 设置播放列表，${tracks.length}首歌曲，起始索引: ${startIndex}`);
 
-            // 设置新播放列表时清空播放历史
-            this.queue.clearHistory();
+            this.queue.replaceQueue(tracks, {startIndex});
+            const queueTracks = this.queue.getTracks();
+            const queueIndex = this.queue.getCurrentIndex();
 
             if (this.audioEngine) {
-                const result = this.audioEngine.setPlaylist(tracks, startIndex);
+                const result = this.audioEngine.setPlaylist(queueTracks, queueIndex);
                 if (result) {
-                    this.playlist = tracks;
-                    this.currentIndex = startIndex;
+                    this.playlist = queueTracks;
+                    this.currentIndex = queueIndex;
 
                     console.log(`✅ API: 播放列表设置成功，当前索引: ${this.currentIndex}`);
-                    this.emit('playlistChanged', tracks);
+                    this.emit('playlistChanged', queueTracks);
                     this.emit('trackIndexChanged', this.currentIndex);
 
                     // 播放列表变更时保存状态
@@ -537,10 +553,10 @@ export class MusicBoxAPI extends EventEmitter {
                 return false;
             }
 
-            await audioGateway.setPlaylist(tracks);
-            this.playlist = tracks;
-            this.currentIndex = startIndex;
-            this.emit('playlistChanged', tracks);
+            await audioGateway.setPlaylist(queueTracks);
+            this.playlist = queueTracks;
+            this.currentIndex = queueIndex;
+            this.emit('playlistChanged', queueTracks);
             this.emit('trackIndexChanged', this.currentIndex);
 
             // 播放列表变更时保存状态
@@ -552,7 +568,7 @@ export class MusicBoxAPI extends EventEmitter {
         }
     }
 
-    async nextTrack(): Promise<boolean> {
+    async nextTrack(reason: QueueAdvanceReason = 'manual-next'): Promise<boolean> {
         try {
             // 防止快速切换时的竞态条件
             if (this._trackSwitchLock) {
@@ -566,18 +582,22 @@ export class MusicBoxAPI extends EventEmitter {
             // 设置切换锁
             this._trackSwitchLock = true;
 
-            // 将当前索引加入播放历史（在切换到下一首之前）
-            this.queue.pushHistory(this.currentIndex);
-
-            // 根据播放模式获取下一首的索引
-            const nextIndex = this.getNextTrackIndex();
+            const previousTracks = this.playlist;
+            const nextIndex = this.queue.getNextIndex(reason);
             if (nextIndex === -1) {
                 console.log('⚠️ 无法获取下一首歌曲索引');
                 this._trackSwitchLock = false;
                 return false;
             }
 
-            const nextTrack = this.playlist[nextIndex];
+            const queueTracks = this.queue.getTracks();
+            if (queueTracks !== previousTracks) {
+                this.playlist = queueTracks;
+                this.audioEngine?.setPlaylist(queueTracks, this.queue.getCurrentIndex());
+                this.emit('playlistChanged', queueTracks);
+            }
+
+            const nextTrack = queueTracks[nextIndex];
             if (!nextTrack) {
                 console.log('⚠️ 下一首歌曲不存在');
                 this._trackSwitchLock = false;
@@ -588,6 +608,7 @@ export class MusicBoxAPI extends EventEmitter {
                 // 将计算好的nextIndex传递给音频引擎
                 const result = await this.audioEngine.nextTrack(nextIndex);
                 if (result) {
+                    this.queue.commitCurrentIndex(nextIndex);
                     // 更新API状态
                     await this.playbackStateSynchronizer.syncFromEngine({position: 0});
 
@@ -607,6 +628,7 @@ export class MusicBoxAPI extends EventEmitter {
             }
 
             this.currentIndex = nextIndex;
+            this.queue.commitCurrentIndex(nextIndex);
             this.currentTrack = nextTrack;
             this.emit('trackIndexChanged', this.currentIndex);
             this.emit('trackChanged', this.currentTrack);
@@ -636,16 +658,12 @@ export class MusicBoxAPI extends EventEmitter {
             // 设置切换锁
             this._trackSwitchLock = true;
 
-            // 根据播放模式获取上一首的索引
-            const prevIndex = this.getPreviousTrackIndex();
+            const prevIndex = this.queue.getPreviousIndex();
             if (prevIndex === -1) {
                 console.log('⚠️ 无法获取上一首歌曲索引');
                 this._trackSwitchLock = false;
                 return false;
             }
-
-            // 如果从播放历史中获取到了索引，需要从历史栈中移除
-            this.queue.removeLastHistoryIndexIfMatches(prevIndex);
 
             const prevTrack = this.playlist[prevIndex];
             if (!prevTrack) {
@@ -658,6 +676,7 @@ export class MusicBoxAPI extends EventEmitter {
                 // 将计算好的prevIndex传递给音频引擎
                 const result = await this.audioEngine.previousTrack(prevIndex);
                 if (result) {
+                    this.queue.commitCurrentIndex(prevIndex);
                     // 更新API状态
                     await this.playbackStateSynchronizer.syncFromEngine({position: 0});
 
@@ -674,6 +693,7 @@ export class MusicBoxAPI extends EventEmitter {
             }
 
             this.currentIndex = prevIndex;
+            this.queue.commitCurrentIndex(prevIndex);
             this.currentTrack = prevTrack;
             this.emit('trackIndexChanged', this.currentIndex);
             this.emit('trackChanged', this.currentTrack);
@@ -737,6 +757,9 @@ export class MusicBoxAPI extends EventEmitter {
     setPlayMode(mode: unknown): boolean {
         const changed = this.queue.setPlayMode(mode);
         this.playMode = this.queue.getPlayMode();
+        if (changed) {
+            this.syncQueueOrder();
+        }
         return changed;
     }
 
@@ -746,15 +769,88 @@ export class MusicBoxAPI extends EventEmitter {
 
     togglePlayMode(): PlayMode {
         this.playMode = this.queue.togglePlayMode();
+        this.syncQueueOrder();
         return this.playMode;
     }
 
     getNextTrackIndex(): number {
-        return this.queue.getNextTrackIndex(this.playlist, this.currentIndex);
+        return this.queue.peekNextIndex('track-ended');
     }
 
     getPreviousTrackIndex(): number {
-        return this.queue.getPreviousTrackIndex(this.playlist, this.currentIndex);
+        return this.queue.getPreviousIndex();
+    }
+
+    async appendToQueue(tracks: Track[]): Promise<QueueMutationResult> {
+        const result = this.queue.appendToQueue(tracks);
+        await this.applyQueueMutation(result);
+        return result;
+    }
+
+    async playNext(tracks: Track[]): Promise<QueueMutationResult> {
+        const result = this.queue.playNext(tracks);
+        await this.applyQueueMutation(result);
+        return result;
+    }
+
+    moveQueueEntry(queueId: string, targetIndex: number): boolean {
+        const moved = this.queue.moveQueueEntry(queueId, targetIndex);
+        if (moved) {
+            this.syncQueueOrder();
+            this.saveCurrentPlaybackState();
+        }
+        return moved;
+    }
+
+    getPlaybackQueueSnapshot(): PlaybackQueueSnapshot {
+        return this.queue.getSnapshot();
+    }
+
+    async restorePlaybackQueue(snapshot: PlaybackQueueSnapshot): Promise<boolean> {
+        this.queue.restore(snapshot);
+        const tracks = this.queue.getTracks();
+        const currentIndex = this.queue.getCurrentIndex();
+        const result = this.audioEngine
+            ? this.audioEngine.setPlaylist(tracks, currentIndex)
+            : await audioGateway.setPlaylist(tracks);
+        if (!result) {
+            return false;
+        }
+
+        this.playlist = tracks;
+        this.currentIndex = currentIndex;
+        this.playMode = this.queue.getPlayMode();
+        this.emit('playlistChanged', tracks);
+        this.emit('trackIndexChanged', currentIndex);
+        return true;
+    }
+
+    private async applyQueueMutation(result: QueueMutationResult): Promise<void> {
+        if (result.added === 0 && result.moved === 0) {
+            return;
+        }
+
+        this.syncQueueOrder();
+        this.saveCurrentPlaybackState();
+        if (!result.startedPlayback) {
+            return;
+        }
+
+        const track = this.queue.getCurrentEntry()?.track;
+        const filePath = this.getTrackFilePath(track);
+        if (filePath && await this.loadTrack(filePath)) {
+            await this.play();
+        }
+    }
+
+    private syncQueueOrder(): void {
+        const tracks = this.queue.getTracks();
+        const currentIndex = this.queue.getCurrentIndex();
+        this.playlist = tracks;
+        this.currentIndex = currentIndex;
+        this.audioEngine?.setPlaylist(tracks, currentIndex);
+        this.emit('playlistChanged', tracks);
+        this.emit('trackIndexChanged', currentIndex);
     }
 
     updateTrackDuration(filePath: string, duration: number): void {

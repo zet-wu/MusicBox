@@ -1,5 +1,5 @@
 import type {MusicBoxAPIEvents} from '@api/types/events';
-import type {PlayMode} from '@api/types/playback';
+import type {PlaybackQueueSnapshot, PlayMode, QueueMutationResult} from '@api/types/playback';
 import type {WasapiShareMode} from '@api/types/settings';
 import type {Track} from '@api/types/track';
 import type {AudioEngineManagerBridge, AudioEngineType} from './AudioEngineAdapter';
@@ -48,6 +48,11 @@ export interface PlaybackRuntimePort {
     setVolume(volume: number): Promise<boolean>;
     setPosition(position: number): Promise<boolean>;
     setPlaylist(tracks: Track[], startIndex?: number): Promise<boolean>;
+    appendToQueue(tracks: Track[]): Promise<QueueMutationResult>;
+    playNext(tracks: Track[]): Promise<QueueMutationResult>;
+    moveQueueEntry(queueId: string, targetIndex: number): boolean;
+    getPlaybackQueueSnapshot(): PlaybackQueueSnapshot;
+    restorePlaybackQueue(snapshot: PlaybackQueueSnapshot): Promise<boolean>;
     getPosition(): Promise<number>;
     getCurrentTrack(): Track | null;
     togglePlayMode(): PlayMode;

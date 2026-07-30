@@ -28,6 +28,7 @@ export interface AudioEngineBridge {
     onPlaybackStateChanged: ((isPlaying: boolean) => void | Promise<void>) | null;
     onPositionChanged: ((position: number) => void | Promise<void>) | null;
     onVolumeChanged: ((volume: number) => void) | null;
+    onTrackEnded: (() => void | Promise<void>) | null;
     getNextTrackIndex: (() => number) | null;
     getPreviousTrackIndex: (() => number) | null;
     initialize(): Promise<boolean>;

@@ -212,6 +212,24 @@ export class PlaybackQueue {
         return 0;
     }
 
+    peekNextIndex(reason: QueueAdvanceReason): number {
+        if (this.entries.length === 0) {
+            return -1;
+        }
+
+        const currentIndex = this.getCurrentIndex();
+        if (reason === 'track-ended' && this.playMode === 'repeat-one') {
+            return currentIndex >= 0 ? currentIndex : 0;
+        }
+
+        if (currentIndex < this.entries.length - 1) {
+            return currentIndex + 1;
+        }
+
+        // 随机模式会在循环边界刷新显式队列，边界处不预加载旧排列。
+        return this.playMode === 'shuffle' ? -1 : 0;
+    }
+
     getPreviousIndex(): number {
         if (this.entries.length === 0) {
             return -1;

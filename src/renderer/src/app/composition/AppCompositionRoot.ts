@@ -171,6 +171,7 @@ export function createAppComposition({
         integrations: {
             getLibraryTracks: () => libraryDataService.getTracks(),
             setPlaylist: (tracks, startIndex) => playbackController.setPlaylist(tracks, startIndex),
+            restorePlaybackQueue: (snapshot) => playbackController.restorePlaybackQueue(snapshot),
             loadTrack: (filePath) => playbackController.loadTrack(filePath),
             play: () => playbackController.play(),
             setPosition: (position) => playbackController.setPosition(position),
