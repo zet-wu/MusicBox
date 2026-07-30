@@ -834,6 +834,21 @@
           fill: var(--color-text-secondary);
           opacity: 0.6;
         }
+
+        &.system-collection-cover {
+          background: linear-gradient(135deg,
+                  rgba(var(--color-primary-rgb), 0.95) 0%,
+                  rgba(var(--color-primary-rgb), 0.55) 100%);
+
+          .cover-icon {
+            fill: #fff;
+            opacity: 0.92;
+          }
+        }
+
+        &.favorites-cover {
+          background: linear-gradient(135deg, #e53e3e 0%, #ed64a6 100%);
+        }
       }
 
       .cover-shadow {

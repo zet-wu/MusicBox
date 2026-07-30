@@ -1,6 +1,7 @@
 import type {Playlist} from '@api/types/playlist';
 import type {Track} from '@api/types/track';
 import type {AppComponentPort} from '../AppRuntimePorts';
+import type {CollectionType} from '@ui/pages/PlaylistDetailPage';
 
 export class ContentUIFacade {
     constructor(private readonly app: AppComponentPort) {}
@@ -40,6 +41,22 @@ export class ContentUIFacade {
 
     async showPlaylistDetail(playlist: Playlist): Promise<void> {
         await this.app.components.playlistDetailPage?.show(playlist);
+    }
+
+    async showSystemCollection(collectionType: Exclude<CollectionType, 'playlist'>): Promise<void> {
+        await this.app.components.playlistDetailPage?.showSystemCollection(collectionType);
+    }
+
+    applySystemCollectionSearchResults(results: Track[] | null): boolean {
+        return this.app.components.playlistDetailPage?.applySearchResults(results) ?? false;
+    }
+
+    async reloadSystemCollection(): Promise<boolean> {
+        return await this.app.components.playlistDetailPage?.reloadSystemCollection() ?? false;
+    }
+
+    isSystemCollectionVisible(): boolean {
+        return this.app.components.playlistDetailPage?.isSystemCollectionVisible() ?? false;
     }
 
     async showNetworkDriveDetail(drive: unknown): Promise<void> {

@@ -1,5 +1,5 @@
 import {appNotificationService} from "@/features/appShell/service";
-import {favoriteService} from "@/features/library/service";
+import {favoriteService} from "@/features/library/service/FavoriteService";
 import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/track";
 

@@ -23,9 +23,12 @@ class PlaylistTrackMutationService {
             return false;
         }
 
+        const isFavorites = playlist.id === 'system:favorites';
         const confirmed = await appConfirmationService.confirm({
-            title: '清空歌单',
-            message: `确定要清空歌单"${playlist.name}"吗？\n这将移除歌单中的所有 ${tracks.length} 首歌曲，此操作无法撤销。`,
+            title: isFavorites ? '清空收藏' : '清空歌单',
+            message: isFavorites
+                ? `确定要清空收藏吗？\n这将取消收藏全部 ${tracks.length} 首歌曲，此操作无法撤销。`
+                : `确定要清空歌单"${playlist.name}"吗？\n这将移除歌单中的所有 ${tracks.length} 首歌曲，此操作无法撤销。`,
             confirmText: '清空',
             type: 'warning'
         });
@@ -39,7 +42,7 @@ class PlaylistTrackMutationService {
             const result = await libraryDataService.removeFromPlaylist(playlist.id, trackIds);
 
             if (result.success) {
-                appNotificationService.showInfo(`歌单"${playlist.name}"已清空`);
+                appNotificationService.showInfo(isFavorites ? '收藏已清空' : `歌单"${playlist.name}"已清空`);
                 return true;
             }
 

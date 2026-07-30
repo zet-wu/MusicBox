@@ -362,6 +362,18 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             set currentView(value: AppView) {
                 app.currentView = value;
             },
+            get library() {
+                return app.library;
+            },
+            set library(value: Track[]) {
+                app.library = value;
+            },
+            get filteredLibrary() {
+                return app.filteredLibrary;
+            },
+            set filteredLibrary(value: Track[]) {
+                app.filteredLibrary = value;
+            },
             updateTrackList: (source) => app.updateTrackList(source)
         }
     };

@@ -4,7 +4,11 @@
 
 import {Component} from "@ui/base/Component";
 import {appNotificationService} from "@/features/appShell/service";
-import {favoriteService} from "@/features/library/service";
+import {
+    FAVORITES_PLAYLIST_ID,
+    favoriteService
+} from "@/features/library/service/FavoriteService";
+import {libraryDataService} from "@/features/library/service/LibraryDataService";
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
 import {
     playlistInfoAlignmentPreferenceService,
@@ -32,7 +36,47 @@ type PlaylistDetail = Partial<Playlist> & {
     trackIds?: string[];
     trackCount?: number;
     coverImage?: string | null;
+    collectionType?: CollectionType;
 };
+
+export type CollectionType = 'playlist' | 'favorites' | 'all-tracks';
+
+export interface CollectionCapabilities {
+    canAddSongs: boolean;
+    canClear: boolean;
+    canEditCover: boolean;
+    canRemoveTracks: boolean;
+    showCreatedDate: boolean;
+}
+
+export function getCollectionCapabilities(collectionType: CollectionType): CollectionCapabilities {
+    switch (collectionType) {
+        case 'favorites':
+            return {
+                canAddSongs: true,
+                canClear: true,
+                canEditCover: false,
+                canRemoveTracks: false,
+                showCreatedDate: false
+            };
+        case 'all-tracks':
+            return {
+                canAddSongs: false,
+                canClear: false,
+                canEditCover: false,
+                canRemoveTracks: false,
+                showCreatedDate: false
+            };
+        default:
+            return {
+                canAddSongs: true,
+                canClear: true,
+                canEditCover: true,
+                canRemoveTracks: true,
+                showCreatedDate: true
+            };
+    }
+}
 
 interface CoverResult {
     success?: boolean;
@@ -46,6 +90,8 @@ class PlaylistDetailPage extends Component {
     public isVisible: boolean;
     public currentPlaylist: PlaylistDetail | null;
     public tracks: PlaylistDetailTrack[];
+    private sourceTracks: PlaylistDetailTrack[];
+    private searchTrackIds: Set<string> | null;
     public selectedTracks: Set<number>;
     private container: HTMLElement | null;
     private isMultiSelectMode: boolean;
@@ -63,6 +109,8 @@ class PlaylistDetailPage extends Component {
         this.isVisible = false;
         this.currentPlaylist = null;
         this.tracks = [];
+        this.sourceTracks = [];
+        this.searchTrackIds = null;
         this.selectedTracks = new Set();
         this.isMultiSelectMode = false;
         this.lastSelectedIndex = -1;
@@ -76,7 +124,13 @@ class PlaylistDetailPage extends Component {
         this.setupElements();
         this.setupSettingsListener();
         this.favoriteUnsubscribe = favoriteService.onChanged(({trackIds}) => {
-            if (this.isVisible && this.tracks.some((track) => track.fileId && trackIds.includes(track.fileId))) {
+            if (!this.isVisible) {
+                return;
+            }
+
+            if (this.getCollectionType() === 'favorites') {
+                void this.loadPlaylistTracks();
+            } else if (this.sourceTracks.some((track) => track.fileId && trackIds.includes(track.fileId))) {
                 this.render();
             }
         });
@@ -85,6 +139,8 @@ class PlaylistDetailPage extends Component {
     async show(playlist: PlaylistDetail): Promise<void> {
         this.isVisible = true;
         this.currentPlaylist = playlist;
+        this.searchTrackIds = null;
+        this.clearSelection();
 
         if (this.element instanceof HTMLElement) {
             // 预设样式，减少可见的样式变换
@@ -109,10 +165,30 @@ class PlaylistDetailPage extends Component {
         }
     }
 
+    async showSystemCollection(collectionType: Exclude<CollectionType, 'playlist'>): Promise<void> {
+        const playlist: PlaylistDetail = collectionType === 'favorites'
+            ? {
+                id: FAVORITES_PLAYLIST_ID,
+                name: '收藏',
+                description: '珍藏您喜爱的歌曲',
+                systemType: 'favorites',
+                collectionType
+            }
+            : {
+                id: 'system:all-tracks',
+                name: '全部歌曲',
+                description: '音乐库中的所有歌曲',
+                collectionType
+            };
+        await this.show(playlist);
+    }
+
     hide(): void {
         this.isVisible = false;
         this.currentPlaylist = null;
         this.tracks = [];
+        this.sourceTracks = [];
+        this.searchTrackIds = null;
 
         this.hideCoverContextMenu();
 
@@ -171,7 +247,12 @@ class PlaylistDetailPage extends Component {
     }
 
     updatePlaylistInfo(playlist: Pick<PlaylistDetail, 'id' | 'name' | 'description'>): boolean {
-        if (!this.isVisible || !this.currentPlaylist || this.currentPlaylist.id !== playlist.id) {
+        if (
+            !this.isVisible
+            || !this.currentPlaylist
+            || this.currentPlaylist.id !== playlist.id
+            || this.getCollectionType() !== 'playlist'
+        ) {
             return false;
         }
 
@@ -181,9 +262,37 @@ class PlaylistDetailPage extends Component {
         return true;
     }
 
+    applySearchResults(results: Track[] | null): boolean {
+        if (!this.isVisible || this.getCollectionType() === 'playlist') {
+            return false;
+        }
+
+        this.searchTrackIds = results
+            ? new Set(results.map((track) => this.getTrackIdentity(track)).filter(Boolean))
+            : null;
+        this.applySourceTracks();
+        this.clearSelection();
+        this.render();
+        return true;
+    }
+
+    async reloadSystemCollection(): Promise<boolean> {
+        if (!this.isVisible || this.getCollectionType() === 'playlist') {
+            return false;
+        }
+
+        await this.loadPlaylistTracks();
+        return true;
+    }
+
+    isSystemCollectionVisible(): boolean {
+        return this.isVisible && this.getCollectionType() !== 'playlist';
+    }
+
     render(): void {
         if (!this.currentPlaylist || !this.container) return;
 
+        const capabilities = getCollectionCapabilities(this.getCollectionType());
         const createdDate = new Date(this.currentPlaylist.createdAt || Date.now());
         // 使用实际加载的tracks数量，确保UI状态与数据一致
         const trackCount = this.tracks ? this.tracks.length : (this.currentPlaylist.trackIds ? this.currentPlaylist.trackIds.length : 0);
@@ -221,12 +330,12 @@ class PlaylistDetailPage extends Component {
                                     </svg>
                                     <span>${this.formatTotalDuration(totalDuration)}</span>
                                 </span>
-                                <span class="meta-item">
+                                ${capabilities.showCreatedDate ? `<span class="meta-item">
                                     <svg class="meta-icon" viewBox="0 0 24 24">
                                         <path d="M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19Z"/>
                                     </svg>
                                     <span>创建于 ${createdDate.toLocaleDateString('zh-CN')}</span>
-                                </span>
+                                </span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -252,7 +361,8 @@ class PlaylistDetailPage extends Component {
                             </div>
                         </button>
                     </div>
-                    <div class="actions-secondary">
+                    ${capabilities.canAddSongs || capabilities.canClear ? `<div class="actions-secondary">
+                        ${capabilities.canAddSongs ? `
                         <button class="action-btn add-songs" id="playlist-add-songs">
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
@@ -265,6 +375,8 @@ class PlaylistDetailPage extends Component {
                             </svg>
                             <span>从文件夹添加</span>
                         </button>
+                        ` : ''}
+                        ${capabilities.canClear ? `
                         <div class="action-menu">
                             <button class="action-btn menu-trigger" id="playlist-menu">
                                 <svg class="icon" viewBox="0 0 24 24">
@@ -276,11 +388,12 @@ class PlaylistDetailPage extends Component {
                                     <svg class="menu-icon" viewBox="0 0 24 24">
                                         <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
                                     </svg>
-                                    <span>清空歌单</span>
+                                    <span>${this.getCollectionType() === 'favorites' ? '清空收藏' : '清空歌单'}</span>
                                 </button>
                             </div>
                         </div>
-                    </div>
+                        ` : ''}
+                    </div>` : ''}
                 </div>
 
                 <!-- 现代化歌曲列表区域 -->
@@ -458,7 +571,7 @@ class PlaylistDetailPage extends Component {
         }
 
         const cover = target.closest<HTMLElement>('#playlist-cover');
-        if (cover) {
+        if (cover && getCollectionCapabilities(this.getCollectionType()).canEditCover) {
             this.showCoverContextMenuFromEvent(event as MouseEvent);
             return;
         }
@@ -482,7 +595,7 @@ class PlaylistDetailPage extends Component {
         }
 
         const cover = target.closest<HTMLElement>('#playlist-cover');
-        if (cover) {
+        if (cover && getCollectionCapabilities(this.getCollectionType()).canEditCover) {
             event.preventDefault();
             this.showCoverContextMenu(event.clientX, event.clientY);
             return;
@@ -562,6 +675,11 @@ class PlaylistDetailPage extends Component {
 
     async loadPlaylistCover(): Promise<void> {
         if (!this.currentPlaylist) return;
+        if (!getCollectionCapabilities(this.getCollectionType()).canEditCover) {
+            this.currentPlaylist.coverImage = null;
+            return;
+        }
+
         try {
             const result = await playlistDataService.getPlaylistCover(this.currentPlaylist.id);
             if (result.success && result.coverPath) {
@@ -578,9 +696,21 @@ class PlaylistDetailPage extends Component {
     async loadPlaylistTracks(): Promise<void> {
         if (!this.currentPlaylist) return;
         try {
+            if (this.getCollectionType() === 'all-tracks') {
+                this.sourceTracks = await libraryDataService.getTracks();
+                this.applySourceTracks();
+                this.currentPlaylist.trackIds = this.sourceTracks
+                    .map((track) => track.fileId)
+                    .filter((fileId): fileId is string => Boolean(fileId));
+                this.currentPlaylist.trackCount = this.tracks.length;
+                this.render();
+                return;
+            }
+
             const result = await playlistDataService.getPlaylistDetail(this.currentPlaylist.id);
             if (result.success) {
-                this.tracks = (result.tracks || result.playlist?.tracks || []) as PlaylistDetailTrack[];
+                this.sourceTracks = (result.tracks || result.playlist?.tracks || []) as PlaylistDetailTrack[];
+                this.applySourceTracks();
 
                 // 同步更新currentPlaylist对象，确保UI状态正确
                 if (result.playlist) {
@@ -588,13 +718,16 @@ class PlaylistDetailPage extends Component {
                     this.currentPlaylist.trackIds = playlistDetail.trackIds || [];
                     this.currentPlaylist.trackCount = this.tracks.length;
                     // 如果有其他需要同步的属性，也在这里更新
-                    if (playlistDetail.name) this.currentPlaylist.name = playlistDetail.name;
-                    if (playlistDetail.description !== undefined) this.currentPlaylist.description = playlistDetail.description;
+                    if (this.getCollectionType() === 'playlist') {
+                        if (playlistDetail.name) this.currentPlaylist.name = playlistDetail.name;
+                        if (playlistDetail.description !== undefined) this.currentPlaylist.description = playlistDetail.description;
+                    }
                 }
 
                 this.render();
             } else {
                 console.error('❌ PlaylistDetailPage: 加载歌单歌曲失败', result.error);
+                this.sourceTracks = [];
                 this.tracks = [];
                 // 同步更新空状态
                 this.currentPlaylist.trackIds = [];
@@ -603,6 +736,7 @@ class PlaylistDetailPage extends Component {
             }
         } catch (error) {
             console.error('❌ PlaylistDetailPage: 加载歌单歌曲失败', error);
+            this.sourceTracks = [];
             this.tracks = [];
             // 同步更新空状态
             this.currentPlaylist.trackIds = [];
@@ -613,6 +747,17 @@ class PlaylistDetailPage extends Component {
 
     renderTrackList(): string {
         if (this.tracks.length === 0) {
+            const capabilities = getCollectionCapabilities(this.getCollectionType());
+            const emptyTitle = this.getCollectionType() === 'favorites'
+                ? '还没有收藏歌曲'
+                : this.getCollectionType() === 'all-tracks'
+                    ? '音乐库还是空的'
+                    : '歌单还是空的';
+            const emptyDescription = this.getCollectionType() === 'favorites'
+                ? '点击歌曲旁的心形按钮，或添加歌曲到收藏'
+                : this.getCollectionType() === 'all-tracks'
+                    ? '导入音乐后，歌曲会显示在这里'
+                    : '添加一些您喜欢的音乐，开始您的音乐之旅';
             return `
                 <div class="playlist-empty-state">
                     <div class="empty-content">
@@ -626,19 +771,22 @@ class PlaylistDetailPage extends Component {
                                 <div class="wave wave-3"></div>
                             </div>
                         </div>
-                        <h3 class="empty-title">歌单还是空的</h3>
-                        <p class="empty-description">添加一些您喜欢的音乐，开始您的音乐之旅</p>
+                        <h3 class="empty-title">${emptyTitle}</h3>
+                        <p class="empty-description">${emptyDescription}</p>
+                        ${capabilities.canAddSongs ? `
                         <button class="empty-action-btn" type="button">
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
                             </svg>
                             <span>添加歌曲</span>
                         </button>
+                        ` : ''}
                     </div>
                 </div>
             `;
         }
 
+        const capabilities = getCollectionCapabilities(this.getCollectionType());
         return `
             <div class="modern-tracks-table ${this.showCovers ? 'with-covers' : ''}">
                 <div class="tracks-table-header">
@@ -694,11 +842,11 @@ class PlaylistDetailPage extends Component {
                                             <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5 2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
                                         </svg>
                                     </button>
-                                    <button class="track-action-btn remove-btn" data-action="remove">
+                                    ${capabilities.canRemoveTracks ? `<button class="track-action-btn remove-btn" data-action="remove">
                                         <svg class="icon" viewBox="0 0 24 24">
                                             <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
                                         </svg>
-                                    </button>
+                                    </button>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -733,12 +881,15 @@ class PlaylistDetailPage extends Component {
     }
 
     showAddSongsDialog(): void {
+        if (!getCollectionCapabilities(this.getCollectionType()).canAddSongs) {
+            return;
+        }
         this.emit('showAddSongsDialog', this.currentPlaylist);
     }
 
     // 从文件夹添加音乐
     async addFromFolder(): Promise<void> {
-        if (!this.currentPlaylist) {
+        if (!this.currentPlaylist || !getCollectionCapabilities(this.getCollectionType()).canAddSongs) {
             return;
         }
 
@@ -750,9 +901,13 @@ class PlaylistDetailPage extends Component {
     }
 
     async clearPlaylist(): Promise<void> {
-        if (!this.currentPlaylist || !this.tracks.length) return;
+        if (
+            !this.currentPlaylist
+            || !this.sourceTracks.length
+            || !getCollectionCapabilities(this.getCollectionType()).canClear
+        ) return;
 
-        const changed = await playlistTrackMutationService.clearPlaylist(this.currentPlaylist, this.tracks);
+        const changed = await playlistTrackMutationService.clearPlaylist(this.currentPlaylist, this.sourceTracks);
         if (changed) {
             await this.loadPlaylistTracks();
             this.emit('playlistUpdated', this.currentPlaylist);
@@ -849,7 +1004,10 @@ class PlaylistDetailPage extends Component {
     }
 
     async removeSelectedTracks(): Promise<void> {
-        if (this.selectedTracks.size === 0) return;
+        if (
+            this.selectedTracks.size === 0
+            || !getCollectionCapabilities(this.getCollectionType()).canRemoveTracks
+        ) return;
 
         if (!this.currentPlaylist) return;
 
@@ -869,11 +1027,13 @@ class PlaylistDetailPage extends Component {
         const result = await favoriteService.toggle(track);
         if (!result.success) {
             appNotificationService.showError(result.error || '更新收藏状态失败');
+        } else if (this.getCollectionType() === 'favorites' && !result.favorite) {
+            await this.loadPlaylistTracks();
         }
     }
 
     async removeTrackFromPlaylist(track: PlaylistDetailTrack, _index: number): Promise<void> {
-        if (!this.currentPlaylist) return;
+        if (!this.currentPlaylist || !getCollectionCapabilities(this.getCollectionType()).canRemoveTracks) return;
 
         const changed = await playlistTrackMutationService.removeTrack(this.currentPlaylist.id, track);
         if (changed) {
@@ -983,6 +1143,25 @@ class PlaylistDetailPage extends Component {
 
     // 渲染歌单封面
     renderPlaylistCover(): string {
+        if (this.getCollectionType() === 'favorites') {
+            return `
+                <div class="cover-placeholder system-collection-cover favorites-cover">
+                    <svg class="cover-icon" viewBox="0 0 24 24">
+                        <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5 2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
+                    </svg>
+                </div>
+            `;
+        }
+        if (this.getCollectionType() === 'all-tracks') {
+            return `
+                <div class="cover-placeholder system-collection-cover library-cover">
+                    <svg class="cover-icon" viewBox="0 0 24 24">
+                        <path d="M12,3V12.26C11.5,12.09 11,12 10.5,12C8.01,12 6,14.01 6,16.5S8.01,21 10.5,21S15,18.99 15,16.5V6H19V3H12Z"/>
+                    </svg>
+                </div>
+            `;
+        }
+
         if (this.currentPlaylist && this.currentPlaylist.coverImage) {
             // 如果有自定义封面，显示自定义封面
             return `
@@ -1002,6 +1181,10 @@ class PlaylistDetailPage extends Component {
 
     // 显示封面右键菜单
     showCoverContextMenu(x: number, y: number): void {
+        if (!getCollectionCapabilities(this.getCollectionType()).canEditCover) {
+            return;
+        }
+
         // 移除现有的菜单
         this.hideCoverContextMenu();
 
@@ -1054,7 +1237,7 @@ class PlaylistDetailPage extends Component {
 
     // 选择并设置封面
     async selectAndSetCover(): Promise<void> {
-        if (!this.currentPlaylist) return;
+        if (!this.currentPlaylist || !getCollectionCapabilities(this.getCollectionType()).canEditCover) return;
 
         const result = await playlistCoverActionService.selectAndSetCover(this.currentPlaylist.id);
         if (result.changed) {
@@ -1067,7 +1250,7 @@ class PlaylistDetailPage extends Component {
 
     // 设置歌单封面
     async setCover(imagePath: string): Promise<void> {
-        if (!this.currentPlaylist) return;
+        if (!this.currentPlaylist || !getCollectionCapabilities(this.getCollectionType()).canEditCover) return;
 
         const result = await playlistCoverActionService.setCover(this.currentPlaylist.id, imagePath);
         if (result.changed) {
@@ -1080,7 +1263,7 @@ class PlaylistDetailPage extends Component {
 
     // 移除歌单封面
     async removeCover(): Promise<void> {
-        if (!this.currentPlaylist) return;
+        if (!this.currentPlaylist || !getCollectionCapabilities(this.getCollectionType()).canEditCover) return;
 
         const result = await playlistCoverActionService.removeCover(this.currentPlaylist.id);
         if (result.changed) {
@@ -1106,6 +1289,23 @@ class PlaylistDetailPage extends Component {
             .map((selectedIndex) => this.tracks[selectedIndex])
             .filter((item): item is PlaylistDetailTrack => Boolean(item));
         this.emit('trackRightClick', track, index, x, y, new Set(this.selectedTracks), selectedTrackItems);
+    }
+
+    private getCollectionType(): CollectionType {
+        return this.currentPlaylist?.collectionType || 'playlist';
+    }
+
+    private applySourceTracks(): void {
+        this.tracks = this.searchTrackIds
+            ? this.sourceTracks.filter((track) => this.searchTrackIds?.has(this.getTrackIdentity(track)))
+            : [...this.sourceTracks];
+        if (this.currentPlaylist) {
+            this.currentPlaylist.trackCount = this.tracks.length;
+        }
+    }
+
+    private getTrackIdentity(track: Pick<Track, 'fileId' | 'filePath'>): string {
+        return track.fileId || track.filePath || '';
     }
 }
 

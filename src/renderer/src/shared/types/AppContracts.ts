@@ -3,6 +3,7 @@ import type {MusicBoxAPIEvents} from '@api/types/events';
 export type AppView =
     | 'home-page'
     | 'library'
+    | 'favorites'
     | 'recent'
     | 'artists'
     | 'albums'

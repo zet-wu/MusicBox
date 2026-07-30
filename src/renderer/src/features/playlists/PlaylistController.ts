@@ -140,7 +140,7 @@ export class PlaylistController {
     async handleTracksAddedToPlaylist(): Promise<void> {
         const app = this.app;
 
-        if (app.currentView === 'playlist-detail') {
+        if (app.currentView === 'playlist-detail' || app.currentView === 'favorites') {
             await this.ui.reloadPlaylistDetailTracks();
         }
 

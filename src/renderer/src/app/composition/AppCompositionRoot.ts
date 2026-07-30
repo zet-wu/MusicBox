@@ -162,7 +162,12 @@ export function createAppComposition({
             isPlaylistDetailVisible: () => ui.content.isPlaylistDetailVisible(),
             updatePlaylistDetailTrack: (filePath, updatedData) => (
                 ui.content.updatePlaylistDetailTrack(filePath, updatedData)
-            )
+            ),
+            applySystemCollectionSearchResults: (results) => (
+                ui.content.applySystemCollectionSearchResults(results)
+            ),
+            reloadSystemCollection: () => ui.content.reloadSystemCollection(),
+            isSystemCollectionVisible: () => ui.content.isSystemCollectionVisible()
         }
     });
 

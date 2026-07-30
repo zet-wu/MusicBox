@@ -41,6 +41,9 @@ interface LibraryAppUI {
     updatePlayerTrackInfo(track: Track): Promise<void>;
     isPlaylistDetailVisible(): boolean;
     updatePlaylistDetailTrack(filePath: string, updatedData: Partial<Track>): boolean;
+    applySystemCollectionSearchResults(results: Track[] | null): boolean;
+    reloadSystemCollection(): Promise<boolean>;
+    isSystemCollectionVisible(): boolean;
 }
 
 interface LibraryAppIntegrations {
@@ -172,6 +175,12 @@ export class LibraryAppController {
                 ? tracks
                 : await libraryDataService.getTracks();
             app.filteredLibrary = [...app.library];
+            if (
+                (app.currentView === 'library' || app.currentView === 'favorites')
+                && this.ui.isSystemCollectionVisible()
+            ) {
+                await this.ui.reloadSystemCollection();
+            }
             app.updateTrackList('refresh');
         } catch (error) {
             console.error('❌ [App] refreshLibrary 失败:', error);
@@ -188,6 +197,13 @@ export class LibraryAppController {
             return;
         }
 
+        if (
+            (app.currentView === 'library' || app.currentView === 'favorites')
+            && this.ui.applySystemCollectionSearchResults(app.filteredLibrary)
+        ) {
+            return;
+        }
+
         this.ui.setTrackListTracks(app.filteredLibrary);
     }
 
@@ -199,6 +215,12 @@ export class LibraryAppController {
     handleSearchCleared(): void {
         const app = this.app;
         app.filteredLibrary = [...app.library];
+        if (
+            (app.currentView === 'library' || app.currentView === 'favorites')
+            && this.ui.applySystemCollectionSearchResults(null)
+        ) {
+            return;
+        }
         this.updateTrackList('search-cleared');
     }
 
@@ -378,7 +400,7 @@ export class LibraryAppController {
 
             this.updateTrackList('track-info-updated');
 
-            if (app.currentView === 'playlist-detail' && this.ui.isPlaylistDetailVisible()) {
+            if (this.ui.isPlaylistDetailVisible()) {
                 this.ui.updatePlaylistDetailTrack(track.filePath, {
                     title: updatedData.title,
                     artist: updatedData.artist,
