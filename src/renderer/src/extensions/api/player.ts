@@ -8,7 +8,15 @@ import {ErrorUtils, NotAvailableError} from '@extensions/api/common/errors';
 import {ExtensionContext, IDisposable, toDisposable} from '@extensions/core';
 import {extensionHostService} from "@/features/extensions/service";
 import {playbackUiStateService} from "@/features/playback/service/PlaybackUiStateService";
-import {PlaybackStateType, PlayerAPI, PlayerState, PlayModeType, Track} from "@extensions/api/types/player";
+import {
+    PlaybackStateType,
+    PlayerAPI,
+    PlayerState,
+    PlayModeType,
+    QueueEntry,
+    QueueMutationResult,
+    Track
+} from "@extensions/api/types/player";
 import type {Track as ApiTrack} from '@api/types/track';
 
 /**
@@ -147,6 +155,38 @@ export function createPlayerAPI(_context: ExtensionContext): PlayerAPI {
             return ErrorUtils.wrapSync(() => {
                 return [...playbackUiStateService.getPlaylist()] as unknown as Track[];
             }, 'player.getPlaylist');
+        },
+
+        getQueue(): QueueEntry[] {
+            return ErrorUtils.wrapSync(() => {
+                return playbackUiStateService.getPlaybackQueueSnapshot().entries as unknown as QueueEntry[];
+            }, 'player.getQueue');
+        },
+
+        async addToQueue(tracks: Track[]): Promise<QueueMutationResult> {
+            Validator.assertArray(tracks, 'tracks');
+            return await ErrorUtils.wrapAsync(async () => {
+                return await playbackUiStateService.appendToQueue(
+                    tracks as unknown as ApiTrack[]
+                ) as QueueMutationResult;
+            }, 'player.addToQueue');
+        },
+
+        async playNext(tracks: Track[]): Promise<QueueMutationResult> {
+            Validator.assertArray(tracks, 'tracks');
+            return await ErrorUtils.wrapAsync(async () => {
+                return await playbackUiStateService.playNext(
+                    tracks as unknown as ApiTrack[]
+                ) as QueueMutationResult;
+            }, 'player.playNext');
+        },
+
+        moveQueueEntry(queueId: string, targetIndex: number): boolean {
+            Validator.assertString(queueId, 'queueId');
+            Validator.assertNumber(targetIndex, 'targetIndex');
+            return ErrorUtils.wrapSync(() => {
+                return playbackUiStateService.moveQueueEntry(queueId, targetIndex);
+            }, 'player.moveQueueEntry');
         },
 
         setPlayMode(mode: PlayModeType): void {

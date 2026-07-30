@@ -40,6 +40,35 @@ describe('PlaybackQueue', () => {
         expect(queue.getCurrentIndex()).toBe(0);
     });
 
+    it('普通追加不会移动队列中已有的歌曲', () => {
+        const queue = createQueue();
+        const tracks = ['a', 'b', 'c', 'd'].map(createTrack);
+        queue.replaceQueue(tracks.slice(0, 3), {startIndex: 1});
+
+        const result = queue.appendToQueue([tracks[2], tracks[0], tracks[3]]);
+
+        expect(result).toMatchObject({added: 1, skippedExisting: 2});
+        expect(queue.getTracks()).toEqual(tracks);
+        expect(queue.getCurrentIndex()).toBe(1);
+    });
+
+    it('空队列追加和下一首播放都会建立队列并请求自动播放', () => {
+        const appendQueue = createQueue();
+        const playNextQueue = createQueue();
+        const tracks = ['a', 'b'].map(createTrack);
+
+        expect(appendQueue.appendToQueue(tracks)).toMatchObject({
+            added: 2,
+            startedPlayback: true
+        });
+        expect(playNextQueue.playNext(tracks)).toMatchObject({
+            added: 2,
+            startedPlayback: true
+        });
+        expect(appendQueue.getCurrentIndex()).toBe(0);
+        expect(playNextQueue.getCurrentIndex()).toBe(0);
+    });
+
     it('下一首播放会移动已有歌曲、加入新歌曲并跳过当前歌曲', () => {
         const queue = createQueue();
         const first = createTrack('first');
@@ -69,6 +98,23 @@ describe('PlaybackQueue', () => {
 
         expect(queue.getTracks().map((track) => track.fileId)).toEqual(['a', 'b', 'd', 'c']);
         expect(queue.getCurrentIndex()).toBe(1);
+    });
+
+    it('随机模式批量追加会分散插入当前歌曲之后并保持原有未来顺序', () => {
+        const queue = createQueue([0, 0, 0.4, 0.75]);
+        const tracks = ['a', 'b', 'c', 'd', 'e'].map(createTrack);
+        queue.replaceQueue(tracks.slice(0, 3), {startIndex: 0});
+        queue.setPlayMode('shuffle');
+
+        const existingFuture = queue.getTracks().slice(1).map((track) => track.fileId);
+        queue.appendToQueue(tracks.slice(3));
+
+        const ids = queue.getTracks().map((track) => track.fileId);
+        const retainedFuture = ids.filter((id) => existingFuture.includes(id));
+        expect(ids[0]).toBe('a');
+        expect(retainedFuture).toEqual(existingFuture);
+        expect(ids.slice(1)).toEqual(expect.arrayContaining(['b', 'c', 'd', 'e']));
+        expect(Math.abs(ids.indexOf('d') - ids.indexOf('e'))).toBeGreaterThan(1);
     });
 
     it('随机模式新一轮重新洗牌且第一首不立即重复上一轮末曲', () => {

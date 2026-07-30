@@ -1,7 +1,7 @@
 import {EventEmitter} from '@utils/index.js';
 import {audioGateway} from '@/infrastructure/electron/AudioGateway';
 import {cacheManager} from "@/shared/cache";
-import {PlaybackQueue} from '@/features/playback/domain';
+import {isSameTrack, PlaybackQueue} from '@/features/playback/domain';
 import {AudioEngineAdapter} from '@/features/playback/service/AudioEngineAdapter';
 import type {AudioEngineManagerBridge, AudioEngineType} from '@/features/playback/service/AudioEngineAdapter';
 import {PlaybackPersistence} from '@/features/playback/service/PlaybackPersistence';
@@ -346,6 +346,11 @@ export class MusicBoxAPI extends EventEmitter {
         return track?.filePath || track?.path || null;
     }
 
+    private hasSameTrackOrder(first: Track[], second: Track[]): boolean {
+        return first.length === second.length
+            && first.every((track, index) => isSameTrack(track, second[index]));
+    }
+
     private getAudioEngineLabel(): string {
         return this.audioEngine?.getEngineType() === 'wasapi' ? 'WASAPI Engine' : 'Web Audio Engine';
     }
@@ -591,7 +596,7 @@ export class MusicBoxAPI extends EventEmitter {
             }
 
             const queueTracks = this.queue.getTracks();
-            if (queueTracks !== previousTracks) {
+            if (!this.hasSameTrackOrder(previousTracks, queueTracks)) {
                 this.playlist = queueTracks;
                 this.audioEngine?.setPlaylist(queueTracks, this.queue.getCurrentIndex());
                 this.emit('playlistChanged', queueTracks);

@@ -149,7 +149,24 @@ export class PlaybackAppController {
                 }
 
                 if (playbackState.queue) {
-                    await this.integrations.restorePlaybackQueue(playbackState.queue);
+                    const restored = await this.integrations.restorePlaybackQueue(playbackState.queue);
+                    const queueTrack = playbackState.queue.entries.find(
+                        (entry) => entry.queueId === playbackState.queue?.currentQueueId
+                    )?.track;
+                    if (restored && queueTrack?.filePath) {
+                        const loadResult = await this.integrations.loadTrack(queueTrack.filePath);
+                        if (loadResult) {
+                            if (position > 0) {
+                                await this.integrations.setPosition(position);
+                            }
+                            if (settings.autoplay) {
+                                setTimeout(async () => {
+                                    await this.integrations.play();
+                                }, 1000);
+                            }
+                        }
+                        return;
+                    }
                 }
 
                 if (playlist && playlist.length > 0) {

@@ -27,6 +27,8 @@ const API_PERMISSION_MAP: Record<string, string> = {
     'player.getPlaylist': Permissions.PLAYER_QUEUE,
     'player.setPlaylist': Permissions.PLAYER_QUEUE,
     'player.addToQueue': Permissions.PLAYER_QUEUE,
+    'player.playNext': Permissions.PLAYER_QUEUE,
+    'player.moveQueueEntry': Permissions.PLAYER_QUEUE,
     'player.removeFromQueue': Permissions.PLAYER_QUEUE,
     'player.clearQueue': Permissions.PLAYER_QUEUE,
     'player.getPosition': Permissions.PLAYER_READ,

@@ -60,6 +60,11 @@ export class PlaybackQueue {
         const uniqueTracks = deduplicateTracks(tracks);
         this.entries = uniqueTracks.map((track) => this.createEntry(track));
 
+        const currentEntry = startTrack
+            ? this.entries.find((entry) => isSameTrack(entry.track, startTrack))
+            : null;
+        this.currentQueueId = currentEntry?.queueId ?? null;
+
         if (options.playMode) {
             this.setPlayMode(options.playMode);
         }
@@ -67,11 +72,6 @@ export class PlaybackQueue {
         if (options.shuffleAll) {
             this.entries = this.shuffle(this.entries);
         }
-
-        const currentEntry = startTrack
-            ? this.entries.find((entry) => isSameTrack(entry.track, startTrack))
-            : null;
-        this.currentQueueId = currentEntry?.queueId ?? null;
         return this.getSnapshot();
     }
 

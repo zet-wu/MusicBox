@@ -1,4 +1,5 @@
 import type {
+    PlaybackQueueSnapshot,
     PlaybackStateSnapshot,
     PlayMode,
     QueueMutationResult
@@ -119,6 +120,10 @@ export class PlaybackUiStateService {
 
     moveQueueEntry(queueId: string, targetIndex: number): boolean {
         return playbackService.moveQueueEntry(queueId, targetIndex);
+    }
+
+    getPlaybackQueueSnapshot(): PlaybackQueueSnapshot {
+        return playbackService.getPlaybackQueueSnapshot();
     }
 
     setPlayMode(mode: PlayMode): boolean {

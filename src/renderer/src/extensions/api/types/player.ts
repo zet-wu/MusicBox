@@ -22,6 +22,19 @@ export interface PlayerState {
     volume: number;
 }
 
+export interface QueueEntry {
+    queueId: string;
+    track: Track;
+}
+
+export interface QueueMutationResult {
+    added: number;
+    moved: number;
+    skippedExisting: number;
+    skippedCurrent: number;
+    startedPlayback: boolean;
+}
+
 /**
  * 播放器 API 接口
  */
@@ -120,6 +133,26 @@ export interface PlayerAPI {
      * @returns {Track[]} 播放列表
      */
     getPlaylist(): Track[];
+
+    /**
+     * 获取带稳定队列标识的显式播放队列
+     */
+    getQueue(): QueueEntry[];
+
+    /**
+     * 将尚未存在的歌曲加入播放队列
+     */
+    addToQueue(tracks: Track[]): Promise<QueueMutationResult>;
+
+    /**
+     * 将歌曲移动或插入到当前歌曲之后
+     */
+    playNext(tracks: Track[]): Promise<QueueMutationResult>;
+
+    /**
+     * 按稳定队列标识移动歌曲
+     */
+    moveQueueEntry(queueId: string, targetIndex: number): boolean;
 
     /**
      * 设置播放模式
