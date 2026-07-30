@@ -169,7 +169,7 @@ MusicBox 当前有两类播放实现：
 - Web Audio engine：位于 `features/playback/service/audioEngine/webAudio/`，处理浏览器侧解码、播放、预加载、进度、可见性和对象 URL 生命周期。
 - WASAPI/native engine：renderer 通过 `WasapiEngine.ts` 和 `nativeAudioGateway` 调用主进程 `NativeAudioController`，再桥接 `dist/main/NativeAudio.node`。
 
-`PlaybackService` 和 `AudioEngineAdapter` 负责切换引擎、统一播放控制、播放列表、进度、音量、播放模式、均衡器和桌面歌词同步。`native/` 中的 Rust crate 使用 N-API 暴露原生音频能力，并在 `npm run build:rs` 时复制到 `dist/main/NativeAudio.node`。
+`PlaybackService` 统一暴露播放控制，`AudioEngineAdapter` 负责 Web Audio / WASAPI 切换。`PlaybackQueue` 是顺序、随机和单曲循环模式共享的显式队列模型，使用稳定的 `queueId` 支持排序和状态恢复；随机模式直接调整可见队列顺序，不维护隐藏播放序列。`native/` 中的 Rust crate 使用 N-API 暴露原生音频能力，并在 `npm run build:rs` 时复制到 `dist/main/NativeAudio.node`。
 
 ## 音乐库与元数据
 
