@@ -1,13 +1,14 @@
 import type {PlaybackState, PlaybackStoreChange, Unsubscribe} from '@/features/playback';
-import type {Track} from '@api/types/track';
+import type {PlaybackQueueSnapshot} from '@api/types/playback';
 
 interface PlaybackQueueStateSource {
     getState(): Readonly<PlaybackState>;
+    getPlaybackQueueSnapshot(): PlaybackQueueSnapshot;
     subscribe(listener: (state: Readonly<PlaybackState>, change: PlaybackStoreChange) => void): Unsubscribe;
 }
 
 interface PlaybackQueueUI {
-    syncQueueTracks(tracks: Track[], currentIndex?: number): void;
+    syncQueueEntries(snapshot: PlaybackQueueSnapshot): void;
     setQueueCurrentTrack(index: number): void;
 }
 
@@ -31,12 +32,11 @@ export class PlaybackQueueSyncService {
             return;
         }
 
-        const state = this.playback.getState();
-        this.queue.syncQueueTracks(state.playlist, state.currentIndex);
+        this.queue.syncQueueEntries(this.playback.getPlaybackQueueSnapshot());
 
         this.unsubscribe = this.playback.subscribe((nextState, change) => {
             if (change.type === 'playlistChanged') {
-                this.queue.syncQueueTracks(nextState.playlist, nextState.currentIndex);
+                this.queue.syncQueueEntries(this.playback.getPlaybackQueueSnapshot());
                 return;
             }
 

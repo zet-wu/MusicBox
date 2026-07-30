@@ -16,7 +16,14 @@ interface PlaylistBindingComponents {
 
 interface PlaylistBindingUI {
     showCreatePlaylistDialog(track?: Track): void;
-    showContextMenu(x: number, y: number, track: Track, index: number, selectedTracks?: Set<number>): void;
+    showContextMenu(
+        x: number,
+        y: number,
+        track: Track,
+        index: number,
+        selectedTracks?: Set<number>,
+        selectedTrackItems?: Track[]
+    ): void;
 }
 
 export interface PlaylistComponentBindingHost {
@@ -103,8 +110,15 @@ export function bindPlaylistComponentEvents({
 
     components.playlistDetailPage.on(
         'trackRightClick',
-        (track: Track, index: number, x: number, y: number, selectedTracks?: Set<number>) => {
-            ui.showContextMenu(x, y, track, index, selectedTracks);
+        (
+            track: Track,
+            index: number,
+            x: number,
+            y: number,
+            selectedTracks?: Set<number>,
+            selectedTrackItems?: Track[]
+        ) => {
+            ui.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
         }
     );
 

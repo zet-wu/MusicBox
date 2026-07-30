@@ -122,6 +122,10 @@ export class PlaybackService {
         return playbackApiAdapter.moveQueueEntry(queueId, targetIndex);
     }
 
+    getPlaybackQueueSnapshot(): PlaybackQueueSnapshot {
+        return playbackApiAdapter.getPlaybackQueueSnapshot();
+    }
+
     async restorePlaybackQueue(snapshot: PlaybackQueueSnapshot): Promise<boolean> {
         return await playbackApiAdapter.restorePlaybackQueue(snapshot);
     }

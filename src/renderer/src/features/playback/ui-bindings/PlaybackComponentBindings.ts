@@ -12,7 +12,14 @@ interface PlaybackBindingComponents {
 }
 
 interface PlaybackBindingUI {
-    showContextMenu(x: number, y: number, track: Track, index: number, selectedTracks?: Set<number>): void;
+    showContextMenu(
+        x: number,
+        y: number,
+        track: Track,
+        index: number,
+        selectedTracks?: Set<number>,
+        selectedTrackItems?: Track[]
+    ): void;
     toggleQueue(): void;
     toggleLyricsForTrack(track: Track | null): Promise<void>;
 }
@@ -29,10 +36,13 @@ export interface PlaybackComponentBindingHost {
     handlePlaylistTrackRemoved(track: Track, index: number): Promise<void>;
     handlePlaylistCleared(): Promise<void>;
     addToPlaylist(track: Track): void | Promise<void>;
+    addTracksToQueue(tracks: Track[]): Promise<void>;
+    playTracksNext(tracks: Track[]): Promise<void>;
     handleAddToCustomPlaylist(track: Track, index: number): Promise<void>;
     handleDeleteTrack(track: Track, index: number): Promise<void>;
     handleBatchDelete(selectedTracks: Set<number> | null | undefined, track: Track, index: number): Promise<void>;
     handleEditTrackInfo(track: Track, index: number): Promise<void>;
+    moveQueueEntry(queueId: string, targetIndex: number): boolean;
 }
 
 interface PlaybackComponentBindingContext {
@@ -49,6 +59,7 @@ interface TrackEventPayload {
 
 interface ContextMenuPayload extends TrackEventPayload {
     selectedTracks?: Set<number>;
+    tracks?: Track[];
     _index?: number;
 }
 
@@ -64,8 +75,15 @@ export function bindPlaybackComponentEvents({
 
     components.trackList.on(
         'trackRightClick',
-        (track: Track, index: number, x: number, y: number, selectedTracks?: Set<number>) => {
-            ui.showContextMenu(x, y, track, index, selectedTracks);
+        (
+            track: Track,
+            index: number,
+            x: number,
+            y: number,
+            selectedTracks?: Set<number>,
+            selectedTrackItems?: Track[]
+        ) => {
+            ui.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
         }
     );
 
@@ -97,12 +115,20 @@ export function bindPlaybackComponentEvents({
         await app.handlePlaylistCleared();
     });
 
+    components.playlist.on('queueReordered', ({queueId, targetIndex}: {queueId: string; targetIndex: number}) => {
+        app.moveQueueEntry(queueId, targetIndex);
+    });
+
     components.contextMenu.on('play', async ({track, index}: ContextMenuPayload) => {
         await app.handleTrackPlayed(track, index);
     });
 
-    components.contextMenu.on('addToPlaylist', ({track}: ContextMenuPayload) => {
-        void app.addToPlaylist(track);
+    components.contextMenu.on('addToPlaylist', ({track, tracks}: ContextMenuPayload) => {
+        void app.addTracksToQueue(tracks?.length ? tracks : [track]);
+    });
+
+    components.contextMenu.on('playNext', ({track, tracks}: ContextMenuPayload) => {
+        void app.playTracksNext(tracks?.length ? tracks : [track]);
     });
 
     components.contextMenu.on('addToCustomPlaylist', async ({track, index}: ContextMenuPayload) => {

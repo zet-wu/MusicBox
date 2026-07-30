@@ -172,6 +172,7 @@ export function createAppComposition({
             getLibraryTracks: () => libraryDataService.getTracks(),
             setPlaylist: (tracks, startIndex) => playbackController.setPlaylist(tracks, startIndex),
             restorePlaybackQueue: (snapshot) => playbackController.restorePlaybackQueue(snapshot),
+            moveQueueEntry: (queueId, targetIndex) => playbackController.moveQueueEntry(queueId, targetIndex),
             loadTrack: (filePath) => playbackController.loadTrack(filePath),
             play: () => playbackController.play(),
             setPosition: (position) => playbackController.setPosition(position),
@@ -184,6 +185,8 @@ export function createAppComposition({
         app: hostPorts.playlist,
         playback: {
             setPlaylist: (tracks, startIndex) => playbackController.setPlaylist(tracks, startIndex),
+            appendToQueue: (tracks) => playbackController.appendToQueue(tracks),
+            playNext: (tracks) => playbackController.playNext(tracks),
             getCurrentIndex: () => playbackController.getCurrentIndex(),
             getPlaylist: () => playbackController.getPlaylist(),
             pause: () => playbackController.pause()

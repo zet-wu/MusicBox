@@ -147,6 +147,10 @@ class PlaybackController {
         return playbackStoreProvider.getState().playlist;
     }
 
+    getPlaybackQueueSnapshot(): PlaybackQueueSnapshot {
+        return playbackService.getPlaybackQueueSnapshot();
+    }
+
     getDuration(): number {
         return playbackStoreProvider.getState().duration;
     }

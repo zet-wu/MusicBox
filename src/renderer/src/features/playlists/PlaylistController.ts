@@ -1,5 +1,6 @@
 import type {Playlist} from '@api/types/playlist';
 import type {Track} from '@api/types/track';
+import type {QueueMutationResult} from '@api/types/playback';
 
 interface PlaylistControllerOptions {
     app: PlaylistAppHost;
@@ -26,6 +27,8 @@ interface PlaylistUI {
 
 interface PlaylistPlaybackIntegrations {
     setPlaylist(tracks: Track[], startIndex?: number): Promise<boolean>;
+    appendToQueue(tracks: Track[]): Promise<QueueMutationResult>;
+    playNext(tracks: Track[]): Promise<QueueMutationResult>;
     getCurrentIndex(): number;
     getPlaylist(): Track[];
     pause(): Promise<boolean>;
@@ -75,10 +78,26 @@ export class PlaylistController {
     }
 
     async addToPlaylist(track: Track): Promise<void> {
-        const currentPlaylist = this.playback.getPlaylist();
-        const nextPlaylist = [...currentPlaylist, track];
-        await this.playback.setPlaylist(nextPlaylist, this.playback.getCurrentIndex());
-        this.app.showInfo(`已添加 "${track.title}" 到播放列表`);
+        await this.addTracksToQueue([track]);
+    }
+
+    async addTracksToQueue(tracks: Track[]): Promise<void> {
+        const result = await this.playback.appendToQueue(tracks);
+        if (result.added > 0) {
+            this.app.showInfo(`已添加 ${result.added} 首歌曲到播放列表`);
+        } else {
+            this.app.showInfo('所选歌曲已在播放列表中');
+        }
+    }
+
+    async playTracksNext(tracks: Track[]): Promise<void> {
+        const result = await this.playback.playNext(tracks);
+        const changed = result.added + result.moved;
+        if (changed > 0) {
+            this.app.showInfo(`已安排 ${changed} 首歌曲接下来播放`);
+        } else if (result.skippedCurrent > 0) {
+            this.app.showInfo('当前歌曲已跳过，没有其他歌曲需要安排');
+        }
     }
 
     async handleAddToCustomPlaylist(track: Track, _index: number): Promise<void> {

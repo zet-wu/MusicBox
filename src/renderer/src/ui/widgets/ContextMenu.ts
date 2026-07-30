@@ -11,10 +11,14 @@ class ContextMenu extends Component {
     private currentTrack: Track | null;
     private currentIndex: number;
     private selectedTracks: Set<number> | null;
+    private selectedTrackItems: Track[];
     private listenersSetup: boolean;
     private menu!: HTMLElement;
     private playItem!: HTMLElement;
+    private playNextItem!: HTMLElement;
+    private playNextLabel!: HTMLElement;
     private addToPlaylistItem!: HTMLElement;
+    private addToPlaylistLabel!: HTMLElement;
     private addToCustomPlaylistItem!: HTMLElement;
     private editInfoItem!: HTMLElement;
     private deleteItem!: HTMLElement;
@@ -28,10 +32,18 @@ class ContextMenu extends Component {
         this.currentTrack = null;
         this.currentIndex = -1;
         this.selectedTracks = null;
+        this.selectedTrackItems = [];
         this.listenersSetup = false;
     }
 
-    show(x: number, y: number, track: Track, index: number, selectedTracks: Set<number> | null = null): void {
+    show(
+        x: number,
+        y: number,
+        track: Track,
+        index: number,
+        selectedTracks: Set<number> | null = null,
+        selectedTrackItems: Track[] = [track]
+    ): void {
         if (!this.listenersSetup) {
             this.setupElements();
             this.setupEventListeners();
@@ -41,12 +53,14 @@ class ContextMenu extends Component {
         this.currentTrack = track;
         this.currentIndex = index;
         this.selectedTracks = selectedTracks;
+        this.selectedTrackItems = [...selectedTrackItems];
         this.isVisible = true;
 
         // 多选模式：隐藏单曲操作，显示批量删除
         const isMulti = selectedTracks && selectedTracks.size > 1;
         this.playItem.style.display = isMulti ? 'none' : '';
-        this.addToPlaylistItem.style.display = isMulti ? 'none' : '';
+        this.playNextItem.style.display = '';
+        this.addToPlaylistItem.style.display = '';
         this.addToCustomPlaylistItem.style.display = isMulti ? 'none' : '';
         this.editInfoItem.style.display = isMulti ? 'none' : '';
         this.deleteItem.style.display = isMulti ? 'none' : '';
@@ -54,6 +68,11 @@ class ContextMenu extends Component {
         if (isMulti) {
             this.batchDeleteLabel.textContent = `批量删除 (${selectedTracks.size} 首)`;
         }
+        const selectionCount = this.selectedTrackItems.length;
+        this.playNextLabel.textContent = selectionCount > 1 ? `下 ${selectionCount} 首播放` : '下一首播放';
+        this.addToPlaylistLabel.textContent = selectionCount > 1
+            ? `添加到播放列表 (${selectionCount} 首)`
+            : '添加到播放列表';
 
         // 菜单位置
         this.menu.style.left = `${x}px`;
@@ -79,6 +98,7 @@ class ContextMenu extends Component {
         this.currentTrack = null;
         this.currentIndex = -1;
         this.selectedTracks = null;
+        this.selectedTrackItems = [];
     }
 
     destroy(): void {
@@ -89,7 +109,10 @@ class ContextMenu extends Component {
     setupElements(): void {
         this.menu = this.element;
         this.playItem = this.element.querySelector('#context-play') as HTMLElement;
+        this.playNextItem = this.element.querySelector('#context-play-next') as HTMLElement;
+        this.playNextLabel = this.element.querySelector('#context-play-next-label') as HTMLElement;
         this.addToPlaylistItem = this.element.querySelector('#context-add-to-playlist') as HTMLElement;
+        this.addToPlaylistLabel = this.element.querySelector('#context-add-to-playlist-label') as HTMLElement;
         this.addToCustomPlaylistItem = this.element.querySelector('#context-add-to-custom-playlist') as HTMLElement;
         this.editInfoItem = this.element.querySelector('#context-edit-info') as HTMLElement;
         this.deleteItem = this.element.querySelector('#context-delete') as HTMLElement;
@@ -104,7 +127,20 @@ class ContextMenu extends Component {
         });
 
         this.addEventListenerManaged(this.addToPlaylistItem, 'click', () => {
-            this.emit('addToPlaylist', {track: this.currentTrack, index: this.currentIndex});
+            this.emit('addToPlaylist', {
+                track: this.currentTrack,
+                tracks: this.selectedTrackItems,
+                index: this.currentIndex
+            });
+            this.hide();
+        });
+
+        this.addEventListenerManaged(this.playNextItem, 'click', () => {
+            this.emit('playNext', {
+                track: this.currentTrack,
+                tracks: this.selectedTrackItems,
+                index: this.currentIndex
+            });
             this.hide();
         });
 

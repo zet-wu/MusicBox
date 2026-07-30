@@ -19,6 +19,7 @@ interface PlaybackAppIntegrations {
     getLibraryTracks(): Promise<Track[]>;
     setPlaylist(tracks: Track[], startIndex?: number): Promise<boolean>;
     restorePlaybackQueue(snapshot: PlaybackQueueSnapshot): Promise<boolean>;
+    moveQueueEntry(queueId: string, targetIndex: number): boolean;
     loadTrack(filePath: string): Promise<boolean>;
     play(): Promise<boolean>;
     setPosition(position: number): Promise<boolean>;
@@ -102,6 +103,10 @@ export class PlaybackAppController {
 
     handleTrackIndexChanged(_index: number): void {
         // Queue highlighting is driven by PlaybackQueueSyncService.
+    }
+
+    moveQueueEntry(queueId: string, targetIndex: number): boolean {
+        return this.integrations.moveQueueEntry(queueId, targetIndex);
     }
 
     async restorePlaybackState(): Promise<void> {

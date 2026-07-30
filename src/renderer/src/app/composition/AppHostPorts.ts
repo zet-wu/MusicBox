@@ -47,6 +47,7 @@ export interface MusicBoxCompositionHost {
     emit(event: string, ...args: any[]): void;
     removeAllListeners(event?: string): void;
     addToPlaylist(track: Track): void | Promise<void>;
+    addTracksToQueue(tracks: Track[]): Promise<void>;
     addMusicFiles(): Promise<void>;
     cleanup(): Promise<void>;
     clearRuntimeData(): void;
@@ -57,6 +58,8 @@ export interface MusicBoxCompositionHost {
     handleDeleteTrack(track: Track, index: number): Promise<void>;
     handleDriveRemoved(drive?: unknown): Promise<void>;
     handleEditTrackInfo(track: Track, index: number): Promise<void>;
+    moveQueueEntry(queueId: string, targetIndex: number): boolean;
+    playTracksNext(tracks: Track[]): Promise<void>;
     handleNetworkDriveSelected(drive: unknown): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
     handlePlaylistCleared(): Promise<void>;
@@ -284,10 +287,13 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handlePlaylistTrackRemoved: (track, index) => app.handlePlaylistTrackRemoved(track, index),
             handlePlaylistCleared: () => app.handlePlaylistCleared(),
             addToPlaylist: (track) => app.addToPlaylist(track),
+            addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
+            playTracksNext: (tracks) => app.playTracksNext(tracks),
             handleAddToCustomPlaylist: (track, index) => app.handleAddToCustomPlaylist(track, index),
             handleDeleteTrack: (track, index) => app.handleDeleteTrack(track, index),
             handleBatchDelete: (selectedTracks, track, index) => app.handleBatchDelete(selectedTracks, track, index),
-            handleEditTrackInfo: (track, index) => app.handleEditTrackInfo(track, index)
+            handleEditTrackInfo: (track, index) => app.handleEditTrackInfo(track, index),
+            moveQueueEntry: (queueId, targetIndex) => app.moveQueueEntry(queueId, targetIndex)
         },
         playlist: {
             get currentView() {

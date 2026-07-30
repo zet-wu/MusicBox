@@ -216,7 +216,19 @@ class TrackList extends Component {
             if (!this.selectedTracks.has(index)) {
                 this.selectTrack(index);
             }
-            this.emit('trackRightClick', track, index, e.clientX, e.clientY, this.selectedTracks);
+            const selectedTrackItems = Array.from(this.selectedTracks)
+                .sort((left, right) => left - right)
+                .map((selectedIndex) => this.tracks[selectedIndex])
+                .filter((item): item is Track => Boolean(item));
+            this.emit(
+                'trackRightClick',
+                track,
+                index,
+                e.clientX,
+                e.clientY,
+                new Set(this.selectedTracks),
+                selectedTrackItems
+            );
         });
 
         return item;

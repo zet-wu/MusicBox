@@ -1,4 +1,5 @@
 import type {Track} from '@api/types/track';
+import type {PlaybackQueueSnapshot} from '@api/types/playback';
 import type {AppComponentPort} from '../AppRuntimePorts';
 
 export class QueueUIFacade {
@@ -6,6 +7,10 @@ export class QueueUIFacade {
 
     syncQueueTracks(tracks: Track[], currentIndex = 0): void {
         this.app.components.playlist?.setTracks(tracks, currentIndex);
+    }
+
+    syncQueueEntries(snapshot: PlaybackQueueSnapshot): void {
+        this.app.components.playlist?.setEntries(snapshot.entries, snapshot.currentQueueId);
     }
 
     setQueueCurrentTrack(index: number): void {

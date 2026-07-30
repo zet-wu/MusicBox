@@ -4,11 +4,13 @@
 
 import {formatTime} from "@utils/index.js";
 import {Component} from "@ui/base/Component";
+import type {QueueEntry} from "@api/types/playback";
 import type {Track} from "@api/types/track";
 
 interface PlaylistTrackEventPayload {
     track: Track;
     index: number;
+    queueId?: string;
 }
 
 interface PlaylistTrackRemovedPayload extends PlaylistTrackEventPayload {
@@ -18,6 +20,8 @@ interface PlaylistTrackRemovedPayload extends PlaylistTrackEventPayload {
 class Playlist extends Component {
     isVisible: boolean;
     tracks: Track[];
+    entries: QueueEntry[];
+    currentQueueId: string | null;
     currentTrackIndex: number;
     listenersSetup: boolean;
     panel!: HTMLElement;
@@ -31,6 +35,8 @@ class Playlist extends Component {
         this.element = element;
         this.isVisible = false;
         this.tracks = [];
+        this.entries = [];
+        this.currentQueueId = null;
         this.currentTrackIndex = -1;
         this.listenersSetup = false; // 事件监听器是否已设置
 
@@ -63,6 +69,8 @@ class Playlist extends Component {
     destroy(): void {
         // 清理播放列表数据
         this.tracks = [];
+        this.entries = [];
+        this.currentQueueId = null;
         this.listenersSetup = false;
 
         // 清理DOM内容
@@ -126,6 +134,51 @@ class Playlist extends Component {
             }
         });
 
+        this.addEventListenerManaged(this.tracksContainer, 'dragstart', (event: Event) => {
+            const dragEvent = event as DragEvent;
+            const row = dragEvent.target instanceof Element
+                ? dragEvent.target.closest<HTMLElement>('.playlist-track')
+                : null;
+            if (!row?.dataset.queueId || !dragEvent.dataTransfer) {
+                return;
+            }
+
+            dragEvent.dataTransfer.effectAllowed = 'move';
+            dragEvent.dataTransfer.setData('text/plain', row.dataset.queueId);
+            row.classList.add('dragging');
+        });
+
+        this.addEventListenerManaged(this.tracksContainer, 'dragover', (event: Event) => {
+            const dragEvent = event as DragEvent;
+            if (dragEvent.target instanceof Element && dragEvent.target.closest('.playlist-track')) {
+                dragEvent.preventDefault();
+                if (dragEvent.dataTransfer) {
+                    dragEvent.dataTransfer.dropEffect = 'move';
+                }
+            }
+        });
+
+        this.addEventListenerManaged(this.tracksContainer, 'drop', (event: Event) => {
+            const dragEvent = event as DragEvent;
+            const targetRow = dragEvent.target instanceof Element
+                ? dragEvent.target.closest<HTMLElement>('.playlist-track')
+                : null;
+            const queueId = dragEvent.dataTransfer?.getData('text/plain');
+            if (!targetRow || !queueId) {
+                return;
+            }
+
+            dragEvent.preventDefault();
+            const targetIndex = Number.parseInt(targetRow.dataset.index || '-1', 10);
+            if (targetIndex >= 0) {
+                this.emit('queueReordered', {queueId, targetIndex});
+            }
+        });
+
+        this.addEventListenerManaged(this.tracksContainer, 'dragend', () => {
+            this.tracksContainer.querySelector('.playlist-track.dragging')?.classList.remove('dragging');
+        });
+
         // Close on outside click
         this.addEventListenerManaged(document, 'click', (e: Event) => {
             const target = e.target as HTMLElement | null;
@@ -167,13 +220,27 @@ class Playlist extends Component {
 
     setTracks(tracks: Track[], currentIndex = -1): void {
         this.tracks = [...tracks];
+        this.entries = tracks.map((track, index) => ({
+            queueId: track.fileId || track.filePath || `legacy-${index}`,
+            track
+        }));
+        this.currentQueueId = this.entries[currentIndex]?.queueId ?? null;
         this.currentTrackIndex = currentIndex;
         this.render();
         console.log('🎵 Playlist: 设置播放列表:', tracks.length, '首歌曲');
     }
 
+    setEntries(entries: QueueEntry[], currentQueueId: string | null): void {
+        this.entries = entries.map((entry) => ({...entry}));
+        this.tracks = this.entries.map((entry) => entry.track);
+        this.currentQueueId = currentQueueId;
+        this.currentTrackIndex = this.entries.findIndex((entry) => entry.queueId === currentQueueId);
+        this.render();
+    }
+
     setCurrentTrack(index: number): void {
         this.currentTrackIndex = index;
+        this.currentQueueId = this.entries[index]?.queueId ?? null;
         this.render();
 
         // 如果播放列表可见，滚动到当前歌曲
@@ -220,7 +287,8 @@ class Playlist extends Component {
                 (index + 1);
 
             return `
-                <div class="playlist-track ${isCurrent ? 'current playing' : ''}" data-index="${index}">
+                <div class="playlist-track ${isCurrent ? 'current playing' : ''}" data-index="${index}" data-queue-id="${this.entries[index]?.queueId || ''}" draggable="true">
+                    <div class="playlist-track-drag" title="拖动调整顺序">⋮⋮</div>
                     <div class="playlist-track-number">${trackNumber}</div>
                     <div class="playlist-track-info">
                         <div class="playlist-track-title">${track.title || 'Unknown Title'}</div>
@@ -242,7 +310,7 @@ class Playlist extends Component {
         if (!track) {
             return null;
         }
-        return {track, index};
+        return {track, index, queueId: this.entries[index]?.queueId};
     }
 }
 

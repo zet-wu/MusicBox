@@ -514,6 +514,10 @@ export class MusicBoxApp extends EventEmitter {
         this.playbackController.handleTrackIndexChanged(index);
     }
 
+    moveQueueEntry(queueId: string, targetIndex: number): boolean {
+        return this.playbackController.moveQueueEntry(queueId, targetIndex);
+    }
+
     updateLibraryTrackDuration(filePath: string, duration: number): void {
         this.libraryController.updateLibraryTrackDuration(filePath, duration);
     }
@@ -526,6 +530,14 @@ export class MusicBoxApp extends EventEmitter {
 
     async addToPlaylist(track: Track): Promise<void> {
         await this.playlistController.addToPlaylist(track);
+    }
+
+    async addTracksToQueue(tracks: Track[]): Promise<void> {
+        await this.playlistController.addTracksToQueue(tracks);
+    }
+
+    async playTracksNext(tracks: Track[]): Promise<void> {
+        await this.playlistController.playTracksNext(tracks);
     }
 
     async handleBatchDelete(selectedTracks: Set<number> | null | undefined, track: Track, index: number): Promise<void> {

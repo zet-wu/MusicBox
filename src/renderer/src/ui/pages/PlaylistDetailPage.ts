@@ -1047,7 +1047,11 @@ class PlaylistDetailPage extends Component {
     }
 
     showTrackContextMenu(x: number, y: number, track: PlaylistDetailTrack, index: number): void {
-        this.emit('trackRightClick', track, index, x, y, this.selectedTracks);
+        const selectedTrackItems = Array.from(this.selectedTracks)
+            .sort((left, right) => left - right)
+            .map((selectedIndex) => this.tracks[selectedIndex])
+            .filter((item): item is PlaylistDetailTrack => Boolean(item));
+        this.emit('trackRightClick', track, index, x, y, new Set(this.selectedTracks), selectedTrackItems);
     }
 }
 

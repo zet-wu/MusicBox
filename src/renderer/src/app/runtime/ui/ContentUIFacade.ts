@@ -32,9 +32,10 @@ export class ContentUIFacade {
         y: number,
         track: Track,
         index: number,
-        selectedTracks?: Set<number>
+        selectedTracks?: Set<number>,
+        selectedTrackItems?: Track[]
     ): void {
-        this.app.components.contextMenu?.show(x, y, track, index, selectedTracks);
+        this.app.components.contextMenu?.show(x, y, track, index, selectedTracks, selectedTrackItems);
     }
 
     async showPlaylistDetail(playlist: Playlist): Promise<void> {

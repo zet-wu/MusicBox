@@ -139,6 +139,24 @@
       color: var(--color-primary);
     }
   }
+
+  &.dragging {
+    opacity: 0.45;
+  }
+}
+
+.playlist-track-drag {
+  width: 18px;
+  color: var(--color-text-secondary);
+  cursor: grab;
+  font-size: var(--font-size-xs);
+  letter-spacing: -2px;
+  opacity: 0.45;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .playlist-track-number {
