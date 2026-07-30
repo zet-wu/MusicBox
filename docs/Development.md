@@ -6,17 +6,38 @@
 
 - Node.js >= 22.0.0
 - npm，使用项目 lockfile 对应版本即可
-- Python >= 3.8，用于 `src/main/metadata_editor.py` 及其打包
+- Python >= 3.8，用于 `src/main/metadata_editor.py` 及其打包；Python 依赖必须安装在仓库根目录的 `.venv` 虚拟环境中
 - Rust toolchain with Cargo，推荐支持 Rust 2024 edition 的稳定版本
-- Windows WASAPI 相关开发建议在 Windows 上验证；macOS/Linux 可验证常规 Electron、Web Audio 和打包流程
+- Rust `NativeAudio.node` 和 WASAPI 仅适用于 Windows；macOS/Linux 使用 Web Audio 回退路径，并验证通用 Electron 功能和对应平台打包流程
 
-## 安装依赖
+## 创建 Python 虚拟环境
+
+Windows PowerShell：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+macOS/Linux：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+不要使用系统级 `pip` 安装本项目依赖。后续运行开发、Python helper 或平台打包命令时，应保持 `.venv` 处于激活状态。
+
+## 安装 Node.js 和 Rust 相关依赖
 
 ```bash
 npm install
 npm run install:renderer
 npm run install:rs
-pip install -r requirements.txt
 ```
 
 说明：
@@ -24,14 +45,28 @@ pip install -r requirements.txt
 - 根目录依赖用于 Electron main、打包和共享脚本。
 - `src/renderer` 是独立 Vite 工程，需要单独安装。
 - `native` 是 Rust N-API 模块，同时有 npm wrapper 用于复制构建产物。
-- `requirements.txt` 当前用于 Python 元数据 helper。
+- `requirements.txt` 当前用于 Python 元数据 helper，其依赖只应安装到根目录的 `.venv`。
 
 ## 常用命令
 
-```bash
-# 完整开发启动：构建 renderer/native/main 后启动 Electron
-npm run dev
+Windows 完整开发启动：
 
+```bash
+# 构建 renderer、Windows native 和 main 后启动 Electron
+npm run dev
+```
+
+当前 `npm run dev` 会构建 Windows WASAPI 模块，`npm run dev:main` 还使用了 Windows 的 `chcp`。macOS/Linux 使用以下流程启动 Web Audio 版本：
+
+```bash
+npm run build:renderer
+npm run build:ts
+npx electron dist/main/main.js --expose-gc
+```
+
+其余常用命令可在各平台执行：
+
+```bash
 # 只启动 Vite renderer dev server，适合纯 UI 调试
 npm run dev:renderer
 
@@ -150,13 +185,21 @@ npm run docs:preview
 
 ## 打包说明
 
-完整打包命令：
+`npm run build` 包含 Windows WASAPI 原生模块构建，因此当前适合 Windows 完整构建。各平台安装包应在对应的目标操作系统上构建：
 
 ```bash
-npm run build
+# Windows
+npm run build:rs
+npm run build:win
+
+# macOS
+npm run build:mac
+
+# Linux
+npm run build:linux
 ```
 
-步骤：
+Windows 完整构建主要步骤：
 
 1. `build:python`：将 `src/main/metadata_editor.py` 打包到 `dist/main/metadata_editor(.exe)`。
 2. `build:renderer`：Vite 构建主窗口和桌面歌词窗口到 `src/renderer/public`。
@@ -164,15 +207,9 @@ npm run build
 4. `build:ts`：编译 `src/main` TypeScript 到 `dist/main`。
 5. `build:main`：执行 `electron-builder`。
 
-分平台命令：
+`electron-builder.yml` 中配置了平台目标、图标、asar unpack 和 extra resources。Windows 包中的 `NativeAudio.node` 与各平台生成的 `metadata_editor` 必须作为独立资源可访问。Python helper、原生模块、签名和系统打包工具依赖宿主平台，不要默认可以从一个操作系统完整交叉构建所有目标。
 
-```bash
-npm run build:win
-npm run build:mac
-npm run build:linux
-```
-
-`electron-builder.yml` 中配置了平台目标、图标、asar unpack 和 extra resources。`NativeAudio.node` 与 `metadata_editor` 必须作为独立资源可访问。
+当前 `electron-builder.yml` 将 Windows 专用的 `NativeAudio.node` 放在全局 `extraResources` 中。正式构建 macOS/Linux 安装包前，必须先将其改为 Windows 条件资源，否则非 Windows 构建仍可能查找该文件。构建多架构安装包时，还必须分别生成与目标 CPU 架构匹配的原生模块，不能把 x64 的 `.node` 文件放入 arm64 安装包。
 
 ## 手动验证清单
 
@@ -211,14 +248,25 @@ npm run build:rs
 
 ### Python helper 打包失败
 
-执行：
+先在仓库根目录激活虚拟环境，再重新安装依赖并构建。
 
-```bash
-pip install -r requirements.txt
+Windows PowerShell：
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 npm run build:python
 ```
 
-脚本会优先使用 PyInstaller，失败后尝试 Nuitka。打包阶段需要能访问 Python 包安装源。
+macOS/Linux：
+
+```bash
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+npm run build:python
+```
+
+脚本会优先使用 PyInstaller，失败后尝试 Nuitka。打包命令必须从已激活 `.venv` 的终端运行，并且打包阶段需要能访问 Python 包安装源。
 
 ### 插件没有加载
 

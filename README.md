@@ -66,8 +66,8 @@
 #### 环境要求
 
 - Node.js >= 22
-- Python >= 3.8
-- Rust toolchain with Cargo，推荐使用支持 Rust 2024 edition 的稳定版本
+- Python >= 3.8（依赖必须安装在仓库根目录的 `.venv` 虚拟环境中）
+- Rust toolchain with Cargo，推荐使用支持 Rust 2024 edition 的稳定版本；当前 Rust WASAPI 模块仅在 Windows 构建和使用
 
 从源码构建 MusicBox，请按照以下步骤操作：
 
@@ -78,27 +78,71 @@ git clone https://github.com/asxez/MusicBox.git
 cd MusicBox
 ```
 
-#### 2. 安装依赖
+#### 2. 创建 Python 虚拟环境
+
+Windows PowerShell：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+macOS/Linux：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+后续开发和构建命令均应在已激活 `.venv` 的终端中执行。
+
+#### 3. 安装 Node.js 和 Rust 相关依赖
 
 ```bash
 npm install
 npm run install:renderer
 npm run install:rs
-pip install -r requirements.txt
 ```
 
-#### 3. 开发模式运行
+#### 4. 开发模式运行
+
+Windows 可运行完整开发流程（包含 WASAPI 原生模块）：
 
 ```bash
 npm run dev
 ```
 
-#### 4. 构建应用
+当前 `npm run dev` 和 `npm run dev:main` 含有 Windows 专用步骤。macOS/Linux 开发时使用 Web Audio 回退路径：
 
 ```bash
-# 构建当前平台版本
-npm run build
+npm run build:renderer
+npm run build:ts
+npx electron dist/main/main.js --expose-gc
 ```
+
+#### 5. 构建应用
+
+安装包应在对应的目标操作系统上构建：
+
+```bash
+# Windows
+npm run build:rs
+npm run build:win
+
+# macOS
+npm run build:mac
+
+# Linux
+npm run build:linux
+```
+
+其中 `build:win` 在 Windows 运行，`build:mac` 在 macOS 运行，`build:linux` 在 Linux 运行。Python helper、原生模块、代码签名及系统打包工具均可能依赖宿主平台，不应假设可以在单一系统上完成全部交叉构建。
+
+> 当前 `electron-builder.yml` 将 Windows 专用的 `NativeAudio.node` 配置为全平台资源。正式构建 macOS/Linux 安装包前，需要先将该资源调整为 Windows 条件配置；同时确保原生产物与目标 CPU 架构一致。
 
 ## 🛠️ 开发
 

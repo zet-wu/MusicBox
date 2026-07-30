@@ -2,18 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-There's a file modification bug in Claude Code. The workaround is: always use complete absolute Windows paths with drive letters and backslashes for ALL file operations. Apply this rule going forward, not just for this file.
+## Cross-Platform File Editing
 
-## CRITICAL: File Editing on Windows
-
-### Always Use Backslashes on Windows for File Paths
-
-**When using Edit or MultiEdit tools on Windows, you MUST use backslashes (`\`) in file paths, NOT forward slashes (`/`).**
-
-```
-WRONG:  Edit(file_path: "D:/repos/project/file.tsx", ...)
-RIGHT:  Edit(file_path: "D:\repos\project\file.tsx", ...)
-```
+Use paths appropriate to the current host platform. Do not hard-code Windows drive letters, user directories, path separators, executable suffixes, or case-insensitive path assumptions. In application code, use `node:path` helpers instead of manually concatenating paths. File and import name casing must match exactly so the code also works on case-sensitive Linux filesystems.
 
 ## Project Overview
 
@@ -24,18 +15,44 @@ MusicBox is a plugin-based local music player built with Electron. It supports m
 - **Main Process**: Electron (v41.2.1) with TypeScript, Node.js (>=24.15.0)
 - **Renderer Process**: Vite + TypeScript/vanilla JS hybrid (migrating to TypeScript)
 - **Native Audio**: Rust (v1.94.1) with WASAPI exclusive mode support, built via napi-rs
-- **Python**: Used for metadata editing utilities (>=3.8), compiled to `.exe` via PyInstaller
+- **Python**: Used for metadata editing utilities (>=3.8), managed in the repository-root `.venv`, and compiled to `.exe` via PyInstaller
 - **Styling**: SCSS
 
 ## Development Commands
 
-```bash
-# Install all dependencies
-npm install && npm run install:renderer && npm run install:rs
-pip install -r requirements.txt
+Create and activate the Python virtual environment before installing other dependencies.
 
-# Development (builds renderer + Rust + TypeScript, then launches Electron with --expose-gc)
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Keep `.venv` activated for all subsequent development and build commands.
+
+```bash
+# Install Node.js and Rust-related dependencies
+npm install && npm run install:renderer && npm run install:rs
+
+# Windows development (builds renderer + WASAPI native module + TypeScript)
 npm run dev
+
+# macOS/Linux development (uses the Web Audio fallback)
+npm run build:renderer
+npm run build:ts
+npx electron dist/main/main.js --expose-gc
 
 # Build renderer only (for UI iteration)
 npm run dev:renderer    # Vite dev server on port 8080
@@ -56,7 +73,8 @@ npm run typecheck:renderer
 # Full application build
 npm run build
 
-# Platform-specific builds
+# Platform-specific builds (run on the corresponding host OS)
+npm run build:rs        # Windows: build WASAPI native module first
 npm run build:win       # Windows (NSIS + portable)
 npm run build:mac       # macOS (DMG + ZIP)
 npm run build:linux     # Linux (AppImage + deb + rpm)
@@ -237,6 +255,7 @@ Located in `src/renderer/src/extensions/`:
 ### Python Metadata Editor
 - Source: `src/main/metadata_editor.py`
 - Dependencies: mutagen (defined in `requirements.txt`)
+- Environment: repository-root `.venv`; never install project dependencies with the system-level `pip`
 - Build process automatically tries PyInstaller first, falls back to Nuitka
 
 ### Native Audio Module
@@ -245,10 +264,10 @@ Located in `src/renderer/src/extensions/`:
 - Release build uses LTO and opt-level=3 for performance
 
 ### Development Workflow
-- Main process changes: Run `npm run build:ts` (or `npm run watch:ts`), then restart `npm run dev`
+- Main process changes: Run `npm run build:ts` (or `npm run watch:ts`), then restart with the platform-appropriate development flow
 - Renderer UI changes: Use `npm run dev:renderer` for faster iteration (Vite HMR)
 - Rust changes: Run `npm run build:rs` then restart main process
-- Python changes: Run `npm run build:python` then restart main process
+- Python changes: Activate the repository-root `.venv`, run `npm run build:python`, then restart the main process
 
 ## Code Style Notes
 
@@ -262,10 +281,13 @@ Located in `src/renderer/src/extensions/`:
 - **File organization**: Controllers in `src/main/controllers/`, services in `src/main/services/`, features in `src/renderer/src/features/`
 - **Decorators**: Use `@IpcHandler('channel:name')` for IPC handler methods in controllers
 - **Windows**: `npm run dev:main` uses `chcp 65001` to set UTF-8 console encoding (required for proper emoji/log output on Windows)
+- **macOS/Linux**: Do not use `npm run dev` or `npm run dev:main` until their Windows-only WASAPI and `chcp` steps are made conditional; build renderer/main and launch Electron directly as shown above
+- **Packaging**: Run `build:win`, `build:mac`, and `build:linux` on their corresponding host operating systems; build `NativeAudio.node` before Windows packaging, and do not assume native helpers, signing, or system packaging tools can be fully cross-compiled
+- **Packaging resources**: `electron-builder.yml` currently lists the Windows-only `NativeAudio.node` in global `extraResources`; make it Windows-conditional before macOS/Linux releases, and build native artifacts separately for x64 and arm64
 
 ## Testing
 
-No automated test framework configured. For all changes, smoke-test manually with `npm run dev`:
+No automated test framework is configured. Use `npm run dev` on Windows or the documented Web Audio startup flow on macOS/Linux, then smoke-test manually:
 - Library scan and browse
 - Audio playback (local and network files)
 - Lyrics display (synced and desktop lyrics)
