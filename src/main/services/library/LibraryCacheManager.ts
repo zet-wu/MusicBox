@@ -507,7 +507,7 @@ export class LibraryCacheManager {
     createPlaylist(name: string, description = ''): Playlist {
         if (!name?.trim()) throw new Error('歌单名称不能为空');
         if (!Array.isArray(this.cache.playlists)) this.cache.playlists = [];
-        if (this.cache.playlists.find(p => p.name === name.trim())) throw new Error('歌单名称已存在');
+        if (this.getUserPlaylists().find(p => p.name === name.trim())) throw new Error('歌单名称已存在');
 
         const playlist: Playlist = {
             id: crypto.randomUUID(),
@@ -541,7 +541,9 @@ export class LibraryCacheManager {
         if (!newName?.trim()) throw new Error('歌单名称不能为空');
         const playlist = this.getPlaylistById(playlistId);
         if (!playlist) throw new Error('歌单不存在');
-        if (this.cache.playlists.find(p => p.id !== playlistId && p.name === newName.trim())) throw new Error('歌单名称已存在');
+        if (this.getUserPlaylists().find(p => p.id !== playlistId && p.name === newName.trim())) {
+            throw new Error('歌单名称已存在');
+        }
         const oldName = playlist.name;
         playlist.name = newName.trim();
         playlist.description = description.trim();
@@ -606,8 +608,8 @@ export class LibraryCacheManager {
     }
 
     getPlaylistCover(playlistId: string): string | null {
-        if (playlistId === FAVORITES_PLAYLIST_ID) return null;
         const playlist = this.cache.playlists?.find(p => p.id === playlistId);
+        if (playlist?.systemType === 'favorites') return null;
         return playlist ? ((playlist as any).coverImage ?? null) : null;
     }
 
@@ -746,12 +748,16 @@ export class LibraryCacheManager {
 
     private getUserPlaylists(): Playlist[] {
         return Array.isArray(this.cache.playlists)
-            ? this.cache.playlists.filter((playlist) => playlist.id !== FAVORITES_PLAYLIST_ID)
+            ? this.cache.playlists.filter((playlist) => (
+                playlist.id !== FAVORITES_PLAYLIST_ID
+                && playlist.systemType !== 'favorites'
+            ))
             : [];
     }
 
     private assertUserManagedPlaylist(playlistId: string): void {
-        if (playlistId === FAVORITES_PLAYLIST_ID) {
+        const playlist = this.getPlaylistById(playlistId);
+        if (playlistId === FAVORITES_PLAYLIST_ID || playlist?.systemType === 'favorites') {
             throw new Error('系统收藏歌单不支持此操作');
         }
     }
