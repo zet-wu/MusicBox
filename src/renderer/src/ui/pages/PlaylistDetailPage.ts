@@ -158,6 +158,17 @@ class PlaylistDetailPage extends Component {
         info.classList.add(`align-${this.playlistInfoAlignment}`);
     }
 
+    updatePlaylistInfo(playlist: Pick<PlaylistDetail, 'id' | 'name' | 'description'>): boolean {
+        if (!this.isVisible || !this.currentPlaylist || this.currentPlaylist.id !== playlist.id) {
+            return false;
+        }
+
+        this.currentPlaylist.name = playlist.name;
+        this.currentPlaylist.description = playlist.description || '';
+        this.render();
+        return true;
+    }
+
     render(): void {
         if (!this.currentPlaylist || !this.container) return;
 

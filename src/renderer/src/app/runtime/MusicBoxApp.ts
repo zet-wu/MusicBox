@@ -398,8 +398,8 @@ export class MusicBoxApp extends EventEmitter {
     }
 
     // 处理歌单重命名成功
-    async handlePlaylistRenamed(): Promise<void> {
-        await this.playlistController.handlePlaylistRenamed();
+    async handlePlaylistRenamed(playlist?: Playlist): Promise<void> {
+        await this.playlistController.handlePlaylistRenamed(playlist);
     }
 
     // 处理显示添加歌曲对话框

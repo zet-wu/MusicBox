@@ -82,6 +82,10 @@ export class ContentUIFacade {
         return true;
     }
 
+    updatePlaylistDetailInfo(playlist: Playlist): boolean {
+        return this.app.components.playlistDetailPage?.updatePlaylistInfo(playlist) ?? false;
+    }
+
     async reloadPlaylistDetailTracks(): Promise<void> {
         await this.app.components.playlistDetailPage?.loadPlaylistTracks();
     }

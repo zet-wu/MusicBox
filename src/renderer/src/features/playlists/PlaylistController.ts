@@ -21,6 +21,7 @@ interface PlaylistUI {
     showPlaylistDetail(playlist: Playlist): Promise<void>;
     showMusicLibrarySelectionDialog(playlist: Playlist): Promise<void>;
     reloadPlaylistDetailTracks(): Promise<void>;
+    updatePlaylistDetailInfo(playlist: Playlist): boolean;
     updateNavigationPlaylistInfo(playlist: Playlist): void;
     refreshNavigationPlaylists(): Promise<void>;
 }
@@ -125,7 +126,10 @@ export class PlaylistController {
         await this.refreshNavigationPlaylists();
     }
 
-    async handlePlaylistRenamed(): Promise<void> {
+    async handlePlaylistRenamed(playlist?: Playlist): Promise<void> {
+        if (playlist && this.app.currentView === 'playlist-detail') {
+            this.ui.updatePlaylistDetailInfo(playlist);
+        }
         await this.refreshNavigationPlaylists();
     }
 
