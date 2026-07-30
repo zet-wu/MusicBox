@@ -1,3 +1,5 @@
+import type {PlaylistInfoAlignment} from "@api/types/settings";
+
 interface ComponentEventSource {
     on(event: string, handler: (...args: any[]) => void | Promise<void>): void;
 }
@@ -35,6 +37,7 @@ interface SettingsBindingIntegrations {
     onNavigateToSettingsSection(handler: (sectionName: string) => void): void;
     setGaplessPlayback(enabled: boolean): void;
     setTrackCoverDisplayPreference(enabled: boolean): void;
+    setPlaylistInfoAlignment(alignment: PlaylistInfoAlignment): void;
 }
 
 export function bindSettingsComponentEvents({
@@ -116,6 +119,10 @@ export function bindSettingsComponentEvents({
         if (enabled && app.isInitialized) {
             await app.preloadTrackCovers();
         }
+    });
+
+    components.settings.on('playlistInfoAlignmentChanged', (alignment: PlaylistInfoAlignment) => {
+        integrations.setPlaylistInfoAlignment(alignment);
     });
 
     components.settings.on('gaplessPlaybackEnabled', (enabled: boolean) => {

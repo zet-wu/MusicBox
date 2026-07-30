@@ -109,6 +109,7 @@ class Settings extends Component {
         this.autoplayToggle = this.element.querySelector('#autoplay-toggle');
         this.rememberPositionToggle = this.element.querySelector('#remember-position-toggle');
         this.playlistDoubleClickModeSelect = this.element.querySelector('#playlist-double-click-mode-select');
+        this.playlistInfoAlignmentSelect = this.element.querySelector('#playlist-info-alignment-select');
         this.desktopLyricsToggle = this.element.querySelector('#desktop-lyrics-toggle');
         this.statisticsToggle = this.element.querySelector('#statistics-toggle');
         this.recentPlayToggle = this.element.querySelector('#recent-play-toggle');
@@ -388,6 +389,7 @@ class Settings extends Component {
         this.autoplayToggle.checked = initialValues.autoplay;
         this.rememberPositionToggle.checked = initialValues.rememberPosition;
         this.playlistDoubleClickModeSelect.value = initialValues.playlistDoubleClickMode;
+        this.playlistInfoAlignmentSelect.value = initialValues.playlistInfoAlignment;
         this.desktopLyricsToggle.checked = initialValues.desktopLyrics;
         this.statisticsToggle.checked = initialValues.statistics;
         this.recentPlayToggle.checked = initialValues.recentPlay;
@@ -677,6 +679,7 @@ class Settings extends Component {
             autoplayToggle: this.autoplayToggle,
             rememberPositionToggle: this.rememberPositionToggle,
             playlistDoubleClickModeSelect: this.playlistDoubleClickModeSelect,
+            playlistInfoAlignmentSelect: this.playlistInfoAlignmentSelect,
             desktopLyricsToggle: this.desktopLyricsToggle,
             statisticsToggle: this.statisticsToggle,
             recentPlayToggle: this.recentPlayToggle,

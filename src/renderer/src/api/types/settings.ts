@@ -1,5 +1,6 @@
 export type WasapiShareMode = 'exclusive' | 'shared';
 export type PlaylistDoubleClickMode = 'shuffle' | 'sequence';
+export type PlaylistInfoAlignment = 'left' | 'center' | 'right';
 
 export interface DesktopLyricsSettings {
     fontSize?: number;
@@ -23,6 +24,7 @@ export interface MusicBoxSettings {
     showTrackCovers?: boolean;
     gaplessPlayback?: boolean;
     playlistDoubleClickMode?: PlaylistDoubleClickMode;
+    playlistInfoAlignment?: PlaylistInfoAlignment;
     exclusiveMode?: boolean;
     wasapiShareMode?: WasapiShareMode;
     [key: string]: unknown;

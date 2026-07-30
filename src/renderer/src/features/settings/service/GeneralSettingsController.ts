@@ -4,6 +4,7 @@ import {appModalService} from "@/features/appShell/service";
 import {settingsPanelVisibilityService} from "./SettingsPanelVisibilityService";
 import type {SettingValue} from "./SettingsStore";
 import type {SettingsListenerScope} from "./SettingsListenerScope";
+import type {PlaylistInfoAlignment} from "@api/types/settings";
 
 export interface GeneralSettingsElements {
     navButtons: Iterable<HTMLElement>;
@@ -12,6 +13,7 @@ export interface GeneralSettingsElements {
     autoplayToggle: HTMLInputElement | null;
     rememberPositionToggle: HTMLInputElement | null;
     playlistDoubleClickModeSelect: HTMLSelectElement | null;
+    playlistInfoAlignmentSelect: HTMLSelectElement | null;
     desktopLyricsToggle: HTMLInputElement | null;
     statisticsToggle: HTMLInputElement | null;
     recentPlayToggle: HTMLInputElement | null;
@@ -66,6 +68,14 @@ class GeneralSettingsController {
         scope.listen(elements.playlistDoubleClickModeSelect, 'change', () => {
             const value = elements.playlistDoubleClickModeSelect?.value === 'sequence' ? 'sequence' : 'shuffle';
             callbacks.updateSetting('playlistDoubleClickMode', value);
+        });
+        scope.listen(elements.playlistInfoAlignmentSelect, 'change', () => {
+            const selectedValue = elements.playlistInfoAlignmentSelect?.value;
+            const alignment: PlaylistInfoAlignment = selectedValue === 'center' || selectedValue === 'right'
+                ? selectedValue
+                : 'left';
+            callbacks.updateSetting('playlistInfoAlignment', alignment);
+            callbacks.emit('playlistInfoAlignmentChanged', alignment);
         });
     }
 

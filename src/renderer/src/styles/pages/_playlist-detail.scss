@@ -855,33 +855,37 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    gap: var(--spacing-sm);
     align-self: stretch;
 
     .playlist-title {
+      width: 100%;
       font-size: 3.5rem;
       font-weight: 800;
       color: var(--color-text);
-      margin: 0 0 var(--spacing-md) 0;
+      margin: 0;
       line-height: 1.1;
       letter-spacing: -0.02em;
       overflow-wrap: anywhere;
     }
 
     .playlist-description {
+      width: 100%;
       font-size: var(--font-size-md);
       color: var(--color-text-secondary);
       line-height: 1.6;
-      margin: 0 0 var(--spacing-lg) 0;
+      margin: 0;
       overflow-wrap: anywhere;
     }
 
     .playlist-meta {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      display: flex;
       align-items: center;
-      gap: var(--spacing-md);
-      width: 100%;
-      margin-top: auto;
+      flex-wrap: wrap;
+      gap: var(--spacing-lg);
+      width: auto;
+      margin-top: var(--spacing-sm);
 
       .meta-item {
         display: flex;
@@ -891,14 +895,7 @@
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
         font-weight: 500;
-
-        &:nth-child(2) {
-          justify-content: center;
-        }
-
-        &:last-child {
-          justify-content: flex-end;
-        }
+        white-space: nowrap;
 
         .meta-icon {
           width: 16px;
@@ -907,6 +904,33 @@
           fill: currentColor;
           opacity: 0.8;
         }
+      }
+    }
+
+    &.align-left {
+      text-align: left;
+
+      .playlist-meta {
+        align-self: flex-start;
+        justify-content: flex-start;
+      }
+    }
+
+    &.align-center {
+      text-align: center;
+
+      .playlist-meta {
+        align-self: center;
+        justify-content: center;
+      }
+    }
+
+    &.align-right {
+      text-align: right;
+
+      .playlist-meta {
+        align-self: flex-end;
+        justify-content: flex-end;
       }
     }
   }
@@ -1768,7 +1792,6 @@
     .hero-content {
       flex-direction: column;
       align-items: center;
-      text-align: center;
       gap: var(--spacing-lg);
     }
 
@@ -1815,7 +1838,6 @@
     .hero-content {
       flex-direction: column;
       align-items: center;
-      text-align: center;
       gap: var(--spacing-lg);
     }
 
@@ -1830,14 +1852,7 @@
       }
 
       .playlist-meta {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-md);
-
-        .meta-item,
-        .meta-item:nth-child(2),
-        .meta-item:last-child {
-          justify-content: center;
-        }
+        gap: var(--spacing-sm) var(--spacing-md);
       }
     }
   }

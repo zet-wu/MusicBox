@@ -4,6 +4,7 @@ import type {AppUIPorts} from "@/app/runtime/ui/AppUIPorts";
 import {updateNotificationService} from "@/features/appShell/service";
 import {playbackUiStateService} from "@/features/playback/service/PlaybackUiStateService";
 import {playbackService} from "@/features/playback/service/PlaybackService";
+import {playlistInfoAlignmentPreferenceService} from "@/features/settings/service";
 import {trackCoverDisplayPreferenceService} from "@/features/settings/service";
 import {settingsExtensionNavigationService} from "@/features/settings/service";
 import {
@@ -107,6 +108,9 @@ export class ComponentEventBinder {
                 },
                 setTrackCoverDisplayPreference: (enabled) => {
                     trackCoverDisplayPreferenceService.setEnabled(enabled);
+                },
+                setPlaylistInfoAlignment: (alignment) => {
+                    playlistInfoAlignmentPreferenceService.setAlignment(alignment);
                 }
             },
             ui: {

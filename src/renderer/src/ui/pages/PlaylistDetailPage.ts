@@ -4,7 +4,10 @@
 
 import {Component} from "@ui/base/Component";
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
-import {trackCoverDisplayPreferenceService} from "@/features/settings/service";
+import {
+    playlistInfoAlignmentPreferenceService,
+    trackCoverDisplayPreferenceService
+} from "@/features/settings/service";
 import {playlistCoverActionService} from "@/features/playlists/service/PlaylistCoverActionService";
 import {playlistDataService} from "@/features/playlists/service/PlaylistDataService";
 import {playlistFolderImportService} from "@/features/playlists/service/PlaylistFolderImportService";
@@ -12,6 +15,7 @@ import {playlistPlaybackActionService} from "@/features/playlists/service/Playli
 import {playlistTrackMutationService} from "@/features/playlists/service/PlaylistTrackMutationService";
 import type {Unsubscribe} from "@api/types/common";
 import type {Playlist, Track} from "@api/types/library";
+import type {PlaylistInfoAlignment} from "@api/types/settings";
 
 type PlaylistDetailTrack = Track & {
     fileId?: string;
@@ -45,9 +49,11 @@ class PlaylistDetailPage extends Component {
     private isMultiSelectMode: boolean;
     private lastSelectedIndex: number;
     private showCovers: boolean;
+    private playlistInfoAlignment: PlaylistInfoAlignment;
     private documentClickHandler: ((event: Event) => void) | null;
     private listenersSetup = false;
     private coverDisplayPreferenceUnsubscribe: Unsubscribe | null = null;
+    private playlistInfoAlignmentUnsubscribe: Unsubscribe | null = null;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -62,6 +68,7 @@ class PlaylistDetailPage extends Component {
 
         // 获取封面显示设置
         this.showCovers = this.getShowCoversSettings();
+        this.playlistInfoAlignment = playlistInfoAlignmentPreferenceService.getAlignment();
 
         this.setupElements();
         this.setupSettingsListener();
@@ -111,6 +118,10 @@ class PlaylistDetailPage extends Component {
             this.coverDisplayPreferenceUnsubscribe();
             this.coverDisplayPreferenceUnsubscribe = null;
         }
+        if (this.playlistInfoAlignmentUnsubscribe) {
+            this.playlistInfoAlignmentUnsubscribe();
+            this.playlistInfoAlignmentUnsubscribe = null;
+        }
         this.hideCoverContextMenu();
         super.destroy();
     }
@@ -131,6 +142,20 @@ class PlaylistDetailPage extends Component {
                 this.render();
             }
         });
+        this.playlistInfoAlignmentUnsubscribe = playlistInfoAlignmentPreferenceService.onChanged((alignment) => {
+            this.playlistInfoAlignment = alignment;
+            this.updatePlaylistInfoAlignment();
+        });
+    }
+
+    private updatePlaylistInfoAlignment(): void {
+        const info = this.container?.querySelector('.playlist-detail-info');
+        if (!info) {
+            return;
+        }
+
+        info.classList.remove('align-left', 'align-center', 'align-right');
+        info.classList.add(`align-${this.playlistInfoAlignment}`);
     }
 
     render(): void {
@@ -155,7 +180,7 @@ class PlaylistDetailPage extends Component {
                                 <div class="cover-shadow"></div>
                             </div>
                         </div>
-                        <div class="playlist-detail-info">
+                        <div class="playlist-detail-info align-${this.playlistInfoAlignment}">
                             <h1 class="playlist-title">${this.escapeHtml(this.currentPlaylist.name)}</h1>
                             ${this.currentPlaylist.description ? `
                             <p class="playlist-description">${this.escapeHtml(this.currentPlaylist.description)}</p>

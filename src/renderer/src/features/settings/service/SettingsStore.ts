@@ -1,6 +1,6 @@
 import {cacheManager} from "@/shared/cache";
 import type {MusicBoxSettings} from "@api/types/settings";
-import type {PlaylistDoubleClickMode} from "@api/types/settings";
+import type {PlaylistDoubleClickMode, PlaylistInfoAlignment} from "@api/types/settings";
 
 export type SettingValue = string | number | boolean | object | null | undefined;
 
@@ -9,6 +9,7 @@ export interface SettingsInitialValues {
     autoplay: boolean;
     rememberPosition: boolean;
     playlistDoubleClickMode: PlaylistDoubleClickMode;
+    playlistInfoAlignment: PlaylistInfoAlignment;
     desktopLyrics: boolean;
     statistics: boolean;
     recentPlay: boolean;
@@ -63,6 +64,7 @@ class SettingsStore {
             autoplay: this.getBoolean(settings, 'autoplay', false),
             rememberPosition: this.getBoolean(settings, 'rememberPosition', false),
             playlistDoubleClickMode: settings.playlistDoubleClickMode === 'sequence' ? 'sequence' : 'shuffle',
+            playlistInfoAlignment: this.getPlaylistInfoAlignment(settings),
             desktopLyrics: this.getBoolean(settings, 'desktopLyrics', true),
             statistics: this.getBoolean(settings, 'statistics', true),
             recentPlay: this.getBoolean(settings, 'recentPlay', true),
@@ -96,6 +98,11 @@ class SettingsStore {
 
     private getString(settings: MusicBoxSettings, key: string, defaultValue: string): string {
         return typeof settings[key] === 'string' ? settings[key] as string : defaultValue;
+    }
+
+    private getPlaylistInfoAlignment(settings: MusicBoxSettings): PlaylistInfoAlignment {
+        const alignment = settings.playlistInfoAlignment;
+        return alignment === 'center' || alignment === 'right' ? alignment : 'left';
     }
 }
 

@@ -20,6 +20,7 @@ export * from './MediaDirectorySettingsService';
 export * from './MusicFolderListRenderer';
 export * from './MusicFolderSettingsController';
 export * from './MusicFolderSettingsService';
+export * from './PlaylistInfoAlignmentPreferenceService';
 export * from './SettingsExtensionNavigationService';
 export * from './SettingsListenerScope';
 export * from './SettingsPageVisibilityService';
