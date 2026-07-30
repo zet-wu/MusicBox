@@ -180,6 +180,8 @@ MusicBox 当前有两类播放实现：
 - `window-config.json`：主窗口尺寸和桌面歌词位置。
 - `extensions.json`、`extensions/`、`extension-storage/`：外部插件和插件存储。
 
+收藏以 `music-library-cache.json` 中固定的系统歌单 `system:favorites` 持久化，歌曲的 `favorite` 状态由该歌单派生。Renderer 通过 `FavoriteService` 串行修改状态，并订阅 preload 转发的收藏变化事件，使播放器与歌曲页面保持同步。
+
 元数据读取主要依赖 `music-metadata` 等 Node 侧库；写入和复杂处理由 `metadata_editor.py` helper 支持，完整打包时通过 `npm run build:python` 生成平台可执行文件。
 
 ## 插件系统

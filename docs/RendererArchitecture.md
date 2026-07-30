@@ -108,6 +108,7 @@ features/<domain>/
 放置建议：
 
 - 与 Electron IPC 交互的代码放在 service，并通过 `infrastructure/electron` gateway 访问。
+- 跨页面共享的收藏状态由 `features/library/service/FavoriteService.ts` 统一写入和发布，页面不自行维护副本。
 - 只处理页面/组件事件绑定的代码放到 `ui-bindings`。
 - 可测试、与 DOM 无关的规则放到 `domain` 或 `service`。
 - 多个 feature 共享的纯工具放到 `shared/`。
