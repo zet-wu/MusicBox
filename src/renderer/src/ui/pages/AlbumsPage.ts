@@ -468,7 +468,11 @@ class AlbumsPage extends Component {
         const playBtn = this.container.querySelector('#play-album');
         if (playBtn) playBtn.addEventListener('click', () => this.emit('playAll', this.selectedAlbum?.tracks.sort((a, b) => ((a as any).track || 0) - ((b as any).track || 0))));
         const shuffleBtn = this.container.querySelector('#shuffle-album');
-        if (shuffleBtn) shuffleBtn.addEventListener('click', () => this.emit('playAll', [...(this.selectedAlbum?.tracks || [])].sort(() => Math.random() - 0.5)));
+        if (shuffleBtn) {
+            shuffleBtn.addEventListener('click', () => {
+                this.emit('shuffleAll', this.selectedAlbum?.tracks || []);
+            });
+        }
 
         // 歌曲行
         this.container.querySelectorAll('.trackx').forEach((row: any) => {

@@ -1,4 +1,5 @@
 export type WasapiShareMode = 'exclusive' | 'shared';
+export type PlaylistDoubleClickMode = 'shuffle' | 'sequence';
 
 export interface DesktopLyricsSettings {
     fontSize?: number;
@@ -21,6 +22,7 @@ export interface MusicBoxSettings {
     albumsPage?: boolean;
     showTrackCovers?: boolean;
     gaplessPlayback?: boolean;
+    playlistDoubleClickMode?: PlaylistDoubleClickMode;
     exclusiveMode?: boolean;
     wasapiShareMode?: WasapiShareMode;
     [key: string]: unknown;

@@ -88,6 +88,9 @@ export class PageComponentBindings {
                     components.artistsPage.on('playAll', async (tracks: Track[]) => {
                         await app.handlePlayAllTracks(tracks);
                     });
+                    components.artistsPage.on('shuffleAll', async (tracks: Track[]) => {
+                        await app.handleShuffleAllTracks(tracks);
+                    });
 
                     components.artistsPage.on('addToPlaylist', (track: Track) => {
                         app.addToPlaylist(track);
@@ -103,6 +106,9 @@ export class PageComponentBindings {
 
                     components.albumsPage.on('playAll', async (tracks: Track[]) => {
                         await app.handlePlayAllTracks(tracks);
+                    });
+                    components.albumsPage.on('shuffleAll', async (tracks: Track[]) => {
+                        await app.handleShuffleAllTracks(tracks);
                     });
 
                     components.albumsPage.on('addToPlaylist', (track: Track) => {

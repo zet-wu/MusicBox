@@ -1,5 +1,6 @@
 import {cacheManager} from "@/shared/cache";
 import type {MusicBoxSettings} from "@api/types/settings";
+import type {PlaylistDoubleClickMode} from "@api/types/settings";
 
 export type SettingValue = string | number | boolean | object | null | undefined;
 
@@ -7,6 +8,7 @@ export interface SettingsInitialValues {
     language: string;
     autoplay: boolean;
     rememberPosition: boolean;
+    playlistDoubleClickMode: PlaylistDoubleClickMode;
     desktopLyrics: boolean;
     statistics: boolean;
     recentPlay: boolean;
@@ -60,6 +62,7 @@ class SettingsStore {
             language: this.getString(settings, 'language', 'zh-CN'),
             autoplay: this.getBoolean(settings, 'autoplay', false),
             rememberPosition: this.getBoolean(settings, 'rememberPosition', false),
+            playlistDoubleClickMode: settings.playlistDoubleClickMode === 'sequence' ? 'sequence' : 'shuffle',
             desktopLyrics: this.getBoolean(settings, 'desktopLyrics', true),
             statistics: this.getBoolean(settings, 'statistics', true),
             recentPlay: this.getBoolean(settings, 'recentPlay', true),

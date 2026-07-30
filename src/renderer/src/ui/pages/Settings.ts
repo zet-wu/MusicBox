@@ -108,6 +108,7 @@ class Settings extends Component {
         this.languageSelect = this.element.querySelector('#language-select');
         this.autoplayToggle = this.element.querySelector('#autoplay-toggle');
         this.rememberPositionToggle = this.element.querySelector('#remember-position-toggle');
+        this.playlistDoubleClickModeSelect = this.element.querySelector('#playlist-double-click-mode-select');
         this.desktopLyricsToggle = this.element.querySelector('#desktop-lyrics-toggle');
         this.statisticsToggle = this.element.querySelector('#statistics-toggle');
         this.recentPlayToggle = this.element.querySelector('#recent-play-toggle');
@@ -386,6 +387,7 @@ class Settings extends Component {
         this.languageSelect.value = initialValues.language;
         this.autoplayToggle.checked = initialValues.autoplay;
         this.rememberPositionToggle.checked = initialValues.rememberPosition;
+        this.playlistDoubleClickModeSelect.value = initialValues.playlistDoubleClickMode;
         this.desktopLyricsToggle.checked = initialValues.desktopLyrics;
         this.statisticsToggle.checked = initialValues.statistics;
         this.recentPlayToggle.checked = initialValues.recentPlay;
@@ -674,6 +676,7 @@ class Settings extends Component {
             languageSelect: this.languageSelect,
             autoplayToggle: this.autoplayToggle,
             rememberPositionToggle: this.rememberPositionToggle,
+            playlistDoubleClickModeSelect: this.playlistDoubleClickModeSelect,
             desktopLyricsToggle: this.desktopLyricsToggle,
             statisticsToggle: this.statisticsToggle,
             recentPlayToggle: this.recentPlayToggle,

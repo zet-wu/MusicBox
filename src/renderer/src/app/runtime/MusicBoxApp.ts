@@ -292,6 +292,10 @@ export class MusicBoxApp extends EventEmitter {
         await this.playbackController.handlePlayAllTracks(tracks);
     }
 
+    async handleShuffleAllTracks(tracks: Track[]): Promise<void> {
+        await this.playbackController.handleShuffleAllTracks(tracks);
+    }
+
     async handleViewChange(view: AppView): Promise<void> {
         await this.viewRouter.handleViewChange(view);
     }
@@ -505,8 +509,13 @@ export class MusicBoxApp extends EventEmitter {
     }
 
     // 播放播放列表中的歌曲
-    async playTrackFromPlaylist(track: Track, index: number, tracks?: Track[]): Promise<void> {
-        await this.playbackController.playTrackFromPlaylist(track, index, tracks);
+    async playTrackFromPlaylist(
+        track: Track,
+        index: number,
+        tracks?: Track[],
+        mode?: 'shuffle' | 'sequence'
+    ): Promise<void> {
+        await this.playbackController.playTrackFromPlaylist(track, index, tracks, mode);
     }
 
     // 处理歌曲索引更改（用于 prev/next 按钮）

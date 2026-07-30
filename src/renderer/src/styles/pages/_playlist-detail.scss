@@ -1036,6 +1036,19 @@
         fill: var(--color-primary);
       }
     }
+
+    .shuffle-add-btn {
+      position: relative;
+
+      .shuffle-add-mark {
+        position: absolute;
+        right: 7px;
+        bottom: 4px;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1;
+      }
+    }
   }
 
   .actions-secondary {

@@ -1,4 +1,5 @@
 import {cacheManager} from "@/shared/cache";
+import {isSameTrack} from '@/features/playback/domain';
 import type {PlaybackQueueSnapshot, PlaybackStateSnapshot} from '@api/types/playback';
 import type {MusicBoxSettings} from '@api/types/settings';
 import type {Track} from '@api/types/track';
@@ -44,10 +45,21 @@ export class PlaybackAppController {
         if (!tracks || tracks.length === 0) return;
 
         try {
+            this.integrations.setPlayMode('sequence');
             await this.playTrackFromPlaylist(tracks[0], 0, tracks);
         } catch (error) {
             app.showError('播放失败，请重试');
         }
+    }
+
+    async handleShuffleAllTracks(tracks: Track[]): Promise<void> {
+        if (!tracks || tracks.length === 0) {
+            return;
+        }
+
+        const shuffledTracks = this.shuffleTracks(tracks);
+        this.integrations.setPlayMode('shuffle');
+        await this.playTrackFromPlaylist(shuffledTracks[0], 0, shuffledTracks);
     }
 
     async handleTrackPlayed(track: Track, _index: number): Promise<void> {
@@ -64,7 +76,12 @@ export class PlaybackAppController {
         await this.playTrackFromPlaylist(track, index, playlist);
     }
 
-    async playTrackFromPlaylist(track: Track, index: number, tracks?: Track[]): Promise<void> {
+    async playTrackFromPlaylist(
+        track: Track,
+        index: number,
+        tracks?: Track[],
+        mode?: 'shuffle' | 'sequence'
+    ): Promise<void> {
         if (this.playTrackLock) {
             console.log('🚫 App: 播放操作正在进行中，忽略重复调用');
             return;
@@ -74,7 +91,17 @@ export class PlaybackAppController {
         console.log(`🎵 App: 开始播放 ${track.title || track.filePath}，索引: ${index}`);
 
         try {
-            const playlist = this.resolvePlaybackPlaylist(track, index, tracks);
+            if (mode) {
+                this.integrations.setPlayMode(mode);
+            }
+            const sourceTracks = mode === 'shuffle' && tracks
+                ? [
+                    track,
+                    ...this.shuffleTracks(tracks.filter((candidate) => !isSameTrack(candidate, track)))
+                ]
+                : tracks;
+            const sourceIndex = mode === 'shuffle' ? 0 : index;
+            const playlist = this.resolvePlaybackPlaylist(track, sourceIndex, sourceTracks);
             if (playlist.tracks.length > 0) {
                 console.log('🔄 同步播放列表到API:', playlist.tracks.length, '首歌曲');
 
@@ -282,5 +309,14 @@ export class PlaybackAppController {
             candidate.filePath === track.filePath
             || (!!candidate.path && candidate.path === track.path)
         ));
+    }
+
+    private shuffleTracks(tracks: Track[]): Track[] {
+        const result = [...tracks];
+        for (let index = result.length - 1; index > 0; index -= 1) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+        }
+        return result;
     }
 }

@@ -20,6 +20,7 @@ export interface PageComponentBindingHost {
     handleDriveRemoved(drive?: unknown): Promise<void>;
     handleTrackPlayed(track: Track, index: number): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
+    handleShuffleAllTracks(tracks: Track[]): Promise<void>;
     addToPlaylist(track: Track): void;
 }
 

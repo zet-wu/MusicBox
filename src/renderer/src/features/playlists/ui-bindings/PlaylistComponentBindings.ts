@@ -34,7 +34,14 @@ export interface PlaylistComponentBindingHost {
     handleTrackInfoUpdated(data: unknown): Promise<void>;
     handleTrackPlayed(track: Track, index: number): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
-    playTrackFromPlaylist(track: Track, index: number, tracks?: Track[]): Promise<void>;
+    handleShuffleAllTracks(tracks: Track[]): Promise<void>;
+    addTracksToQueue(tracks: Track[]): Promise<void>;
+    playTrackFromPlaylist(
+        track: Track,
+        index: number,
+        tracks?: Track[],
+        mode?: 'shuffle' | 'sequence'
+    ): Promise<void>;
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
     handleShowAddSongsDialog(playlist: Playlist): Promise<void>;
     handlePlaylistCoverUpdated(playlist: Playlist): Promise<void>;
@@ -99,14 +106,17 @@ export function bindPlaylistComponentEvents({
         await app.handleTrackInfoUpdated(data);
     });
 
-    components.playlistDetailPage.on('trackPlayed', async (track: Track, index: number, tracks?: Track[]) => {
+    components.playlistDetailPage.on(
+        'trackPlayed',
+        async (track: Track, index: number, tracks?: Track[], mode?: 'shuffle' | 'sequence') => {
         if (tracks && tracks.length > 0) {
-            await app.playTrackFromPlaylist(track, index, tracks);
+            await app.playTrackFromPlaylist(track, index, tracks, mode);
             return;
         }
 
         await app.handleTrackPlayed(track, index);
-    });
+        }
+    );
 
     components.playlistDetailPage.on(
         'trackRightClick',
@@ -124,6 +134,14 @@ export function bindPlaylistComponentEvents({
 
     components.playlistDetailPage.on('playAllTracks', async (tracks: Track[]) => {
         await app.handlePlayAllTracks(tracks);
+    });
+
+    components.playlistDetailPage.on('shuffleAllTracks', async (tracks: Track[]) => {
+        await app.handleShuffleAllTracks(tracks);
+    });
+
+    components.playlistDetailPage.on('appendAllTracks', async (tracks: Track[]) => {
+        await app.addTracksToQueue(tracks);
     });
 
     components.playlistDetailPage.on('playlistUpdated', async (playlist: Playlist) => {

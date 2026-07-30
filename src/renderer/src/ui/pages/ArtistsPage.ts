@@ -1420,8 +1420,7 @@ class ArtistsPage extends Component {
         const shuffleBtn = this.container.querySelector('#shuffle-artist');
         if (shuffleBtn) {
             shuffleBtn.addEventListener('click', () => {
-                const shuffledTracks = [...selectedArtist.tracks].sort(() => Math.random() - 0.5);
-                this.emit('playAll', shuffledTracks);
+                this.emit('shuffleAll', selectedArtist.tracks);
             });
         }
 

@@ -62,6 +62,7 @@ export interface MusicBoxCompositionHost {
     playTracksNext(tracks: Track[]): Promise<void>;
     handleNetworkDriveSelected(drive: unknown): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
+    handleShuffleAllTracks(tracks: Track[]): Promise<void>;
     handlePlaylistCleared(): Promise<void>;
     handlePlaylistCoverUpdated(playlist: Playlist): Promise<void>;
     handlePlaylistCreated(playlist?: Playlist): Promise<void>;
@@ -89,7 +90,12 @@ export interface MusicBoxCompositionHost {
     loadAndPlayFile?(filePath: string): Promise<void>;
     loadInitialData(): Promise<void>;
     openDirectoryDialog(): Promise<void>;
-    playTrackFromPlaylist(track: Track, index: number, tracks?: Track[]): Promise<void>;
+    playTrackFromPlaylist(
+        track: Track,
+        index: number,
+        tracks?: Track[],
+        mode?: 'shuffle' | 'sequence'
+    ): Promise<void>;
     preloadTrackCovers(): Promise<void>;
     refreshLibrary(tracks?: Track[]): Promise<void>;
     scanMusicFolder(): Promise<void>;
@@ -265,6 +271,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handleDriveRemoved: (drive) => app.handleDriveRemoved(drive),
             handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
+            handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),
             addToPlaylist: (track) => app.addToPlaylist(track)
         },
         playback: {
@@ -315,7 +322,9 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handleTrackInfoUpdated: (data) => app.handleTrackInfoUpdated(data),
             handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
-            playTrackFromPlaylist: (track, index, tracks) => app.playTrackFromPlaylist(track, index, tracks),
+            handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),
+            addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
+            playTrackFromPlaylist: (track, index, tracks, mode) => app.playTrackFromPlaylist(track, index, tracks, mode),
             handlePlaylistUpdated: (playlist) => app.handlePlaylistUpdated(playlist),
             handleShowAddSongsDialog: (playlist) => app.handleShowAddSongsDialog(playlist),
             handlePlaylistCoverUpdated: (playlist) => app.handlePlaylistCoverUpdated(playlist)

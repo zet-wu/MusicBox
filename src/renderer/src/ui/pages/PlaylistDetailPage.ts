@@ -208,6 +208,12 @@ class PlaylistDetailPage extends Component {
                                 <path d="M14.83,13.41L13.42,14.82L16.55,17.95L14.5,20H20V14.5L17.96,16.54L14.83,13.41M14.5,4L16.54,6.04L4,18.59L5.41,20L17.96,7.46L20,9.5V4M10.59,9.17L5.41,4L4,5.41L9.17,10.58L10.59,9.17Z"/>
                             </svg>
                         </button>
+                        <button class="shuffle-btn secondary shuffle-add-btn" id="playlist-shuffle-add" title="添加全部歌曲到当前播放列表" ${trackCount === 0 ? 'disabled' : ''}>
+                            <svg class="shuffle-icon" viewBox="0 0 24 24">
+                                <path d="M14.83,13.41L13.42,14.82L16.55,17.95L14.5,20H20V14.5L17.96,16.54L14.83,13.41M14.5,4L16.54,6.04L4,18.59L5.41,20L17.96,7.46L20,9.5V4M10.59,9.17L5.41,4L4,5.41L9.17,10.58L10.59,9.17Z"/>
+                            </svg>
+                            <span class="shuffle-add-mark">+</span>
+                        </button>
                     </div>
                     <div class="actions-secondary">
                         <button class="action-btn add-songs" id="playlist-add-songs">
@@ -322,7 +328,7 @@ class PlaylistDetailPage extends Component {
         }
 
         const actionButton = target.closest<HTMLElement>(
-            '#playlist-play-all, #playlist-shuffle, #playlist-add-songs, #playlist-add-from-folder, #select-all-tracks, #clear-selection, #playlist-clear, .empty-action-btn'
+            '#playlist-play-all, #playlist-shuffle, #playlist-shuffle-add, #playlist-add-songs, #playlist-add-from-folder, #select-all-tracks, #clear-selection, #playlist-clear, .empty-action-btn'
         );
         if (actionButton) {
             await this.handleActionButtonClick(actionButton);
@@ -380,6 +386,9 @@ class PlaylistDetailPage extends Component {
                 break;
             case 'playlist-shuffle':
                 await this.shufflePlayTracks();
+                break;
+            case 'playlist-shuffle-add':
+                await this.appendAllTracks();
                 break;
             case 'playlist-add-songs':
                 this.showAddSongsDialog();
@@ -663,7 +672,13 @@ class PlaylistDetailPage extends Component {
 
     async playTrack(track: PlaylistDetailTrack, index: number): Promise<void> {
         try {
-            this.emit('trackPlayed', track, index, this.tracks);
+            this.emit(
+                'trackPlayed',
+                track,
+                index,
+                this.tracks,
+                playlistPlaybackActionService.getDoubleClickMode()
+            );
         } catch (error) {
             console.error('❌ PlaylistDetailPage: 播放歌曲失败', error);
         }
@@ -675,8 +690,13 @@ class PlaylistDetailPage extends Component {
     }
 
     async shufflePlayTracks(): Promise<void> {
-        const shuffledTracks = playlistPlaybackActionService.getShuffledPlayableTracks(this.tracks);
-        if (shuffledTracks) this.emit('playAllTracks', shuffledTracks);
+        const tracks = playlistPlaybackActionService.getPlayableTracks(this.tracks);
+        if (tracks) this.emit('shuffleAllTracks', tracks);
+    }
+
+    async appendAllTracks(): Promise<void> {
+        const tracks = playlistPlaybackActionService.getPlayableTracks(this.tracks);
+        if (tracks) this.emit('appendAllTracks', tracks);
     }
 
     showAddSongsDialog(): void {

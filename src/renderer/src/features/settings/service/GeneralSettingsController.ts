@@ -11,6 +11,7 @@ export interface GeneralSettingsElements {
     languageSelect: HTMLSelectElement | null;
     autoplayToggle: HTMLInputElement | null;
     rememberPositionToggle: HTMLInputElement | null;
+    playlistDoubleClickModeSelect: HTMLSelectElement | null;
     desktopLyricsToggle: HTMLInputElement | null;
     statisticsToggle: HTMLInputElement | null;
     recentPlayToggle: HTMLInputElement | null;
@@ -62,6 +63,10 @@ class GeneralSettingsController {
 
         this.bindCheckedSetting(elements.autoplayToggle, 'autoplay', callbacks, scope);
         this.bindCheckedSetting(elements.rememberPositionToggle, 'rememberPosition', callbacks, scope);
+        scope.listen(elements.playlistDoubleClickModeSelect, 'change', () => {
+            const value = elements.playlistDoubleClickModeSelect?.value === 'sequence' ? 'sequence' : 'shuffle';
+            callbacks.updateSetting('playlistDoubleClickMode', value);
+        });
     }
 
     private bindFeatureToggles(elements: GeneralSettingsElements, callbacks: GeneralSettingsCallbacks, scope: SettingsListenerScope): void {
