@@ -1437,6 +1437,10 @@
                 fill: #e53e3e;
               }
 
+              &.like-btn.active .icon {
+                fill: #e53e3e;
+              }
+
               &.remove-btn:hover {
                 background: rgba(229, 62, 62, 0.1);
 

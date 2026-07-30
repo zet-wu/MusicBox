@@ -236,7 +236,7 @@
 
   &.active .icon {
     // 激活状态保持主题色
-    filter: brightness(0) saturate(100%) invert(0.2) sepia(1) saturate(5) hue-rotate(220deg);
+    filter: brightness(0) saturate(100%) invert(31%) sepia(89%) saturate(3492%) hue-rotate(342deg) brightness(94%) contrast(90%);
   }
 
   &.disabled {
@@ -250,6 +250,10 @@
     &:active {
       transform: unset;
     }
+  }
+
+  &:disabled {
+    pointer-events: none;
   }
 }
 
@@ -438,7 +442,7 @@
 
   .button-icon.active .icon {
     // 激活状态保持主题色
-    filter: brightness(0) saturate(100%) invert(0.9) sepia(1) saturate(5) hue-rotate(220deg);
+    filter: brightness(0) saturate(100%) invert(31%) sepia(89%) saturate(3492%) hue-rotate(342deg) brightness(94%) contrast(90%);
   }
 
   // 全屏按钮深色主题样式

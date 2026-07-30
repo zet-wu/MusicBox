@@ -7,6 +7,7 @@ import {PlayerCoverInteractionController} from "@ui/widgets/player/PlayerCoverIn
 import {resolvePlayerElements} from "@ui/widgets/player/PlayerElementRegistry";
 import {MiniModePlayerView} from "@ui/widgets/player/MiniModePlayerView";
 import {PlayerCoverArtController} from "@ui/widgets/player/PlayerCoverArtController";
+import {PlayerFavoriteController} from "@ui/widgets/player/PlayerFavoriteController";
 import {PlayerMiniModeController} from "@ui/widgets/player/PlayerMiniModeController";
 import {PlayerPlaybackController} from "@ui/widgets/player/PlayerPlaybackController";
 import {PlayerProgressController} from "@ui/widgets/player/PlayerProgressController";
@@ -33,6 +34,7 @@ class Player extends Component {
     private playbackControls!: PlayerPlaybackController;
     private coverInteractionController!: PlayerCoverInteractionController;
     private coverArtController!: PlayerCoverArtController;
+    private favoriteController!: PlayerFavoriteController;
     private trackInfoController!: PlayerTrackInfoController;
     private progressController!: PlayerProgressController;
     private volumeController!: PlayerVolumeController;
@@ -183,6 +185,14 @@ class Player extends Component {
             }
         });
 
+        this.favoriteController = new PlayerFavoriteController({
+            button: actions.likeBtn,
+            getCurrentTrack: () => playbackUiStateService.getCurrentTrack(),
+            addDomListener: (element, event, handler, options) => {
+                this.addEventListenerManaged(element, event, handler, options);
+            }
+        });
+
         this.desktopLyricsButtonController = new DesktopLyricsButtonController({
             button: actions.desktopLyricsBtn,
             addDomListener: (element, event, handler, options) => {
@@ -195,6 +205,7 @@ class Player extends Component {
         this.playbackControls.bind();
         this.progressController.bind();
         this.volumeController.bind();
+        this.favoriteController.bind();
         this.addEventListenerManaged(this.elements.actions.lyricsBtn, 'click', () => {
             this.emit('toggleLyrics');
         });
@@ -217,6 +228,7 @@ class Player extends Component {
 
     async updateTrackInfo(track: Track | null): Promise<void> {
         await this.trackInfoController.updateTrackInfo(track);
+        this.favoriteController.update(track);
     }
 
     updatePlayButton(): void {
@@ -253,6 +265,7 @@ class Player extends Component {
             this.volumeController.setVolume(state.volume);
             await this.desktopLyricsButtonController.initialize();
             await this.restoreMiniModeState();
+            this.favoriteController.update(playbackUiStateService.getCurrentTrack());
             return {
                 status: true
             }
@@ -293,6 +306,7 @@ class Player extends Component {
         this.playbackControls.destroy();
         this.coverInteractionController.destroy();
         this.coverArtController.destroy();
+        this.favoriteController.destroy();
         this.trackInfoController.reset();
 
         // 重置播放状态

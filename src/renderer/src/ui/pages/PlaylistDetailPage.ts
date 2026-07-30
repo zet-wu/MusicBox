@@ -3,6 +3,8 @@
  */
 
 import {Component} from "@ui/base/Component";
+import {appNotificationService} from "@/features/appShell/service";
+import {favoriteService} from "@/features/library/service";
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
 import {
     playlistInfoAlignmentPreferenceService,
@@ -54,6 +56,7 @@ class PlaylistDetailPage extends Component {
     private listenersSetup = false;
     private coverDisplayPreferenceUnsubscribe: Unsubscribe | null = null;
     private playlistInfoAlignmentUnsubscribe: Unsubscribe | null = null;
+    private favoriteUnsubscribe: Unsubscribe | null = null;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -72,6 +75,11 @@ class PlaylistDetailPage extends Component {
 
         this.setupElements();
         this.setupSettingsListener();
+        this.favoriteUnsubscribe = favoriteService.onChanged(({trackIds}) => {
+            if (this.isVisible && this.tracks.some((track) => track.fileId && trackIds.includes(track.fileId))) {
+                this.render();
+            }
+        });
     }
 
     async show(playlist: PlaylistDetail): Promise<void> {
@@ -121,6 +129,10 @@ class PlaylistDetailPage extends Component {
         if (this.playlistInfoAlignmentUnsubscribe) {
             this.playlistInfoAlignmentUnsubscribe();
             this.playlistInfoAlignmentUnsubscribe = null;
+        }
+        if (this.favoriteUnsubscribe) {
+            this.favoriteUnsubscribe();
+            this.favoriteUnsubscribe = null;
         }
         this.hideCoverContextMenu();
         super.destroy();
@@ -377,7 +389,7 @@ class PlaylistDetailPage extends Component {
 
         const trackAction = target.closest<HTMLElement>('.track-action-btn')?.dataset.action;
         if (trackAction === 'like') {
-            this.toggleTrackLike(track, index);
+            await this.toggleTrackLike(track, index);
             return;
         }
 
@@ -673,7 +685,11 @@ class PlaylistDetailPage extends Component {
                             </div>
                             <div class="track-cell cell-actions">
                                 <div class="track-actions">
-                                    <button class="track-action-btn like-btn" data-action="like">
+                                    <button class="track-action-btn like-btn ${favoriteService.isFavorite(track) ? 'active' : ''}"
+                                            data-action="like"
+                                            type="button"
+                                            aria-pressed="${favoriteService.isFavorite(track)}"
+                                            title="${favoriteService.isFavorite(track) ? '取消收藏' : '收藏'}">
                                         <svg class="icon" viewBox="0 0 24 24">
                                             <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5 2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
                                         </svg>
@@ -849,10 +865,11 @@ class PlaylistDetailPage extends Component {
         }
     }
 
-    toggleTrackLike(track: PlaylistDetailTrack, _index: number): void {
-        // 可以实现喜欢/取消喜欢功能
-        console.log('🎵 切换歌曲喜欢状态:', track.title);
-        // TODO: 实现喜欢功能
+    async toggleTrackLike(track: PlaylistDetailTrack, _index: number): Promise<void> {
+        const result = await favoriteService.toggle(track);
+        if (!result.success) {
+            appNotificationService.showError(result.error || '更新收藏状态失败');
+        }
     }
 
     async removeTrackFromPlaylist(track: PlaylistDetailTrack, _index: number): Promise<void> {

@@ -18,6 +18,8 @@ export type {
 } from './LibraryPageDataService';
 export {LibraryService, libraryService} from './LibraryService';
 export type {AddTrackResult, PlaylistCoverResult} from './LibraryService';
+export {FAVORITES_PLAYLIST_ID, FavoriteService, favoriteService} from './FavoriteService';
+export type {FavoriteMutationResult} from './FavoriteService';
 export {TrackMetadataEditService, trackMetadataEditService} from './TrackMetadataEditService';
 export type {
     EditableTrackMetadata,
