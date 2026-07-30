@@ -5,7 +5,6 @@ import type {Track} from "@api/types/track";
 
 interface PlayerFavoriteControllerOptions {
     button: HTMLButtonElement;
-    getCurrentTrack: () => Track | null;
     addDomListener: (
         element: EventTarget,
         event: string,
@@ -16,17 +15,16 @@ interface PlayerFavoriteControllerOptions {
 
 class PlayerFavoriteController {
     private readonly button: HTMLButtonElement;
-    private readonly getCurrentTrack: () => Track | null;
     private readonly addDomListener: PlayerFavoriteControllerOptions['addDomListener'];
     private readonly unsubscribeFavorite: Unsubscribe;
+    private currentTrack: Track | null = null;
     private pending = false;
 
     constructor(options: PlayerFavoriteControllerOptions) {
         this.button = options.button;
-        this.getCurrentTrack = options.getCurrentTrack;
         this.addDomListener = options.addDomListener;
         this.unsubscribeFavorite = favoriteService.onChanged(({trackIds}) => {
-            const currentTrack = this.getCurrentTrack();
+            const currentTrack = this.currentTrack;
             if (currentTrack?.fileId && trackIds.includes(currentTrack.fileId)) {
                 this.update(currentTrack);
             }
@@ -41,6 +39,7 @@ class PlayerFavoriteController {
     }
 
     update(track: Track | null): void {
+        this.currentTrack = track;
         const favorite = favoriteService.isFavorite(track);
         const disabled = !track?.fileId || this.pending;
         this.button.disabled = disabled;
@@ -55,7 +54,7 @@ class PlayerFavoriteController {
     }
 
     private async toggle(): Promise<void> {
-        const track = this.getCurrentTrack();
+        const track = this.currentTrack;
         if (!track?.fileId || this.pending) {
             return;
         }

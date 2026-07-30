@@ -187,7 +187,6 @@ class Player extends Component {
 
         this.favoriteController = new PlayerFavoriteController({
             button: actions.likeBtn,
-            getCurrentTrack: () => playbackUiStateService.getCurrentTrack(),
             addDomListener: (element, event, handler, options) => {
                 this.addEventListenerManaged(element, event, handler, options);
             }

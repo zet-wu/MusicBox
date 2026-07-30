@@ -94,9 +94,9 @@ class PlaylistDetailPage extends Component {
             }
 
             if (this.getCollectionType() === 'favorites') {
-                void this.loadPlaylistTracks();
+                void this.refreshFavoritesInPlace();
             } else if (this.sourceTracks.some((track) => track.fileId && trackIds.includes(track.fileId))) {
-                this.render();
+                this.updateFavoriteButtons(trackIds);
             }
         });
     }
@@ -142,7 +142,6 @@ class PlaylistDetailPage extends Component {
             : {
                 id: 'system:all-tracks',
                 name: '全部歌曲',
-                description: '音乐库中的所有歌曲',
                 collectionType
             };
         await this.show(playlist);
@@ -287,13 +286,13 @@ class PlaylistDetailPage extends Component {
                                     <svg class="meta-icon" viewBox="0 0 24 24">
                                         <path d="M12,3V12.26C11.5,12.09 11,12 10.5,12C8.01,12 6,14.01 6,16.5S8.01,21 10.5,21S15,18.99 15,16.5V6H19V3H12Z"/>
                                     </svg>
-                                    <span>${trackCount} 首歌曲</span>
+                                    <span class="meta-track-count">${trackCount} 首歌曲</span>
                                 </span>
                                 <span class="meta-item">
                                     <svg class="meta-icon" viewBox="0 0 24 24">
                                         <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.2,16.2L11,13V7H12.5V12.2L17,14.9L16.2,16.2Z"/>
                                     </svg>
-                                    <span>${this.formatTotalDuration(totalDuration)}</span>
+                                    <span class="meta-total-duration">${this.formatTotalDuration(totalDuration)}</span>
                                 </span>
                                 ${capabilities.showCreatedDate ? `<span class="meta-item">
                                     <svg class="meta-icon" viewBox="0 0 24 24">
@@ -361,37 +360,7 @@ class PlaylistDetailPage extends Component {
                     </div>` : ''}
                 </div>
 
-                <!-- 现代化歌曲列表区域 -->
-                <div class="tracks-section">
-                    ${trackCount > 0 ? `
-                    <div class="tracks-header">
-                        <div class="header-left">
-                            <h3 class="tracks-title">歌曲列表</h3>
-                            <span class="tracks-count">${trackCount} 首歌曲</span>
-                        </div>
-                        <div class="header-right">
-                            <div class="tracks-controls">
-                                <button class="control-btn" id="select-all-tracks">
-                                    <svg class="icon" viewBox="0 0 24 24">
-                                        <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"/>
-                                    </svg>
-                                    <span>全选</span>
-                                </button>
-                                <button class="control-btn" id="clear-selection" style="display: none;">
-                                    <svg class="icon" viewBox="0 0 24 24">
-                                        <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
-                                    </svg>
-                                    <span>取消选择</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    ` : ''}
-                    <!-- 始终渲染tracks-container，确保DOM结构一致 -->
-                    <div class="tracks-container" id="playlist-track-list">
-                        ${this.renderTrackList()}
-                    </div>
-                </div>
+                ${this.renderTracksSection()}
             </div>
         `;
 
@@ -658,7 +627,7 @@ class PlaylistDetailPage extends Component {
         }
     }
 
-    async loadPlaylistTracks(): Promise<void> {
+    async loadPlaylistTracks(renderPage = true): Promise<void> {
         if (!this.currentPlaylist) return;
         try {
             if (this.getCollectionType() === 'all-tracks') {
@@ -668,7 +637,7 @@ class PlaylistDetailPage extends Component {
                     .map((track) => track.fileId)
                     .filter((fileId): fileId is string => Boolean(fileId));
                 this.currentPlaylist.trackCount = this.tracks.length;
-                this.render();
+                if (renderPage) this.render();
                 return;
             }
 
@@ -689,7 +658,7 @@ class PlaylistDetailPage extends Component {
                     }
                 }
 
-                this.render();
+                if (renderPage) this.render();
             } else {
                 console.error('❌ PlaylistDetailPage: 加载歌单歌曲失败', result.error);
                 this.sourceTracks = [];
@@ -697,7 +666,7 @@ class PlaylistDetailPage extends Component {
                 // 同步更新空状态
                 this.currentPlaylist.trackIds = [];
                 this.currentPlaylist.trackCount = 0;
-                this.render();
+                if (renderPage) this.render();
             }
         } catch (error) {
             console.error('❌ PlaylistDetailPage: 加载歌单歌曲失败', error);
@@ -706,8 +675,43 @@ class PlaylistDetailPage extends Component {
             // 同步更新空状态
             this.currentPlaylist.trackIds = [];
             this.currentPlaylist.trackCount = 0;
-            this.render();
+            if (renderPage) this.render();
         }
+    }
+
+    private renderTracksSection(): string {
+        const trackCount = this.tracks.length;
+        return `
+            <div class="tracks-section">
+                ${trackCount > 0 ? `
+                <div class="tracks-header">
+                    <div class="header-left">
+                        <h3 class="tracks-title">歌曲列表</h3>
+                        <span class="tracks-count">${trackCount} 首歌曲</span>
+                    </div>
+                    <div class="header-right">
+                        <div class="tracks-controls">
+                            <button class="control-btn" id="select-all-tracks">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"/>
+                                </svg>
+                                <span>全选</span>
+                            </button>
+                            <button class="control-btn" id="clear-selection" style="display: none;">
+                                <svg class="icon" viewBox="0 0 24 24">
+                                    <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,6.41Z"/>
+                                </svg>
+                                <span>取消选择</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+                <div class="tracks-container" id="playlist-track-list">
+                    ${this.renderTrackList()}
+                </div>
+            </div>
+        `;
     }
 
     renderTrackList(): string {
@@ -992,8 +996,6 @@ class PlaylistDetailPage extends Component {
         const result = await favoriteService.toggle(track);
         if (!result.success) {
             appNotificationService.showError(result.error || '更新收藏状态失败');
-        } else if (this.getCollectionType() === 'favorites' && !result.favorite) {
-            await this.loadPlaylistTracks();
         }
     }
 
@@ -1254,6 +1256,79 @@ class PlaylistDetailPage extends Component {
             .map((selectedIndex) => this.tracks[selectedIndex])
             .filter((item): item is PlaylistDetailTrack => Boolean(item));
         this.emit('trackRightClick', track, index, x, y, new Set(this.selectedTracks), selectedTrackItems);
+    }
+
+    private async refreshFavoritesInPlace(): Promise<void> {
+        if (!this.isVisible || this.getCollectionType() !== 'favorites') {
+            return;
+        }
+
+        await this.loadPlaylistTracks(false);
+        if (this.isVisible && this.getCollectionType() === 'favorites') {
+            this.updateCollectionContent();
+        }
+    }
+
+    private updateFavoriteButtons(trackIds: string[]): void {
+        if (!this.container || trackIds.length === 0) {
+            return;
+        }
+
+        const changedIds = new Set(trackIds);
+        this.container.querySelectorAll<HTMLElement>('.track-row').forEach((row) => {
+            const index = this.getTrackIndexFromRow(row);
+            const track = index === null ? null : this.tracks[index];
+            if (!track?.fileId || !changedIds.has(track.fileId)) {
+                return;
+            }
+
+            const button = row.querySelector<HTMLButtonElement>('.track-action-btn.like-btn');
+            if (!button) {
+                return;
+            }
+
+            const favorite = favoriteService.isFavorite(track);
+            button.classList.toggle('active', favorite);
+            button.setAttribute('aria-pressed', String(favorite));
+            button.title = favorite ? '取消收藏' : '收藏';
+        });
+    }
+
+    private updateCollectionContent(): void {
+        if (!this.container) {
+            return;
+        }
+
+        this.selectedTracks.clear();
+        this.lastSelectedIndex = -1;
+        this.isMultiSelectMode = false;
+
+        const existingSection = this.container.querySelector('.tracks-section');
+        if (existingSection) {
+            const template = document.createElement('template');
+            template.innerHTML = this.renderTracksSection().trim();
+            const nextSection = template.content.firstElementChild;
+            if (nextSection) {
+                existingSection.replaceWith(nextSection);
+            }
+        }
+
+        const trackCount = this.tracks.length;
+        const countElement = this.container.querySelector('.meta-track-count');
+        if (countElement) {
+            countElement.textContent = `${trackCount} 首歌曲`;
+        }
+        const durationElement = this.container.querySelector('.meta-total-duration');
+        if (durationElement) {
+            durationElement.textContent = this.formatTotalDuration(this.calculateTotalDuration());
+        }
+
+        ['#playlist-play-all', '#playlist-add-all', '#playlist-clear'].forEach((selector) => {
+            const button = this.container?.querySelector<HTMLButtonElement>(selector);
+            if (button) {
+                button.disabled = trackCount === 0;
+            }
+        });
     }
 
     private getCollectionType(): CollectionType {
