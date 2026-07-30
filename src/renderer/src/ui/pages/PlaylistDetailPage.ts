@@ -155,13 +155,7 @@ class PlaylistDetailPage extends Component {
                                 <div class="cover-shadow"></div>
                             </div>
                         </div>
-                        <div class="playlist-info">
-                            <div class="playlist-type">
-                                <svg class="type-icon" viewBox="0 0 24 24">
-                                    <path d="M15,6H3V8H15V6M15,10H3V12H15V10M3,16H11V14H3V16M17,6V14.18C16.69,14.07 16.35,14 16,14A3,3 0 0,0 13,17A3,3 0 0,0 16,20A3,3 0 0,0 19,17V8H22V6H17Z"/>
-                                </svg>
-                                <span>歌单</span>
-                            </div>
+                        <div class="playlist-detail-info">
                             <h1 class="playlist-title">${this.escapeHtml(this.currentPlaylist.name)}</h1>
                             ${this.currentPlaylist.description ? `
                             <p class="playlist-description">${this.escapeHtml(this.currentPlaylist.description)}</p>
@@ -173,14 +167,12 @@ class PlaylistDetailPage extends Component {
                                     </svg>
                                     <span>${trackCount} 首歌曲</span>
                                 </span>
-                                ${totalDuration ? `
                                 <span class="meta-item">
                                     <svg class="meta-icon" viewBox="0 0 24 24">
                                         <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.2,16.2L11,13V7H12.5V12.2L17,14.9L16.2,16.2Z"/>
                                     </svg>
                                     <span>${this.formatTotalDuration(totalDuration)}</span>
                                 </span>
-                                ` : ''}
                                 <span class="meta-item">
                                     <svg class="meta-icon" viewBox="0 0 24 24">
                                         <path d="M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19Z"/>

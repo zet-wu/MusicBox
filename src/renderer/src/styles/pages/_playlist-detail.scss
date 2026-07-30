@@ -105,28 +105,6 @@
       flex: 1;
       min-width: 0;
 
-      .playlist-type {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--spacing-xs);
-        font-size: var(--font-size-sm);
-        font-weight: 600;
-        color: rgba(255, 255, 255, 0.9);
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin-bottom: var(--spacing-md);
-        background: rgba(255, 255, 255, 0.1);
-        padding: var(--spacing-xs) var(--spacing-md);
-        border-radius: var(--radius-full);
-        backdrop-filter: blur(10px);
-
-        .type-icon {
-          width: 16px;
-          height: 16px;
-          fill: currentColor;
-        }
-      }
-
       .playlist-title {
         font-size: 3.5rem;
         font-weight: 900;
@@ -779,7 +757,7 @@
 // 现代化歌单Hero区域样式
 .playlist-hero {
   position: relative;
-  padding: var(--spacing-xl) var(--spacing-lg);
+  padding: var(--spacing-lg);
   margin-bottom: var(--spacing-xl);
   border-radius: var(--radius-xl);
   overflow: hidden;
@@ -819,8 +797,8 @@
     position: relative;
     z-index: 1;
     display: flex;
-    align-items: flex-end;
-    gap: var(--spacing-xl);
+    align-items: stretch;
+    gap: var(--spacing-lg);
   }
 
   .playlist-cover-container {
@@ -872,27 +850,12 @@
     }
   }
 
-  .playlist-info {
+  .playlist-detail-info {
     flex: 1;
     min-width: 0;
-
-    .playlist-type {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-xs);
-      margin-bottom: var(--spacing-sm);
-      font-size: var(--font-size-sm);
-      font-weight: 600;
-      color: var(--color-text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-
-      .type-icon {
-        width: 16px;
-        height: 16px;
-        fill: currentColor;
-      }
-    }
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
 
     .playlist-title {
       font-size: 3.5rem;
@@ -901,6 +864,7 @@
       margin: 0 0 var(--spacing-md) 0;
       line-height: 1.1;
       letter-spacing: -0.02em;
+      overflow-wrap: anywhere;
     }
 
     .playlist-description {
@@ -908,26 +872,38 @@
       color: var(--color-text-secondary);
       line-height: 1.6;
       margin: 0 0 var(--spacing-lg) 0;
-      max-width: 600px;
+      overflow-wrap: anywhere;
     }
 
     .playlist-meta {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: center;
-      gap: var(--spacing-lg);
-      flex-wrap: wrap;
+      gap: var(--spacing-md);
+      width: 100%;
+      margin-top: auto;
 
       .meta-item {
         display: flex;
         align-items: center;
         gap: var(--spacing-xs);
+        min-width: 0;
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
         font-weight: 500;
 
+        &:nth-child(2) {
+          justify-content: center;
+        }
+
+        &:last-child {
+          justify-content: flex-end;
+        }
+
         .meta-icon {
           width: 16px;
           height: 16px;
+          flex-shrink: 0;
           fill: currentColor;
           opacity: 0.8;
         }
@@ -1721,7 +1697,7 @@
     animation: fadeInLeft 1s ease-out 0.2s both;
   }
 
-  .playlist-info {
+  .playlist-detail-info {
     animation: fadeInRight 1s ease-out 0.4s both;
   }
 }
@@ -1801,7 +1777,7 @@
       height: 200px;
     }
 
-    .playlist-info .playlist-title {
+    .playlist-detail-info .playlist-title {
       font-size: 2.8rem;
     }
   }
@@ -1848,14 +1824,21 @@
       height: 180px;
     }
 
-    .playlist-info .playlist-title {
-      font-size: 2.5rem;
-    }
+    .playlist-detail-info {
+      .playlist-title {
+        font-size: 2.5rem;
+      }
 
-    .playlist-meta {
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: var(--spacing-md);
+      .playlist-meta {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+
+        .meta-item,
+        .meta-item:nth-child(2),
+        .meta-item:last-child {
+          justify-content: center;
+        }
+      }
     }
   }
 
