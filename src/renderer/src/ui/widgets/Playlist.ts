@@ -23,6 +23,7 @@ class Playlist extends Component {
     entries: QueueEntry[];
     currentQueueId: string | null;
     currentTrackIndex: number;
+    draggedQueueId: string | null;
     listenersSetup: boolean;
     panel!: HTMLElement;
     closeBtn!: HTMLElement;
@@ -38,6 +39,7 @@ class Playlist extends Component {
         this.entries = [];
         this.currentQueueId = null;
         this.currentTrackIndex = -1;
+        this.draggedQueueId = null;
         this.listenersSetup = false; // 事件监听器是否已设置
 
         this.setupElements();
@@ -143,15 +145,22 @@ class Playlist extends Component {
                 return;
             }
 
+            this.draggedQueueId = row.dataset.queueId;
             dragEvent.dataTransfer.effectAllowed = 'move';
             dragEvent.dataTransfer.setData('text/plain', row.dataset.queueId);
             row.classList.add('dragging');
+            dragEvent.stopPropagation();
         });
 
         this.addEventListenerManaged(this.tracksContainer, 'dragover', (event: Event) => {
             const dragEvent = event as DragEvent;
-            if (dragEvent.target instanceof Element && dragEvent.target.closest('.playlist-track')) {
+            if (
+                this.draggedQueueId
+                && dragEvent.target instanceof Element
+                && dragEvent.target.closest('.playlist-track')
+            ) {
                 dragEvent.preventDefault();
+                dragEvent.stopPropagation();
                 if (dragEvent.dataTransfer) {
                     dragEvent.dataTransfer.dropEffect = 'move';
                 }
@@ -163,12 +172,13 @@ class Playlist extends Component {
             const targetRow = dragEvent.target instanceof Element
                 ? dragEvent.target.closest<HTMLElement>('.playlist-track')
                 : null;
-            const queueId = dragEvent.dataTransfer?.getData('text/plain');
+            const queueId = this.draggedQueueId || dragEvent.dataTransfer?.getData('text/plain');
             if (!targetRow || !queueId) {
                 return;
             }
 
             dragEvent.preventDefault();
+            dragEvent.stopPropagation();
             const targetIndex = Number.parseInt(targetRow.dataset.index || '-1', 10);
             if (targetIndex >= 0) {
                 this.emit('queueReordered', {queueId, targetIndex});
@@ -177,6 +187,7 @@ class Playlist extends Component {
 
         this.addEventListenerManaged(this.tracksContainer, 'dragend', () => {
             this.tracksContainer.querySelector('.playlist-track.dragging')?.classList.remove('dragging');
+            this.draggedQueueId = null;
         });
 
         // Close on outside click

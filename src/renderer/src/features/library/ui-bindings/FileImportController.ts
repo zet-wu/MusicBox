@@ -87,6 +87,9 @@ export class FileImportController {
     setupFileLoading(): void {
         this.app.addManagedEventListener(document, 'dragover', (event) => {
             const e = event as DragEvent;
+            if (!Array.from(e.dataTransfer?.types || []).includes('Files')) {
+                return;
+            }
             e.preventDefault();
             if (e.dataTransfer) {
                 e.dataTransfer.dropEffect = 'copy';
@@ -95,6 +98,9 @@ export class FileImportController {
 
         this.app.addManagedEventListener(document, 'drop', async (event) => {
             const e = event as DragEvent;
+            if (!Array.from(e.dataTransfer?.types || []).includes('Files')) {
+                return;
+            }
             e.preventDefault();
             await this.handleFileDrop(e);
         });
