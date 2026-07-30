@@ -136,10 +136,6 @@ export function bindPlaylistComponentEvents({
         await app.handlePlayAllTracks(tracks);
     });
 
-    components.playlistDetailPage.on('shuffleAllTracks', async (tracks: Track[]) => {
-        await app.handleShuffleAllTracks(tracks);
-    });
-
     components.playlistDetailPage.on('appendAllTracks', async (tracks: Track[]) => {
         await app.addTracksToQueue(tracks);
     });

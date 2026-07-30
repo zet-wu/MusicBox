@@ -997,58 +997,6 @@
       }
     }
 
-    .shuffle-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 40px; // 减小按钮尺寸
-      height: 40px;
-      background: var(--color-secondary-bg);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg); // 与播放按钮保持一致的圆角设计
-      cursor: pointer;
-      transition: all var(--transition-fast);
-
-      &:hover:not(:disabled) {
-        background: var(--color-hover);
-        border-color: var(--color-primary);
-        transform: scale(1.05);
-      }
-
-      &:active {
-        transform: scale(0.95);
-      }
-
-      &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .shuffle-icon {
-        width: 18px; // 减小图标尺寸以匹配按钮
-        height: 18px;
-        fill: var(--color-text-secondary);
-        transition: fill var(--transition-fast);
-      }
-
-      &:hover:not(:disabled) .shuffle-icon {
-        fill: var(--color-primary);
-      }
-    }
-
-    .shuffle-add-btn {
-      position: relative;
-
-      .shuffle-add-mark {
-        position: absolute;
-        right: 7px;
-        bottom: 4px;
-        font-size: 14px;
-        font-weight: 700;
-        line-height: 1;
-      }
-    }
   }
 
   .actions-secondary {

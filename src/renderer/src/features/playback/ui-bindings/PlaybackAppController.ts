@@ -45,8 +45,11 @@ export class PlaybackAppController {
         if (!tracks || tracks.length === 0) return;
 
         try {
-            this.integrations.setPlayMode('sequence');
-            await this.playTrackFromPlaylist(tracks[0], 0, tracks);
+            const playMode = this.integrations.getPlaybackSnapshot().playMode;
+            const queueTracks = playMode === 'shuffle'
+                ? this.shuffleTracks(tracks)
+                : tracks;
+            await this.playTrackFromPlaylist(queueTracks[0], 0, queueTracks);
         } catch (error) {
             app.showError('播放失败，请重试');
         }
