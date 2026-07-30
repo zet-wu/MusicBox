@@ -70,8 +70,8 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.call('deletePlaylist', playlistId);
     }
 
-    renamePlaylist(playlistId: string, newName: string): Promise<PlaylistResult> {
-        return this.call('renamePlaylist', playlistId, newName);
+    renamePlaylist(playlistId: string, newName: string, description = ''): Promise<PlaylistResult> {
+        return this.call('renamePlaylist', playlistId, newName, description);
     }
 
     addToPlaylist(playlistId: string, trackIds: string | string[]): Promise<Result> {

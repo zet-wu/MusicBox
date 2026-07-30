@@ -94,7 +94,7 @@ export interface ElectronLibraryAPI {
     createPlaylist(name: string, description?: string): Promise<unknown>;
     getPlaylistDetail(playlistId: string): Promise<PlaylistDetailResult>;
     deletePlaylist(playlistId: string): Promise<unknown>;
-    renamePlaylist(playlistId: string, newName: string): Promise<unknown>;
+    renamePlaylist(playlistId: string, newName: string, description?: string): Promise<unknown>;
     addToPlaylist(playlistId: string, trackIds: string[]): Promise<Result>;
     removeFromPlaylist(playlistId: string, trackIds: string[]): Promise<Result>;
     cleanupPlaylists(): Promise<unknown>;

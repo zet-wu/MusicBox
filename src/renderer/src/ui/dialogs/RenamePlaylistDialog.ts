@@ -8,6 +8,7 @@ import {playlistDialogActionService} from "@/features/playlists/service/Playlist
 interface PlaylistLike {
     id: string;
     name: string;
+    description?: string;
 }
 
 interface RenamePlaylistResult {
@@ -26,6 +27,7 @@ class RenamePlaylistDialog extends Component {
     private cancelBtn!: HTMLElement;
     private confirmBtn!: HTMLButtonElement;
     private nameInput!: HTMLInputElement;
+    private descriptionInput!: HTMLTextAreaElement;
     private errorElement!: HTMLElement;
 
     constructor() {
@@ -45,6 +47,7 @@ class RenamePlaylistDialog extends Component {
         this.currentPlaylist = playlist;
         this.overlay.style.display = 'flex';
         this.nameInput.value = playlist.name;
+        this.descriptionInput.value = playlist.description || '';
         this.hideError();
         this.validateInput();
 
@@ -74,6 +77,7 @@ class RenamePlaylistDialog extends Component {
         this.cancelBtn = document.getElementById('rename-playlist-cancel') as HTMLElement;
         this.confirmBtn = document.getElementById('rename-playlist-confirm') as HTMLButtonElement;
         this.nameInput = document.getElementById('rename-playlist-input') as HTMLInputElement;
+        this.descriptionInput = document.getElementById('rename-playlist-description-input') as HTMLTextAreaElement;
         this.errorElement = document.getElementById('rename-playlist-error') as HTMLElement;
     }
 
@@ -82,6 +86,7 @@ class RenamePlaylistDialog extends Component {
         this.addEventListenerManaged(this.cancelBtn, 'click', () => this.hide());
         this.addEventListenerManaged(this.confirmBtn, 'click', () => this.renamePlaylist());
         this.addEventListenerManaged(this.nameInput, 'input', () => this.validateInput());
+        this.addEventListenerManaged(this.descriptionInput, 'input', () => this.validateInput());
         this.addEventListenerManaged(this.nameInput, 'keydown', (event) => {
             const e = event as KeyboardEvent;
             if (e.key === 'Enter' && !this.confirmBtn.disabled) {
@@ -106,15 +111,23 @@ class RenamePlaylistDialog extends Component {
 
     validateInput(): boolean {
         const name = this.nameInput.value.trim();
-        const isValid = name.length > 0 && name.length <= 50 && name !== this.currentPlaylist?.name;
+        const description = this.descriptionInput.value.trim();
+        const hasChanges = name !== this.currentPlaylist?.name
+            || description !== (this.currentPlaylist?.description || '');
+        const isValid = name.length > 0
+            && name.length <= 50
+            && description.length <= 200
+            && hasChanges;
         this.confirmBtn.disabled = !isValid;
 
         if (name.length === 0) {
             this.showError('歌单名称不能为空');
         } else if (name.length > 50) {
             this.showError('歌单名称不能超过50个字符');
-        } else if (name === this.currentPlaylist?.name) {
-            this.showError('新名称与当前名称相同');
+        } else if (description.length > 200) {
+            this.showError('歌单描述不能超过200个字符');
+        } else if (!hasChanges) {
+            this.showError('歌单名称和描述均未修改');
         } else {
             this.hideError();
         }
@@ -136,18 +149,25 @@ class RenamePlaylistDialog extends Component {
         }
 
         const newName = this.nameInput.value.trim();
+        const description = this.descriptionInput.value.trim();
+        const nameChanged = newName !== this.currentPlaylist.name;
 
         try {
             this.confirmBtn.disabled = true;
             this.confirmBtn.textContent = '重命名中...';
-            const result = await playlistDialogActionService.renamePlaylist(this.currentPlaylist.id, newName) as RenamePlaylistResult;
+            const result = await playlistDialogActionService.renamePlaylist(
+                this.currentPlaylist.id,
+                newName,
+                description
+            ) as RenamePlaylistResult;
 
             if (result.success) {
                 // 触发重命名成功事件
                 this.emit('playlistRenamed', result.playlist);
                 this.hide();
 
-                this.emit('notification', {type: 'info', message: `歌单已重命名为 "${newName}"`});
+                const message = nameChanged ? `歌单已重命名为 "${newName}"` : '歌单描述已更新';
+                this.emit('notification', {type: 'info', message});
             } else {
                 this.showError('重命名失败');
                 console.error(result);

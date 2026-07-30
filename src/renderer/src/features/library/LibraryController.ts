@@ -87,8 +87,8 @@ class LibraryController {
         return await libraryService.deletePlaylist(playlistId);
     }
 
-    async renamePlaylist(playlistId: string, newName: string): Promise<{success: boolean; playlist?: Playlist; error?: string}> {
-        return await libraryService.renamePlaylist(playlistId, newName);
+    async renamePlaylist(playlistId: string, newName: string, description = ''): Promise<{success: boolean; playlist?: Playlist; error?: string}> {
+        return await libraryService.renamePlaylist(playlistId, newName, description);
     }
 
     async addToPlaylist(playlistId: string, trackIds: string | string[]): Promise<Result> {

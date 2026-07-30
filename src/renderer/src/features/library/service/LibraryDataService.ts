@@ -163,12 +163,12 @@ export class LibraryDataService {
         );
     }
 
-    async renamePlaylist(playlistId: string, newName: string): Promise<PlaylistMutationResult> {
+    async renamePlaylist(playlistId: string, newName: string, description = ''): Promise<PlaylistMutationResult> {
         this.assertNonEmptyString(playlistId, 'playlistId');
         this.assertNonEmptyString(newName, 'newName');
 
         return await this.callGateway(
-            () => libraryGateway.renamePlaylist(playlistId, newName),
+            () => libraryGateway.renamePlaylist(playlistId, newName, description),
             'library.renamePlaylist',
             {success: false, error: '重命名歌单失败'}
         );

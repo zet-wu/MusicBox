@@ -53,8 +53,8 @@ export class LibraryAPI extends BaseAPI {
         return await libraryDataService.deletePlaylist(playlistId);
     }
 
-    async renamePlaylist(playlistId: string, newName: string): Promise<{success: boolean; playlist?: Playlist; error?: string}> {
-        return await libraryDataService.renamePlaylist(playlistId, newName);
+    async renamePlaylist(playlistId: string, newName: string, description = ''): Promise<{success: boolean; playlist?: Playlist; error?: string}> {
+        return await libraryDataService.renamePlaylist(playlistId, newName, description);
     }
 
     async addToPlaylist(playlistId: string, trackIds: string | string[]): Promise<Result> {

@@ -73,8 +73,8 @@ export class PlaylistDialogActionService {
         return result;
     }
 
-    async renamePlaylist(playlistId: string, newName: string): Promise<RenamePlaylistActionResult> {
-        return await libraryDataService.renamePlaylist(playlistId, newName);
+    async renamePlaylist(playlistId: string, newName: string, description = ''): Promise<RenamePlaylistActionResult> {
+        return await libraryDataService.renamePlaylist(playlistId, newName, description);
     }
 
     async addSelectedTracks(playlistId: string, selectedTrackIds: string[]): Promise<AddSelectedTracksResult> {
