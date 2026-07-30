@@ -141,7 +141,10 @@
   }
 
   &.dragging {
-    opacity: 0.45;
+    opacity: 0.35;
+    background: var(--color-primary-bg);
+    outline: 1px dashed var(--color-primary);
+    outline-offset: -1px;
   }
 }
 

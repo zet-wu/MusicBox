@@ -154,32 +154,34 @@ class Playlist extends Component {
 
         this.addEventListenerManaged(this.tracksContainer, 'dragover', (event: Event) => {
             const dragEvent = event as DragEvent;
-            if (
-                this.draggedQueueId
-                && dragEvent.target instanceof Element
-                && dragEvent.target.closest('.playlist-track')
-            ) {
-                dragEvent.preventDefault();
-                dragEvent.stopPropagation();
-                if (dragEvent.dataTransfer) {
-                    dragEvent.dataTransfer.dropEffect = 'move';
-                }
-            }
-        });
-
-        this.addEventListenerManaged(this.tracksContainer, 'drop', (event: Event) => {
-            const dragEvent = event as DragEvent;
             const targetRow = dragEvent.target instanceof Element
                 ? dragEvent.target.closest<HTMLElement>('.playlist-track')
                 : null;
-            const queueId = this.draggedQueueId || dragEvent.dataTransfer?.getData('text/plain');
-            if (!targetRow || !queueId) {
+            if (!this.draggedQueueId || !targetRow) {
                 return;
             }
 
             dragEvent.preventDefault();
             dragEvent.stopPropagation();
-            const targetIndex = Number.parseInt(targetRow.dataset.index || '-1', 10);
+            if (dragEvent.dataTransfer) {
+                dragEvent.dataTransfer.dropEffect = 'move';
+            }
+
+            this.previewQueueInsertion(targetRow, dragEvent.clientY);
+        });
+
+        this.addEventListenerManaged(this.tracksContainer, 'drop', (event: Event) => {
+            const dragEvent = event as DragEvent;
+            const queueId = this.draggedQueueId || dragEvent.dataTransfer?.getData('text/plain');
+            const draggedRow = this.tracksContainer.querySelector<HTMLElement>('.playlist-track.dragging');
+            if (!draggedRow || !queueId) {
+                return;
+            }
+
+            dragEvent.preventDefault();
+            dragEvent.stopPropagation();
+            const rows = Array.from(this.tracksContainer.querySelectorAll<HTMLElement>('.playlist-track'));
+            const targetIndex = rows.indexOf(draggedRow);
             if (targetIndex >= 0) {
                 this.emit('queueReordered', {queueId, targetIndex});
             }
@@ -188,6 +190,7 @@ class Playlist extends Component {
         this.addEventListenerManaged(this.tracksContainer, 'dragend', () => {
             this.tracksContainer.querySelector('.playlist-track.dragging')?.classList.remove('dragging');
             this.draggedQueueId = null;
+            this.render();
         });
 
         // Close on outside click
@@ -322,6 +325,53 @@ class Playlist extends Component {
             return null;
         }
         return {track, index, queueId: this.entries[index]?.queueId};
+    }
+
+    private previewQueueInsertion(targetRow: HTMLElement, pointerY: number): void {
+        const draggedRow = this.tracksContainer.querySelector<HTMLElement>('.playlist-track.dragging');
+        if (!draggedRow || draggedRow === targetRow) {
+            return;
+        }
+
+        const rows = Array.from(this.tracksContainer.querySelectorAll<HTMLElement>('.playlist-track'));
+        const previousTops = new Map(rows.map((row) => [row, row.getBoundingClientRect().top]));
+        const targetRect = targetRow.getBoundingClientRect();
+        const insertAfterTarget = pointerY >= targetRect.top + targetRect.height / 2;
+        const referenceRow = insertAfterTarget ? targetRow.nextElementSibling : targetRow;
+
+        if (referenceRow === draggedRow) {
+            return;
+        }
+
+        this.tracksContainer.insertBefore(draggedRow, referenceRow);
+        this.animateQueueRows(previousTops);
+    }
+
+    private animateQueueRows(previousTops: Map<HTMLElement, number>): void {
+        const rows = this.tracksContainer.querySelectorAll<HTMLElement>('.playlist-track:not(.dragging)');
+        rows.forEach((row) => {
+            const previousTop = previousTops.get(row);
+            if (previousTop === undefined) {
+                return;
+            }
+
+            const offset = previousTop - row.getBoundingClientRect().top;
+            if (Math.abs(offset) < 1) {
+                return;
+            }
+
+            row.getAnimations().forEach((animation) => animation.cancel());
+            row.animate(
+                [
+                    {transform: `translateY(${offset}px)`},
+                    {transform: 'translateY(0)'}
+                ],
+                {
+                    duration: 160,
+                    easing: 'cubic-bezier(0.2, 0, 0, 1)'
+                }
+            );
+        });
     }
 }
 
