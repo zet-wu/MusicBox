@@ -1,4 +1,5 @@
 import type {Track} from '@api/types/track';
+import {getTrackPath, isSameTrack} from '../domain/TrackIdentity';
 import type {AudioEngineState} from './audioEngine';
 import type {AudioEngineManagerBridge} from './AudioEngineAdapter';
 import type {PlaybackRuntimeState} from './PlaybackRuntimeState';
@@ -37,7 +38,7 @@ export class PlaybackStateSynchronizer {
         };
 
         const playbackState = {
-            currentTrack: state.currentTrack as Track | null,
+            currentTrack: this.mergeWithPlaylistTrack(state.currentTrack, state.currentIndex),
             duration: state.duration,
             currentIndex: state.currentIndex,
             position: state.position,
@@ -56,7 +57,7 @@ export class PlaybackStateSynchronizer {
         const currentState = this.runtimeState.getSnapshot();
         const previousIndex = currentState.currentIndex;
         const playbackState = {
-            currentTrack: track as Track | null,
+            currentTrack: this.mergeWithPlaylistTrack(track, state.currentIndex),
             duration: state.duration,
             currentIndex: state.currentIndex,
             position: state.position,
@@ -68,6 +69,37 @@ export class PlaybackStateSynchronizer {
             playbackState,
             previousIndex,
             indexChanged: previousIndex !== playbackState.currentIndex
+        };
+    }
+
+    private mergeWithPlaylistTrack(track: unknown, currentIndex: number): Track | null {
+        if (!track) {
+            return null;
+        }
+
+        if (typeof track !== 'object') {
+            return track as Track;
+        }
+
+        const engineTrack = track as Track;
+        const playlist = this.runtimeState.playlist;
+        const indexedTrack = playlist[currentIndex];
+        const enginePath = getTrackPath(engineTrack);
+        const playlistTrack = (
+            indexedTrack && (!enginePath || isSameTrack(indexedTrack, engineTrack))
+                ? indexedTrack
+                : playlist.find((candidate) => isSameTrack(candidate, engineTrack))
+        );
+
+        if (!playlistTrack) {
+            return engineTrack;
+        }
+
+        return {
+            ...playlistTrack,
+            ...engineTrack,
+            id: playlistTrack.id || engineTrack.id,
+            fileId: playlistTrack.fileId || engineTrack.fileId
         };
     }
 }

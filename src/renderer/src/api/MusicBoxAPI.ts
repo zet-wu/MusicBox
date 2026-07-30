@@ -512,13 +512,7 @@ export class MusicBoxAPI extends EventEmitter {
     }
 
     getCurrentTrack(): Track | null {
-        try {
-            this.currentTrack = this.audioEngine!.getCurrentTrack() as Track | null;
-            return this.currentTrack;
-        } catch (error) {
-            console.error('Failed to get track:', error);
-            return this.currentTrack;
-        }
+        return this.currentTrack;
     }
 
     getDuration(): number {
