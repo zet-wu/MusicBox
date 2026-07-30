@@ -1,7 +1,7 @@
 import type {Playlist} from '@api/types/playlist';
 import type {Track} from '@api/types/track';
 import type {AppComponentPort} from '../AppRuntimePorts';
-import type {CollectionType} from '@ui/pages/PlaylistDetailPage';
+import type {CollectionType} from '@/features/playlists/domain/CollectionCapabilities';
 
 export class ContentUIFacade {
     constructor(private readonly app: AppComponentPort) {}

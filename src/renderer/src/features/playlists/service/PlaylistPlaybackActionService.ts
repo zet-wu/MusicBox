@@ -3,6 +3,7 @@ import type {PlaylistDoubleClickMode} from "@api/types/settings";
 import {appNotificationService} from "@/features/appShell/service";
 import {cacheManager} from "@/shared/cache";
 import type {MusicBoxSettings} from "@api/types/settings";
+import {resolvePlaylistDoubleClickMode} from "@/features/playlists/domain/PlaylistDoubleClickMode";
 
 export class PlaylistPlaybackActionService {
     getPlayableTracks(tracks: Track[]): Track[] | null {
@@ -21,7 +22,7 @@ export class PlaylistPlaybackActionService {
 
     getDoubleClickMode(): PlaylistDoubleClickMode {
         const settings = (cacheManager.getLocalCache('musicbox-settings') || {}) as MusicBoxSettings;
-        return settings.playlistDoubleClickMode === 'sequence' ? 'sequence' : 'shuffle';
+        return resolvePlaylistDoubleClickMode(settings);
     }
 
     shuffleTracks(tracks: Track[]): Track[] {

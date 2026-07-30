@@ -15,6 +15,10 @@ import {
     trackCoverDisplayPreferenceService
 } from "@/features/settings/service";
 import {playlistCoverActionService} from "@/features/playlists/service/PlaylistCoverActionService";
+import {
+    getCollectionCapabilities,
+    type CollectionType
+} from "@/features/playlists/domain/CollectionCapabilities";
 import {playlistDataService} from "@/features/playlists/service/PlaylistDataService";
 import {playlistFolderImportService} from "@/features/playlists/service/PlaylistFolderImportService";
 import {playlistPlaybackActionService} from "@/features/playlists/service/PlaylistPlaybackActionService";
@@ -38,45 +42,6 @@ type PlaylistDetail = Partial<Playlist> & {
     coverImage?: string | null;
     collectionType?: CollectionType;
 };
-
-export type CollectionType = 'playlist' | 'favorites' | 'all-tracks';
-
-export interface CollectionCapabilities {
-    canAddSongs: boolean;
-    canClear: boolean;
-    canEditCover: boolean;
-    canRemoveTracks: boolean;
-    showCreatedDate: boolean;
-}
-
-export function getCollectionCapabilities(collectionType: CollectionType): CollectionCapabilities {
-    switch (collectionType) {
-        case 'favorites':
-            return {
-                canAddSongs: true,
-                canClear: true,
-                canEditCover: false,
-                canRemoveTracks: false,
-                showCreatedDate: false
-            };
-        case 'all-tracks':
-            return {
-                canAddSongs: false,
-                canClear: false,
-                canEditCover: false,
-                canRemoveTracks: false,
-                showCreatedDate: false
-            };
-        default:
-            return {
-                canAddSongs: true,
-                canClear: true,
-                canEditCover: true,
-                canRemoveTracks: true,
-                showCreatedDate: true
-            };
-    }
-}
 
 interface CoverResult {
     success?: boolean;
