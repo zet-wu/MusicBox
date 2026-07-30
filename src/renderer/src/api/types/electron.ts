@@ -79,6 +79,11 @@ export interface PlaylistDetailResult {
     error?: string;
 }
 
+export interface FavoritesChangedData {
+    trackIds: string[];
+    favorite?: boolean;
+}
+
 export interface ElectronLibraryAPI {
     scanDirectory(path: string): Promise<boolean>;
     scanNetworkDrive(driveId: string | number, relativePath: string): Promise<boolean>;
@@ -97,6 +102,7 @@ export interface ElectronLibraryAPI {
     renamePlaylist(playlistId: string, newName: string, description?: string): Promise<unknown>;
     addToPlaylist(playlistId: string, trackIds: string[]): Promise<Result>;
     removeFromPlaylist(playlistId: string, trackIds: string[]): Promise<Result>;
+    setTrackFavorite(trackFileId: string, favorite: boolean): Promise<Result & {favorite?: boolean}>;
     cleanupPlaylists(): Promise<unknown>;
     loadCachedTracks(): Promise<Track[]>;
     validateCache(): Promise<CacheValidationResult>;
@@ -110,6 +116,7 @@ export interface ElectronLibraryAPI {
     getPlaylistCover(playlistId: string): Promise<{success: boolean; coverPath?: string; error?: string}>;
     removePlaylistCover(playlistId: string): Promise<Result>;
     onLibraryUpdated(callback: (event: unknown, data: Track[]) => void): Unsubscribe;
+    onFavoritesChanged(callback: (event: unknown, data: FavoritesChangedData) => void): Unsubscribe;
     onScanProgress(callback: (event: unknown, progress: ScanProgress) => void): Unsubscribe;
     onCacheValidationProgress(callback: (progress: ScanProgress) => void): Unsubscribe;
     onCoverUpdated(callback: (data: unknown) => void): Unsubscribe;

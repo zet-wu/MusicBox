@@ -55,7 +55,9 @@ export interface Playlist {
     cover?: string;
     trackCount?: number;
     duration?: number;
-    tracks: Track[];
+    tracks?: Track[];
+    trackIds?: string[];
+    systemType?: 'favorites';
     createdAt?: number;
     modifiedAt?: number;
 }

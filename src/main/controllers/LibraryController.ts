@@ -3,7 +3,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {BaseController, Controller, IpcHandle} from '../decorators/IpcHandler';
-import {LibraryCacheManager, CachedTrack} from '../services/library/LibraryCacheManager';
+import {
+    FAVORITES_PLAYLIST_ID,
+    LibraryCacheManager,
+    CachedTrack,
+    GetTracksOptions
+} from '../services/library/LibraryCacheManager';
 import {MetadataHandler} from '../services/library/MetadataHandler';
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
 import {NetworkDriveManager} from '../services/network/NetworkDriveManager';
@@ -36,7 +41,7 @@ export class LibraryController extends BaseController {
     @IpcHandle('library:loadCachedTracks')
     async loadCachedTracks(): Promise<CachedTrack[]> {
         try {
-            const tracks = this.libraryCacheManager.getAllTracks();
+            const tracks = this.libraryCacheManager.getTracks();
             console.log(`✅ 从缓存加载 ${tracks.length} 个音乐文件`);
             return tracks;
         } catch (error) {
@@ -64,7 +69,7 @@ export class LibraryController extends BaseController {
                 valid: result.valid.length,
                 invalid: result.invalid.length,
                 modified: result.modified.length,
-                tracks: hasInvalid ? this.libraryCacheManager.getAllTracks() : undefined,
+                tracks: hasInvalid ? this.libraryCacheManager.getTracks() : undefined,
                 mountedDrives,
             };
         } catch (error: any) {
@@ -110,8 +115,8 @@ export class LibraryController extends BaseController {
     // ── 查询 ──────────────────────────────────────────────
 
     @IpcHandle('library:getTracks')
-    async getTracks(): Promise<any[]> {
-        return this.libraryCacheManager.getAllTracks();
+    async getTracks(options: GetTracksOptions = {}): Promise<any[]> {
+        return this.libraryCacheManager.getTracks(options);
     }
 
     @IpcHandle('library:search')
@@ -156,7 +161,7 @@ export class LibraryController extends BaseController {
         try {
             const playlist = this.libraryCacheManager.getPlaylistById(playlistId);
             if (!playlist) return {success: false, error: '歌单不存在'};
-            const allTracks = this.libraryCacheManager.getAllTracks();
+            const allTracks = this.libraryCacheManager.getTracks();
             const tracks = playlist.trackIds
                 .map((id: string) => allTracks.find((t: any) => t.fileId === id))
                 .filter(Boolean);
@@ -208,6 +213,12 @@ export class LibraryController extends BaseController {
                 }
             });
             await this.libraryCacheManager.saveCache();
+            if (playlistId === FAVORITES_PLAYLIST_ID) {
+                this.emitFavoritesChanged(
+                    results.filter(result => result.success).map(result => result.id),
+                    true
+                );
+            }
             return {success: true, results};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -230,6 +241,12 @@ export class LibraryController extends BaseController {
                 }
             });
             await this.libraryCacheManager.saveCache();
+            if (playlistId === FAVORITES_PLAYLIST_ID) {
+                this.emitFavoritesChanged(
+                    results.filter(result => result.success).map(result => result.id),
+                    false
+                );
+            }
             return {success: true, results};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -333,7 +350,7 @@ export class LibraryController extends BaseController {
                 await this.libraryCacheManager.saveCache();
             }
 
-            const allTracks = this.libraryCacheManager.getAllTracks();
+            const allTracks = this.libraryCacheManager.getTracks();
             const win = this.windowManager.getMainWindow();
             if (win) win.webContents.send('library:updated', allTracks);
             return true;
@@ -421,7 +438,7 @@ export class LibraryController extends BaseController {
             await this.libraryCacheManager.saveCache();
         }
 
-        const allTracks = this.libraryCacheManager.getAllTracks();
+        const allTracks = this.libraryCacheManager.getTracks();
         console.log(`✅ 网络扫描完成，找到 ${tracks.length} 个音频文件`);
         const win = this.windowManager.getMainWindow();
         if (win) win.webContents.send('library:updated', allTracks);
@@ -562,6 +579,22 @@ export class LibraryController extends BaseController {
         return this.removeTracksFromPlaylist(playlistId, trackIds);
     }
 
+    @IpcHandle('library:setTrackFavorite')
+    async setTrackFavorite(trackFileId: string, favorite: boolean): Promise<{
+        success: boolean;
+        favorite?: boolean;
+        error?: string;
+    }> {
+        try {
+            const finalState = this.libraryCacheManager.setTrackFavorite(trackFileId, favorite);
+            await this.libraryCacheManager.saveCache();
+            this.emitFavoritesChanged([trackFileId], finalState);
+            return {success: true, favorite: finalState};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
     @IpcHandle('library:updateTrackMetadata')
     async updateTrackMetadata(data: any): Promise<any> {
         // 支持两种调用方式：
@@ -653,11 +686,17 @@ export class LibraryController extends BaseController {
         }
     }
 
+    private emitFavoritesChanged(trackIds: string[], favorite?: boolean): void {
+        if (trackIds.length === 0) return;
+        const win = this.windowManager.getMainWindow();
+        win?.webContents.send('library:favoritesChanged', {trackIds, favorite});
+    }
+
     @IpcHandle('library:scanSingleFile')
     async scanSingleFile(networkPath: string): Promise<any> {
         try {
             const audioExtensions = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.ape'];
-            const existing = this.libraryCacheManager.getAllTracks().find((t: any) => t.filePath === networkPath);
+            const existing = this.libraryCacheManager.getTracks().find((t: any) => t.filePath === networkPath);
             if (existing) return {success: true, track: existing, isNew: false};
             const ext = path.extname(networkPath).toLowerCase();
             if (!audioExtensions.includes(ext)) return {success: false, error: '不支持的音频格式'};
@@ -688,8 +727,9 @@ export class LibraryController extends BaseController {
             await this.libraryCacheManager.saveCache();
             console.log(`✅ 单个文件扫描完成: ${trackData.title} - ${trackData.artist}`);
             const win = this.windowManager.getMainWindow();
-            if (win) win.webContents.send('library:updated', [trackData]);
-            return {success: true, track: addedTracks[0], isNew: true};
+            const addedTrack = this.libraryCacheManager.getTracks().find(track => track.fileId === addedTracks[0]?.fileId);
+            if (win && addedTrack) win.webContents.send('library:updated', [addedTrack]);
+            return {success: true, track: addedTrack, isNew: true};
         } catch (error: any) {
             console.error('❌ 扫描单个文件失败:', error);
             return {success: false, error: error.message};
@@ -774,7 +814,7 @@ export class LibraryController extends BaseController {
         error?: string
     }> {
         try {
-            const existing = this.libraryCacheManager.getAllTracks().find((t: any) => t.filePath === audioFile.filePath);
+            const existing = this.libraryCacheManager.getTracks().find((t: any) => t.filePath === audioFile.filePath);
             if (existing) return {success: true, track: existing, isNew: false};
             const stats = await fs.promises.stat(audioFile.filePath);
             const trackData = {
@@ -784,10 +824,14 @@ export class LibraryController extends BaseController {
                 disc: audioFile.disc, embeddedLyrics: audioFile.embeddedLyrics
             };
             const cacheTrack = this.libraryCacheManager.addTrack(trackData, audioFile.filePath, stats);
+            if (!cacheTrack) {
+                return {success: false, error: '歌曲添加失败'};
+            }
             await this.libraryCacheManager.saveCache();
             const win = this.windowManager.getMainWindow();
-            if (win) win.webContents.send('library:updated', this.libraryCacheManager.getAllTracks());
-            return {success: true, track: cacheTrack, isNew: true};
+            const addedTrack = this.libraryCacheManager.getTracks().find(track => track.fileId === cacheTrack.fileId);
+            if (win) win.webContents.send('library:updated', this.libraryCacheManager.getTracks());
+            return {success: true, track: addedTrack, isNew: true};
         } catch (error: any) {
             console.error('❌ 添加音频文件到音乐库失败:', error);
             return {success: false, error: error.message};

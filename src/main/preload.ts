@@ -254,6 +254,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         renamePlaylist: (playlistId: string, newName: string, description = '') => ipcRenderer.invoke('library:renamePlaylist', playlistId, newName, description),
         addToPlaylist: (playlistId: string, trackIds: string[]) => ipcRenderer.invoke('library:addToPlaylist', playlistId, trackIds),
         removeFromPlaylist: (playlistId: string, trackIds: string[]) => ipcRenderer.invoke('library:removeFromPlaylist', playlistId, trackIds),
+        setTrackFavorite: (trackFileId: string, favorite: boolean) => ipcRenderer.invoke('library:setTrackFavorite', trackFileId, favorite),
         cleanupPlaylists: () => ipcRenderer.invoke('library:cleanupPlaylists'),
 
         // 缓存管理
@@ -275,6 +276,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         onLibraryUpdated: (callback: (...args: any[]) => void) => {
             ipcRenderer.on('library:updated', callback);
             return () => ipcRenderer.removeListener('library:updated', callback);
+        },
+        onFavoritesChanged: (callback: (...args: any[]) => void) => {
+            ipcRenderer.on('library:favoritesChanged', callback);
+            return () => ipcRenderer.removeListener('library:favoritesChanged', callback);
         },
         onScanProgress: (callback: (...args: any[]) => void) => {
             ipcRenderer.on('library:scanProgress', callback);

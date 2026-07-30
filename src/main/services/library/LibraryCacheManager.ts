@@ -43,7 +43,18 @@ export interface Playlist {
     createdAt: number;
     updatedAt: number;
     coverImagePath?: string;
+    systemType?: 'favorites';
 }
+
+export interface GetTracksOptions {
+    favorite?: boolean;
+    albumId?: string;
+    artistId?: string;
+    genre?: string;
+    year?: number;
+}
+
+export const FAVORITES_PLAYLIST_ID = 'system:favorites';
 
 interface CacheStatistics {
     totalTracks: number;
@@ -107,7 +118,15 @@ export class LibraryCacheManager {
 
     constructor(networkFileAdapter: NetworkFileAdapter | null = null) {
         this.networkFileAdapter = networkFileAdapter;
-        this.cache = {...defaultCache, statistics: {...defaultCache.statistics}};
+        this.cache = {
+            ...defaultCache,
+            scannedDirectories: [],
+            tracks: [],
+            playlists: [],
+            ignoredFiles: [],
+            statistics: {...defaultCache.statistics}
+        };
+        this.ensureFavoritesPlaylist();
 
         try {
             const userDataPath = app.getPath('userData');
@@ -141,6 +160,7 @@ export class LibraryCacheManager {
             const data = await fs.promises.readFile(this.cacheFilePath, 'utf8');
             const cacheData = JSON.parse(data);
             this.cache = this.validateCacheData(cacheData);
+            this.ensureFavoritesPlaylist();
             console.log(`✅ LibraryCacheManager: 加载缓存成功，共 ${this.cache.tracks.length} 首歌曲`);
         } catch (error) {
             console.error('❌ LibraryCacheManager: 加载缓存失败:', error);
@@ -155,7 +175,10 @@ export class LibraryCacheManager {
             playlists: Array.isArray(cacheData.playlists)
                 ? cacheData.playlists.filter((p: any) =>
                     p && typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.trackIds)
-                )
+                ).map((playlist: any) => ({
+                    ...playlist,
+                    systemType: playlist.id === FAVORITES_PLAYLIST_ID ? 'favorites' : undefined
+                }))
                 : [],
             ignoredFiles: Array.isArray(cacheData.ignoredFiles) ? cacheData.ignoredFiles : [],
             statistics: {
@@ -174,7 +197,7 @@ export class LibraryCacheManager {
         if (!Array.isArray(this.cache.ignoredFiles)) this.cache.ignoredFiles = [];
 
         this.cache.statistics.totalTracks = this.cache.tracks.length;
-        this.cache.statistics.totalPlaylists = this.cache.playlists.length;
+        this.cache.statistics.totalPlaylists = this.getUserPlaylists().length;
         this.cache.lastUpdated = Date.now();
 
         try {
@@ -419,6 +442,23 @@ export class LibraryCacheManager {
         return this.cache.tracks;
     }
 
+    getTracks(options: GetTracksOptions = {}): CachedTrack[] {
+        const favoriteIds = new Set(this.getFavoritesPlaylist().trackIds);
+        return this.cache.tracks
+            .map((track) => ({
+                ...track,
+                favorite: favoriteIds.has(track.fileId)
+            }))
+            .filter((track) => {
+                if (options.favorite !== undefined && track.favorite !== options.favorite) return false;
+                if (options.albumId !== undefined && (track as any).albumId !== options.albumId) return false;
+                if (options.artistId !== undefined && (track as any).artistId !== options.artistId) return false;
+                if (options.genre !== undefined && (track as any).genre !== options.genre) return false;
+                if (options.year !== undefined && (track as any).year !== options.year) return false;
+                return true;
+            });
+    }
+
     updateTrackInCache(filePath: string, updatedData: Partial<CachedTrack>): boolean {
         const idx = this.cache.tracks.findIndex(t => t.filePath === filePath);
         if (idx === -1) return false;
@@ -436,9 +476,10 @@ export class LibraryCacheManager {
     }
 
     searchTracks(query: string): CachedTrack[] {
-        if (!query?.trim()) return this.getAllTracks();
+        const tracks = this.getTracks();
+        if (!query?.trim()) return tracks;
         const term = query.toLowerCase();
-        return this.cache.tracks.filter(t =>
+        return tracks.filter(t =>
             t.title?.toLowerCase().includes(term) ||
             t.artist?.toLowerCase().includes(term) ||
             t.album?.toLowerCase().includes(term) ||
@@ -482,6 +523,7 @@ export class LibraryCacheManager {
     }
 
     deletePlaylist(playlistId: string): boolean {
+        this.assertUserManagedPlaylist(playlistId);
         if (!Array.isArray(this.cache.playlists)) {
             this.cache.playlists = [];
             return false;
@@ -495,6 +537,7 @@ export class LibraryCacheManager {
     }
 
     renamePlaylist(playlistId: string, newName: string, description = ''): Playlist {
+        this.assertUserManagedPlaylist(playlistId);
         if (!newName?.trim()) throw new Error('歌单名称不能为空');
         const playlist = this.getPlaylistById(playlistId);
         if (!playlist) throw new Error('歌单不存在');
@@ -550,10 +593,11 @@ export class LibraryCacheManager {
     }
 
     getAllPlaylists(): Playlist[] {
-        return Array.isArray(this.cache.playlists) ? [...this.cache.playlists] : [];
+        return this.getUserPlaylists();
     }
 
     updatePlaylistCover(playlistId: string, coverImagePath: string): boolean {
+        this.assertUserManagedPlaylist(playlistId);
         const playlist = this.cache.playlists?.find(p => p.id === playlistId);
         if (!playlist) return false;
         (playlist as any).coverImage = coverImagePath;
@@ -562,11 +606,13 @@ export class LibraryCacheManager {
     }
 
     getPlaylistCover(playlistId: string): string | null {
+        if (playlistId === FAVORITES_PLAYLIST_ID) return null;
         const playlist = this.cache.playlists?.find(p => p.id === playlistId);
         return playlist ? ((playlist as any).coverImage ?? null) : null;
     }
 
     removePlaylistCover(playlistId: string): boolean {
+        this.assertUserManagedPlaylist(playlistId);
         const playlist = this.cache.playlists?.find(p => p.id === playlistId);
         if (!playlist) return false;
         (playlist as any).coverImage = null;
@@ -576,7 +622,7 @@ export class LibraryCacheManager {
 
     getCacheStatistics(): any {
         const tracks = Array.isArray(this.cache.tracks) ? this.cache.tracks : [];
-        const playlists = Array.isArray(this.cache.playlists) ? this.cache.playlists : [];
+        const playlists = this.getUserPlaylists();
         const scannedDirectories = Array.isArray(this.cache.scannedDirectories) ? this.cache.scannedDirectories : [];
         const statistics = (this.cache as any).statistics || {};
         return {
@@ -646,5 +692,67 @@ export class LibraryCacheManager {
     getIgnoreList(): string[] {
         if (!Array.isArray(this.cache.ignoredFiles)) this.cache.ignoredFiles = [];
         return [...this.cache.ignoredFiles];
+    }
+
+    setTrackFavorite(trackFileId: string, favorite: boolean): boolean {
+        if (!this.getTrackByFileId(trackFileId)) {
+            throw new Error('歌曲不存在');
+        }
+
+        const playlist = this.getFavoritesPlaylist();
+        const existingIndex = playlist.trackIds.indexOf(trackFileId);
+        if (favorite && existingIndex === -1) {
+            playlist.trackIds.push(trackFileId);
+            playlist.updatedAt = Date.now();
+        } else if (!favorite && existingIndex !== -1) {
+            playlist.trackIds.splice(existingIndex, 1);
+            playlist.updatedAt = Date.now();
+        }
+        return favorite;
+    }
+
+    private ensureFavoritesPlaylist(): Playlist {
+        if (!Array.isArray(this.cache.playlists)) {
+            this.cache.playlists = [];
+        }
+
+        const existing = this.cache.playlists.find((playlist) => playlist.id === FAVORITES_PLAYLIST_ID);
+        if (existing) {
+            existing.name = '收藏';
+            existing.description = '';
+            existing.systemType = 'favorites';
+            existing.trackIds = Array.from(new Set(existing.trackIds || []));
+            delete existing.coverImagePath;
+            return existing;
+        }
+
+        const now = Date.now();
+        const favorites: Playlist = {
+            id: FAVORITES_PLAYLIST_ID,
+            name: '收藏',
+            description: '',
+            trackIds: [],
+            createdAt: now,
+            updatedAt: now,
+            systemType: 'favorites'
+        };
+        this.cache.playlists.push(favorites);
+        return favorites;
+    }
+
+    private getFavoritesPlaylist(): Playlist {
+        return this.ensureFavoritesPlaylist();
+    }
+
+    private getUserPlaylists(): Playlist[] {
+        return Array.isArray(this.cache.playlists)
+            ? this.cache.playlists.filter((playlist) => playlist.id !== FAVORITES_PLAYLIST_ID)
+            : [];
+    }
+
+    private assertUserManagedPlaylist(playlistId: string): void {
+        if (playlistId === FAVORITES_PLAYLIST_ID) {
+            throw new Error('系统收藏歌单不支持此操作');
+        }
     }
 }

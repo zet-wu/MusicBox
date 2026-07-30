@@ -2,6 +2,7 @@ import {ElectronNamespaceAdapter} from './ElectronBridge';
 import type {Result, Unsubscribe} from '@api/types/common';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 import type {CacheValidationResult, ScanProgress} from '@api/types/events';
+import type {FavoritesChangedData} from '@api/types/electron';
 
 export interface PlaylistResult {
     success: boolean;
@@ -106,6 +107,10 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.call('removeFromPlaylist', playlistId, trackIds);
     }
 
+    setTrackFavorite(trackFileId: string, favorite: boolean): Promise<Result & {favorite?: boolean}> {
+        return this.call('setTrackFavorite', trackFileId, favorite);
+    }
+
     getPlaylistDetail(playlistId: string): Promise<{success: boolean; playlist?: Playlist; tracks?: Track[]; error?: string}> {
         return this.call('getPlaylistDetail', playlistId);
     }
@@ -128,6 +133,10 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
 
     onLibraryUpdated(handler: (tracks: Track[]) => void): Unsubscribe {
         return this.on('onLibraryUpdated', (_event: unknown, tracks: Track[]) => handler(tracks));
+    }
+
+    onFavoritesChanged(handler: (data: FavoritesChangedData) => void): Unsubscribe {
+        return this.on('onFavoritesChanged', (_event: unknown, data: FavoritesChangedData) => handler(data));
     }
 
     onScanProgress(handler: (progress: ScanProgress) => void): Unsubscribe {
