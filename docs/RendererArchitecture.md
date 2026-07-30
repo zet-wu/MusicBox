@@ -165,7 +165,7 @@ npm run lint
 - `service/audioEngine/wasapi/WasapiEngine.ts`：WASAPI renderer adapter。
 - `ui-bindings/`：播放器、列表等 UI 事件绑定。
 
-`PlaybackQueue` 是队列顺序和当前队列项的权威来源。各播放模式共享同一组可见 `QueueEntry`，UI 通过 `queueId` 提交排序，队列快照随播放状态持久化。播放状态变化通过事件和 store 同步到播放器 UI、歌词、桌面歌词和插件 API。
+`PlaybackQueue` 是队列顺序和当前队列项的权威来源。各播放模式共享同一组可见 `QueueEntry`，UI 通过 `queueId` 提交排序，队列快照随播放状态持久化。音频引擎返回的播放元数据由 `PlaybackStateSynchronizer` 与当前队列歌曲合并后写入 `PlaybackRuntimeState`，以保留 `fileId` 等音乐库身份；上层不直接把引擎对象作为当前歌曲。播放状态变化通过事件和 store 同步到播放器 UI、歌词、桌面歌词和插件 API。
 
 ## 样式结构
 
