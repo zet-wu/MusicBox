@@ -105,7 +105,7 @@ controller 使用 `@Controller`、`@IpcHandle`、`@IpcOn` 装饰器声明 IPC �
 - `library`、`settings`、`userdata`
 - `media`、`lyrics`、`covers`、`equalizerPresets`
 - `audio`、`nativeAudio`、`onNativeAudioEvent`
-- `networkDrive`、`globalShortcuts`、`desktopLyrics`
+- `networkDrive`、`globalShortcuts`、`systemMediaKeys`、`desktopLyrics`
 - `extensions`、`httpServer`、`benchmark`、`memory`
 
 通用 Node API 已默认关闭。只有设置 `MUSICBOX_ENABLE_LEGACY_NODE_APIS=1` 时，preload 才会暴露有限的兼容 `fs`、`os`、`path` 方法。新代码应使用领域 API 或 `src/renderer/src/infrastructure/electron/*Gateway.ts`，不要重新引入通用文件系统访问。
@@ -172,6 +172,8 @@ MusicBox 当前有两类播放实现：
 - WASAPI/native engine：renderer 通过 `WasapiEngine.ts` 和 `nativeAudioGateway` 调用主进程 `NativeAudioController`，再桥接 `dist/main/NativeAudio.node`。
 
 `PlaybackService` 统一暴露播放控制，`AudioEngineAdapter` 负责 Web Audio / WASAPI 切换。`PlaybackQueue` 是顺序、随机和单曲循环模式共享的显式队列模型，使用稳定的 `queueId` 支持排序和状态恢复；随机模式直接调整可见队列顺序，不维护隐藏播放序列。`native/` 中的 Rust crate 使用 N-API 暴露原生音频能力，并在 `npm run build:rs` 时复制到 `dist/main/NativeAudio.node`。
+
+`SystemMediaSessionController` 订阅 `PlaybackStore`，通过 Media Session API 向系统同步 Web Audio 的元数据、状态和控制动作。WASAPI 绕过 Chromium 音频焦点，因此 Windows 下仅通过 `systemMediaKeys` gateway 和 `GlobalShortcutsController` 提供媒体键后备；该后备不提供 Windows 系统媒体浮层元数据。
 
 成功开始新的播放会话时，播放运行时发布 `playbackStarted` 事件。组合根启动的 `PlaybackHistoryController` 常驻订阅该事件，并由播放历史服务统一更新最近播放与累计统计；页面只读取和订阅结果，不参与记录。
 
