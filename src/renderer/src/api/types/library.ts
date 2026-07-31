@@ -53,6 +53,7 @@ export interface Playlist {
     name: string;
     description?: string;
     cover?: string;
+    coverImage?: string | null;
     trackCount?: number;
     duration?: number;
     tracks?: Track[];

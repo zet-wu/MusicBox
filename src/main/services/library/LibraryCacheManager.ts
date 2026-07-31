@@ -44,11 +44,13 @@ export interface Playlist {
     createdAt: number;
     updatedAt: number;
     coverImagePath?: string;
+    coverImage?: string;
     systemType?: 'favorites';
 }
 
 export interface ResolvedPlaylist extends Playlist {
     resolvedTrackCount: number;
+    duration: number;
 }
 
 export interface GetTracksOptions {
@@ -676,15 +678,21 @@ export class LibraryCacheManager {
     }
 
     getAllPlaylists(): ResolvedPlaylist[] {
-        const availableTrackIds = new Set(this.cache.tracks.map(track => track.fileId));
-        return this.getUserPlaylists().map(playlist => ({
-            ...playlist,
-            trackIds: [...playlist.trackIds],
-            resolvedTrackCount: playlist.trackIds.reduce(
-                (count, trackId) => count + (availableTrackIds.has(trackId) ? 1 : 0),
-                0
-            )
-        }));
+        const availableTracks = new Map(this.cache.tracks.map(track => [track.fileId, track]));
+        return this.getUserPlaylists().map((playlist) => {
+            const resolvedTracks = playlist.trackIds
+                .map(trackId => availableTracks.get(trackId))
+                .filter((track): track is CachedTrack => Boolean(track));
+            return {
+                ...playlist,
+                trackIds: [...playlist.trackIds],
+                resolvedTrackCount: resolvedTracks.length,
+                duration: resolvedTracks.reduce((total, track) => {
+                    const duration = Number(track.duration || 0);
+                    return total + (Number.isFinite(duration) && duration > 0 ? duration : 0);
+                }, 0)
+            };
+        });
     }
 
     updatePlaylistCover(playlistId: string, coverImagePath: string): boolean {
