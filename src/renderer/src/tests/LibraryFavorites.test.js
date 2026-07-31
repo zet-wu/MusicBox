@@ -89,7 +89,11 @@ describe('LibraryCacheManager 系统收藏', () => {
         const userPlaylist = manager.createPlaylist('收藏');
 
         expect(userPlaylist.systemType).toBeUndefined();
-        expect(manager.getAllPlaylists()).toEqual([userPlaylist]);
+        expect(manager.getAllPlaylists()).toEqual([{
+            ...userPlaylist,
+            trackIds: [],
+            resolvedTrackCount: 0
+        }]);
         expect(manager.getCacheStatistics().totalPlaylists).toBe(1);
     });
 });
