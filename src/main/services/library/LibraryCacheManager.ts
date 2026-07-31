@@ -688,9 +688,10 @@ export class LibraryCacheManager {
             const resolvedTracks = playlist.trackIds
                 .map(trackId => availableTracks.get(trackId))
                 .filter((track): track is CachedTrack => Boolean(track));
+            const coverImage = this.getPlaylistCover(playlist.id);
             return {
                 ...playlist,
-                coverImage: this.getPlaylistCover(playlist.id),
+                ...(coverImage ? {coverImage} : {}),
                 trackIds: [...playlist.trackIds],
                 resolvedTrackCount: resolvedTracks.length,
                 duration: resolvedTracks.reduce((total, track) => {
