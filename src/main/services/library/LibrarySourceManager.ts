@@ -2,7 +2,6 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import {app} from 'electron';
-import type {CachedTrack} from './LibraryCacheManager';
 
 export type LibrarySourceType = 'directory' | 'file';
 export type LibrarySourceOrigin =
@@ -48,7 +47,10 @@ interface LibrarySourceData {
 export interface LegacyLibrarySourceData {
     musicFolders: string[];
     scannedDirectories: string[];
-    tracks: CachedTrack[];
+    tracks: Array<{
+        fileId: string;
+        filePath: string;
+    }>;
 }
 
 export interface LibrarySourceLoadResult {
@@ -68,6 +70,7 @@ export class LibrarySourceManager {
         playlistBindings: []
     };
     private loaded = false;
+    private loadPromise: Promise<LibrarySourceLoadResult> | null = null;
 
     constructor(sourceFilePath?: string) {
         if (sourceFilePath) {
@@ -84,7 +87,16 @@ export class LibrarySourceManager {
 
     async loadAndMigrate(legacyData: LegacyLibrarySourceData): Promise<LibrarySourceLoadResult> {
         if (this.loaded) return this.createLoadResult(false);
+        if (this.loadPromise) return this.loadPromise;
+        this.loadPromise = this.loadAndMigrateInternal(legacyData);
+        try {
+            return await this.loadPromise;
+        } finally {
+            this.loadPromise = null;
+        }
+    }
 
+    private async loadAndMigrateInternal(legacyData: LegacyLibrarySourceData): Promise<LibrarySourceLoadResult> {
         try {
             const raw = await fs.promises.readFile(this.sourceFilePath, 'utf8');
             this.data = this.validateData(JSON.parse(raw));
@@ -103,6 +115,41 @@ export class LibrarySourceManager {
         return this.createLoadResult(true);
     }
 
+    async ensureSource(
+        type: LibrarySourceType,
+        sourcePath: string,
+        origin: LibrarySourceOrigin
+    ): Promise<{source: LibrarySource; created: boolean}> {
+        this.assertLoaded();
+        const id = this.createSourceId(type, sourcePath);
+        const existing = this.data.sources.find(source => source.id === id);
+        if (existing) return {source: this.cloneSource(existing), created: false};
+
+        const source = this.createSource(type, sourcePath, origin, Date.now());
+        this.data.sources.push(source);
+        await this.save();
+        return {source: this.cloneSource(source), created: true};
+    }
+
+    async updateSourceScan(
+        sourceId: string,
+        knownFiles: LibrarySourceKnownFile[],
+        fullScan: boolean
+    ): Promise<LibrarySource> {
+        this.assertLoaded();
+        const source = this.data.sources.find(item => item.id === sourceId);
+        if (!source) throw new Error('音乐库来源不存在');
+
+        const normalizedFiles = this.mergeKnownFiles(
+            fullScan ? [] : source.knownFiles,
+            knownFiles
+        );
+        source.knownFiles = normalizedFiles;
+        source.lastScanAt = Date.now();
+        await this.save();
+        return this.cloneSource(source);
+    }
+
     async save(): Promise<void> {
         const temporaryPath = `${this.sourceFilePath}.tmp`;
         try {
@@ -117,10 +164,7 @@ export class LibrarySourceManager {
     }
 
     getSources(): LibrarySource[] {
-        return this.data.sources.map(source => ({
-            ...source,
-            knownFiles: source.knownFiles.map(file => ({...file}))
-        }));
+        return this.data.sources.map(source => this.cloneSource(source));
     }
 
     getPlaylistBindings(): PlaylistSourceBinding[] {
@@ -274,6 +318,34 @@ export class LibrarySourceManager {
             canonicalPath: this.canonicalize(file.path),
             trackId: typeof file.trackId === 'string' ? file.trackId : undefined
         }));
+    }
+
+    private mergeKnownFiles(
+        existingFiles: LibrarySourceKnownFile[],
+        newFiles: LibrarySourceKnownFile[]
+    ): LibrarySourceKnownFile[] {
+        const filesByPath = new Map<string, LibrarySourceKnownFile>();
+        for (const file of [...existingFiles, ...newFiles]) {
+            if (!file?.path) continue;
+            const canonicalPath = this.canonicalize(file.path);
+            filesByPath.set(canonicalPath, {
+                path: file.path,
+                canonicalPath,
+                trackId: file.trackId
+            });
+        }
+        return Array.from(filesByPath.values());
+    }
+
+    private cloneSource(source: LibrarySource): LibrarySource {
+        return {
+            ...source,
+            knownFiles: source.knownFiles.map(file => ({...file}))
+        };
+    }
+
+    private assertLoaded(): void {
+        if (!this.loaded) throw new Error('音乐库来源尚未加载');
     }
 
     private createLoadResult(migrated: boolean): LibrarySourceLoadResult {

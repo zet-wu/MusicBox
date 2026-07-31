@@ -76,4 +76,38 @@ describe('LibrarySourceManager 旧数据迁移', () => {
         expect(reloaded.getSources()).toHaveLength(1);
         expect(reloaded.getSources()[0].path).toBe(originalPath);
     });
+
+    it('幂等登记来源，并以完整扫描结果替换已知文件', async () => {
+        const manager = await createManager();
+        await manager.loadAndMigrate({
+            musicFolders: [],
+            scannedDirectories: [],
+            tracks: []
+        });
+        const directory = path.resolve('test-files', 'library');
+        const first = await manager.ensureSource('directory', directory, 'scan');
+        const second = await manager.ensureSource('directory', directory, 'playlist_binding');
+        const firstFile = path.join(directory, 'first.flac');
+        const secondFile = path.join(directory, 'second.flac');
+
+        await manager.updateSourceScan(first.source.id, [{
+            path: firstFile,
+            canonicalPath: manager.canonicalize(firstFile),
+            trackId: 'first'
+        }], true);
+        await manager.updateSourceScan(first.source.id, [{
+            path: secondFile,
+            canonicalPath: manager.canonicalize(secondFile),
+            trackId: 'second'
+        }], true);
+
+        expect(first.created).toBe(true);
+        expect(second.created).toBe(false);
+        expect(manager.getSources()).toHaveLength(1);
+        expect(manager.getSources()[0].knownFiles).toEqual([{
+            path: secondFile,
+            canonicalPath: manager.canonicalize(secondFile),
+            trackId: 'second'
+        }]);
+    });
 });

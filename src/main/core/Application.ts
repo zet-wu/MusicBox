@@ -366,6 +366,7 @@ export class Application {
         const networkDriveManager = await this.container.get<any>('networkDriveManager');
         const networkFileAdapter = await this.container.get<any>('networkFileAdapter');
         const libraryCacheManager = await this.container.get<any>('libraryCacheManager');
+        const librarySourceManager = await this.container.get<any>('librarySourceManager');
         const metadataHandler = await this.container.get<any>('metadataHandler');
         const extensionInstaller = await this.container.get<any>('extensionInstaller');
         const extensionStorageService = await this.container.get<any>('extensionStorageService');
@@ -391,7 +392,8 @@ export class Application {
         const libraryController = new LibraryController(
             libraryCacheManager, metadataHandler, networkDriveManager,
             networkFileAdapter, this.windowManager, embeddedCoverService,
-            parseMetadata, () => settingsController.getMusicFolders(), audioController.state
+            parseMetadata, () => settingsController.getMusicFolders(),
+            librarySourceManager, audioController.state
         );
         this.libraryScanner = libraryController;
         this.musicFolderSettingsProvider = settingsController;

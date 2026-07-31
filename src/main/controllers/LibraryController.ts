@@ -12,6 +12,10 @@ import {
 } from '../services/library/LibraryCacheManager';
 import {MetadataHandler} from '../services/library/MetadataHandler';
 import {EmbeddedCoverService, type EmbeddedCoverResult} from '../services/library/EmbeddedCoverService';
+import {
+    LibrarySourceManager,
+    type LibrarySourceKnownFile
+} from '../services/library/LibrarySourceManager';
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
 import {NetworkDriveManager} from '../services/network/NetworkDriveManager';
 import {WindowManager} from '../core/WindowManager';
@@ -30,6 +34,13 @@ export interface LibraryIndexRebuildResult extends LibraryIndexClearSummary {
     error?: string;
 }
 
+export interface LibraryImportResult {
+    success: boolean;
+    tracks: CachedTrack[];
+    failedPaths: string[];
+    error?: string;
+}
+
 @Controller('library')
 export class LibraryController extends BaseController {
     // shared audio engine state (reference shared with AudioController)
@@ -44,6 +55,7 @@ export class LibraryController extends BaseController {
         private embeddedCoverService: EmbeddedCoverService,
         private parseMetadata: (filePath: string, adapter?: any, opts?: any) => Promise<TrackMetadata>,
         private loadMusicFolders: () => Promise<string[]>,
+        private librarySourceManager: LibrarySourceManager,
         audioEngineState: any
     ) {
         super();
@@ -293,8 +305,8 @@ export class LibraryController extends BaseController {
         let scannedFolderCount = 0;
 
         for (const directoryPath of directoryPaths) {
-            const success = await this.scanDirectory(directoryPath);
-            if (success) {
+            const result = await this.importLibraryDirectory(directoryPath);
+            if (result.success) {
                 scannedFolderCount++;
             } else {
                 failedFolders.push(directoryPath);
@@ -306,12 +318,34 @@ export class LibraryController extends BaseController {
 
     @IpcHandle('library:scanDirectory')
     async scanDirectory(directoryPath: string): Promise<boolean> {
+        return (await this.importLibraryDirectory(directoryPath)).success;
+    }
+
+    @IpcHandle('library:importLibraryDirectory')
+    async importLibraryDirectory(directoryPath: string): Promise<LibraryImportResult> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const {source} = await this.librarySourceManager.ensureSource('directory', directoryPath, 'scan');
+            const success = await this.scanDirectorySource(directoryPath, source.id);
+            return {
+                success,
+                tracks: success ? this.getTracksForSource(source.id) : [],
+                failedPaths: success ? [] : [directoryPath],
+                error: success ? undefined : '目录扫描失败'
+            };
+        } catch (error: any) {
+            console.error('❌ 导入音乐文件夹失败:', error);
+            return {success: false, tracks: [], failedPaths: [directoryPath], error: error.message};
+        }
+    }
+
+    private async scanDirectorySource(directoryPath: string, sourceId: string): Promise<boolean> {
         try {
             const scanStartTime = Date.now();
             const isNetwork = this.networkFileAdapter.isNetworkPath(directoryPath);
 
             if (isNetwork) {
-                return this.scanNetworkDirectory(directoryPath, scanStartTime);
+                return this.scanNetworkDirectory(directoryPath, scanStartTime, sourceId);
             }
 
             const tracks: any[] = [];
@@ -386,11 +420,16 @@ export class LibraryController extends BaseController {
 
             if (tracksToCache.length > 0) {
                 this.libraryCacheManager.addTracks(tracksToCache);
-                this.libraryCacheManager.addScannedDirectory(directoryPath);
-                const scanDuration = Date.now() - scanStartTime;
-                this.libraryCacheManager.updateScanStatistics(scanStartTime, scanDuration);
-                await this.libraryCacheManager.saveCache();
             }
+            this.libraryCacheManager.addScannedDirectory(directoryPath);
+            const scanDuration = Date.now() - scanStartTime;
+            this.libraryCacheManager.updateScanStatistics(scanStartTime, scanDuration);
+            await this.libraryCacheManager.saveCache();
+            await this.librarySourceManager.updateSourceScan(
+                sourceId,
+                this.createKnownFiles(files.map(file => file.path)),
+                true
+            );
 
             const allTracks = this.libraryCacheManager.getTracks();
             const win = this.windowManager.getMainWindow();
@@ -402,7 +441,11 @@ export class LibraryController extends BaseController {
         }
     }
 
-    private async scanNetworkDirectory(networkPath: string, scanStartTime: number): Promise<boolean> {
+    private async scanNetworkDirectory(
+        networkPath: string,
+        scanStartTime: number,
+        sourceId: string
+    ): Promise<boolean> {
         const tracks: any[] = [];
         const tracksToCache: any[] = [];
         const rootStat = await this.networkFileAdapter.stat(networkPath);
@@ -478,11 +521,16 @@ export class LibraryController extends BaseController {
 
         if (tracksToCache.length > 0) {
             this.libraryCacheManager.addTracks(tracksToCache);
-            this.libraryCacheManager.addScannedDirectory(networkPath);
-            const scanDuration = Date.now() - scanStartTime;
-            this.libraryCacheManager.updateScanStatistics(scanStartTime, scanDuration);
-            await this.libraryCacheManager.saveCache();
         }
+        this.libraryCacheManager.addScannedDirectory(networkPath);
+        const scanDuration = Date.now() - scanStartTime;
+        this.libraryCacheManager.updateScanStatistics(scanStartTime, scanDuration);
+        await this.libraryCacheManager.saveCache();
+        await this.librarySourceManager.updateSourceScan(
+            sourceId,
+            this.createKnownFiles(files.map(file => file.path)),
+            true
+        );
 
         const allTracks = this.libraryCacheManager.getTracks();
         console.log(`✅ 网络扫描完成，找到 ${tracks.length} 个音频文件`);
@@ -797,48 +845,133 @@ export class LibraryController extends BaseController {
         win?.webContents.send('library:favoritesChanged', {trackIds, favorite});
     }
 
+    private async ensureLibrarySourcesLoaded(): Promise<void> {
+        const result = await this.librarySourceManager.loadAndMigrate({
+            musicFolders: await this.loadMusicFolders(),
+            scannedDirectories: this.libraryCacheManager.getScannedDirectories(),
+            tracks: this.libraryCacheManager.getAllTracks()
+        });
+        if (result.migrated || this.libraryCacheManager.needsPlaylistMembershipMigration()) {
+            await this.libraryCacheManager.saveCache();
+        }
+    }
+
+    private createKnownFiles(filePaths: string[]): LibrarySourceKnownFile[] {
+        return filePaths.map(filePath => ({
+            path: filePath,
+            canonicalPath: this.librarySourceManager.canonicalize(filePath),
+            trackId: this.libraryCacheManager.getTrackByPath(filePath)?.fileId
+        }));
+    }
+
+    private getTracksForSource(sourceId: string): CachedTrack[] {
+        const source = this.librarySourceManager.getSources().find(item => item.id === sourceId);
+        if (!source) return [];
+        const trackIds = new Set(source.knownFiles.flatMap(file => file.trackId ? [file.trackId] : []));
+        return this.libraryCacheManager.getTracks().filter(track => trackIds.has(track.fileId));
+    }
+
+    @IpcHandle('library:importLibraryFiles')
+    async importLibraryFiles(filePaths: string[]): Promise<LibraryImportResult> {
+        const tracks: CachedTrack[] = [];
+        const failedPaths: string[] = [];
+
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            for (const filePath of Array.from(new Set(filePaths || []))) {
+                try {
+                    const track = await this.importLibraryFile(filePath);
+                    tracks.push(track);
+                } catch (error: any) {
+                    failedPaths.push(filePath);
+                    console.warn(`⚠️ 导入音乐文件失败 ${filePath}:`, error.message);
+                }
+            }
+
+            this.windowManager.sendToMainWindow('library:updated', this.libraryCacheManager.getTracks());
+            return {
+                success: failedPaths.length === 0,
+                tracks,
+                failedPaths,
+                error: failedPaths.length > 0 ? `${failedPaths.length} 个文件导入失败` : undefined
+            };
+        } catch (error: any) {
+            console.error('❌ 导入音乐文件失败:', error);
+            return {success: false, tracks, failedPaths: filePaths || [], error: error.message};
+        }
+    }
+
+    private async importLibraryFile(filePath: string): Promise<CachedTrack> {
+        const extension = path.extname(filePath).toLowerCase();
+        if (!AUDIO_EXTENSIONS.includes(extension)) throw new Error('不支持的音频格式');
+
+        const isNetwork = this.networkFileAdapter.isNetworkPath(filePath);
+        const stats = isNetwork
+            ? await this.networkFileAdapter.stat(filePath)
+            : await fs.promises.stat(filePath);
+        const isDirectory = typeof stats.isDirectory === 'function'
+            ? stats.isDirectory()
+            : Boolean((stats as any).isDirectory);
+        if (isDirectory) throw new Error('所选路径是文件夹');
+
+        const {source} = await this.librarySourceManager.ensureSource('file', filePath, 'file_import');
+        const restoredFromIgnoreList = this.libraryCacheManager.removeFromIgnoreList(filePath);
+
+        const existing = this.libraryCacheManager.getTrackByPath(filePath);
+        if (existing) {
+            if (restoredFromIgnoreList) await this.libraryCacheManager.saveCache();
+            await this.librarySourceManager.updateSourceScan(
+                source.id,
+                this.createKnownFiles([filePath]),
+                true
+            );
+            return existing;
+        }
+
+        const metadata = await this.parseMetadata(
+            filePath,
+            isNetwork ? this.networkFileAdapter : undefined,
+            {skipCover: true, skipLyrics: true}
+        );
+        const fileName = path.basename(filePath);
+        const track = this.libraryCacheManager.addTrack({
+            filePath,
+            fileName,
+            title: metadata.title || path.basename(fileName, extension),
+            artist: metadata.artist || '未知艺术家',
+            album: metadata.album || '未知专辑',
+            duration: metadata.duration || 0,
+            bitrate: metadata.bitrate,
+            sampleRate: metadata.sampleRate,
+            year: metadata.year,
+            genre: Array.isArray(metadata.genre) ? metadata.genre.join(', ') : (metadata.genre || ''),
+            track: (metadata as any).track,
+            disc: (metadata as any).disc,
+            embeddedLyrics: metadata.embeddedLyrics,
+            fileSize: stats.size || 0,
+            isNetworkFile: isNetwork
+        }, filePath, stats as fs.Stats);
+        if (!track) throw new Error('歌曲添加失败');
+
+        await this.libraryCacheManager.saveCache();
+        await this.librarySourceManager.updateSourceScan(
+            source.id,
+            this.createKnownFiles([filePath]),
+            true
+        );
+        return track;
+    }
+
     @IpcHandle('library:scanSingleFile')
     async scanSingleFile(networkPath: string): Promise<any> {
-        try {
-            const audioExtensions = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.ape'];
-            const existing = this.libraryCacheManager.getTracks().find((t: any) => t.filePath === networkPath);
-            if (existing) return {success: true, track: existing, isNew: false};
-            const ext = path.extname(networkPath).toLowerCase();
-            if (!audioExtensions.includes(ext)) return {success: false, error: '不支持的音频格式'};
-            const stats = await this.networkFileAdapter.stat(networkPath);
-            const isDir = typeof stats.isDirectory === 'function' ? stats.isDirectory() : Boolean((stats as any).isDirectory);
-            if (isDir) return {success: false, error: '这是一个文件夹，不是音频文件'};
-            const metadata = await this.parseMetadata(networkPath, this.networkFileAdapter);
-            const fileName = path.basename(networkPath);
-            const trackData = {
-                filePath: networkPath,
-                fileName,
-                title: metadata.title || path.basename(fileName, ext),
-                artist: metadata.artist || '未知艺术家',
-                album: metadata.album || '未知专辑',
-                duration: metadata.duration || 0,
-                bitrate: metadata.bitrate,
-                sampleRate: metadata.sampleRate,
-                year: metadata.year,
-                genre: Array.isArray(metadata.genre) ? metadata.genre.join(', ') : (metadata.genre || ''),
-                track: (metadata as any).track,
-                disc: (metadata as any).disc,
-                embeddedLyrics: metadata.embeddedLyrics,
-                fileSize: stats.size || 0,
-                isNetworkFile: true
-            };
-            const cacheTrack = {trackData, filePath: networkPath, stats};
-            const addedTracks = this.libraryCacheManager.addTracks([cacheTrack]);
-            await this.libraryCacheManager.saveCache();
-            console.log(`✅ 单个文件扫描完成: ${trackData.title} - ${trackData.artist}`);
-            const win = this.windowManager.getMainWindow();
-            const addedTrack = this.libraryCacheManager.getTracks().find(track => track.fileId === addedTracks[0]?.fileId);
-            if (win && addedTrack) win.webContents.send('library:updated', [addedTrack]);
-            return {success: true, track: addedTrack, isNew: true};
-        } catch (error: any) {
-            console.error('❌ 扫描单个文件失败:', error);
-            return {success: false, error: error.message};
-        }
+        const existed = Boolean(this.libraryCacheManager.getTrackByPath(networkPath));
+        const result = await this.importLibraryFiles([networkPath]);
+        return {
+            success: result.success,
+            track: result.tracks[0],
+            isNew: result.success ? !existed : undefined,
+            error: result.error
+        };
     }
 
     @IpcHandle('library:scanNetworkDrive')
@@ -850,7 +983,7 @@ export class LibraryController extends BaseController {
             if (!status || !status.connected) throw new Error(`网络磁盘 ${driveId} 未连接`);
             const networkPath = this.networkFileAdapter.buildNetworkPath(driveId, relativePath);
             console.log(`🌐 扫描网络磁盘: ${driveInfo.config.displayName} - ${networkPath}`);
-            return this.scanNetworkDirectory(networkPath, Date.now());
+            return (await this.importLibraryDirectory(networkPath)).success;
         } catch (error: any) {
             console.error('❌ 网络磁盘扫描失败:', error);
             return false;
@@ -918,29 +1051,16 @@ export class LibraryController extends BaseController {
         isNew?: boolean;
         error?: string
     }> {
-        try {
-            const existing = this.libraryCacheManager.getTracks().find((t: any) => t.filePath === audioFile.filePath);
-            if (existing) return {success: true, track: existing, isNew: false};
-            const stats = await fs.promises.stat(audioFile.filePath);
-            const trackData = {
-                title: audioFile.title, artist: audioFile.artist, album: audioFile.album,
-                duration: audioFile.duration, bitrate: audioFile.bitrate, sampleRate: audioFile.sampleRate,
-                year: audioFile.year, genre: audioFile.genre, track: audioFile.track,
-                disc: audioFile.disc, embeddedLyrics: audioFile.embeddedLyrics
-            };
-            const cacheTrack = this.libraryCacheManager.addTrack(trackData, audioFile.filePath, stats);
-            if (!cacheTrack) {
-                return {success: false, error: '歌曲添加失败'};
-            }
-            await this.libraryCacheManager.saveCache();
-            const win = this.windowManager.getMainWindow();
-            const addedTrack = this.libraryCacheManager.getTracks().find(track => track.fileId === cacheTrack.fileId);
-            if (win) win.webContents.send('library:updated', this.libraryCacheManager.getTracks());
-            return {success: true, track: addedTrack, isNew: true};
-        } catch (error: any) {
-            console.error('❌ 添加音频文件到音乐库失败:', error);
-            return {success: false, error: error.message};
-        }
+        const filePath = audioFile?.filePath;
+        if (!filePath) return {success: false, error: '缺少音频文件路径'};
+        const existed = Boolean(this.libraryCacheManager.getTrackByPath(filePath));
+        const result = await this.importLibraryFiles([filePath]);
+        return {
+            success: result.success,
+            track: result.tracks[0],
+            isNew: result.success ? !existed : undefined,
+            error: result.error
+        };
     }
 
     private async updateNetworkFileMetadata(filePath: string, metadata: any): Promise<any> {

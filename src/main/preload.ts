@@ -230,6 +230,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     library: {
         // Scan for music files
         scanDirectory: (path: string) => ipcRenderer.invoke('library:scanDirectory', path),
+        importLibraryDirectory: (path: string) => ipcRenderer.invoke('library:importLibraryDirectory', path),
+        importLibraryFiles: (paths: string[]) => ipcRenderer.invoke('library:importLibraryFiles', paths),
         scanNetworkDrive: (driveId: string, relativePath: string) => ipcRenderer.invoke('library:scanNetworkDrive', driveId, relativePath),
         scanSingleFile: (networkPath: string) => ipcRenderer.invoke('library:scanSingleFile', networkPath),
         scanDirectoryForFiles: (path: string) => ipcRenderer.invoke('library:scanDirectoryForFiles', path),

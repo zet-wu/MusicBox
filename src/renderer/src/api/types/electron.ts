@@ -105,6 +105,8 @@ export interface EmbeddedTrackCover {
 
 export interface ElectronLibraryAPI {
     scanDirectory(path: string): Promise<boolean>;
+    importLibraryDirectory(path: string): Promise<LibraryImportResult>;
+    importLibraryFiles(paths: string[]): Promise<LibraryImportResult>;
     scanNetworkDrive(driveId: string | number, relativePath: string): Promise<boolean>;
     scanSingleFile(networkPath: string): Promise<unknown>;
     scanDirectoryForFiles(path: string): Promise<{success: boolean; files: unknown[]; error?: string}>;
@@ -140,6 +142,13 @@ export interface ElectronLibraryAPI {
     onScanProgress(callback: (event: unknown, progress: ScanProgress) => void): Unsubscribe;
     onCacheValidationProgress(callback: (progress: ScanProgress) => void): Unsubscribe;
     onCoverUpdated(callback: (data: unknown) => void): Unsubscribe;
+}
+
+export interface LibraryImportResult {
+    success: boolean;
+    tracks: Track[];
+    failedPaths: string[];
+    error?: string;
 }
 
 export interface ElectronDesktopLyricsAPI {
