@@ -66,3 +66,38 @@
 .playlist-binding-actions {
     flex-wrap: wrap;
 }
+
+.folder-playlist-binding-dialog {
+    .folder-binding-source-path {
+        overflow: hidden;
+        margin-bottom: 14px;
+        padding: 10px 12px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-body-bg);
+        color: var(--color-text-secondary);
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .playlist-binding-toolbar {
+        justify-content: stretch;
+    }
+
+    .folder-binding-search,
+    .folder-binding-search input {
+        width: 100%;
+    }
+
+    .folder-binding-playlist {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+
+    @media (max-width: 720px) {
+        .folder-binding-playlist {
+            grid-template-columns: 1fr;
+        }
+    }
+}

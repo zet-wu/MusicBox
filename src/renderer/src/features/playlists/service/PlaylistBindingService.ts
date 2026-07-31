@@ -60,7 +60,7 @@ export class PlaylistBindingService {
         return true;
     }
 
-    async unbind(binding: PlaylistSourceBinding, mode: 'keep' | 'remove'): Promise<boolean> {
+    async unbind(binding: Pick<PlaylistSourceBinding, 'id'>, mode: 'keep' | 'remove'): Promise<boolean> {
         const keepTracks = mode === 'keep';
         const confirmed = await appConfirmationService.confirm({
             title: keepTracks ? '解绑并保留歌曲' : '解绑并移除歌曲',
