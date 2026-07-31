@@ -30,12 +30,12 @@ src/renderer/src/features/
   equalizer/               图形/参量均衡器
   events/                  应用事件服务
   extensions/              插件管理功能
-  library/                 音乐库、扫描、元数据编辑
+  library/                 音乐库来源、索引重建、扫描、元数据编辑
   media/                   文件选择、音频读取、媒体文件系统
   mediaAssets/             歌词、封面、本地/在线/内嵌资源
   networkDrive/            SMB / WebDAV 网络磁盘
   playback/                播放队列、状态、音频引擎、UI 绑定
-  playlists/               歌单数据、播放、封面、导入
+  playlists/               歌单数据、播放、封面、文件导入与目录绑定
   settings/                设置页 controller/service/renderer
   userData/                心情、日记等用户数据
 

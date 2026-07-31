@@ -46,7 +46,7 @@ Native/helper modules
 3. `Application.initializeCoreServices()` 注册核心服务，但尽量延迟实例化重型服务。
 4. `Application.registerStartupControllers()` 在窗口创建前注册 IPC controller，确保 renderer 首屏加载时 preload API 可用。
 5. `WindowManager.createMainWindow()` 创建无边框主窗口并加载 `src/renderer/public/index.html`。
-6. 主窗口显示后，后台加载音乐库缓存并向 renderer 发送 `library:updated`。
+6. 主窗口显示后，后台加载音乐库缓存和来源注册表，向 renderer 发送 `library:updated`，并按设置调度全来源扫描。
 7. renderer 入口 `src/renderer/src/app/bootstrap/main.ts` 加载基础工具、API、插件框架、UI component 和应用启动代码。
 8. `createAppComposition()` 组装生命周期、路由、播放、音乐库、插件、快捷键和 UI facade。
 
@@ -87,7 +87,9 @@ controller 使用 `@Controller`、`@IpcHandle`、`@IpcOn` 装饰器声明 IPC �
 
 ### services
 
-- `services/library/LibraryCacheManager.ts` 管理 `music-library-cache.json`、歌单、忽略列表和缓存校验。
+- `services/library/LibraryCacheManager.ts` 管理可重建的音轨索引、歌单、忽略列表和缓存校验。
+- `services/library/LibrarySourceManager.ts` 管理目录/精确文件来源以及歌单与目录来源的绑定。
+- `services/library/CoverCacheStorage.ts` 管理应用专用封面缓存目录、所有权标记和文件清单。
 - `services/library/MetadataHandler.ts` 负责元数据读取/写入相关处理。
 - `services/network/NetworkDriveManager.ts` 和 `NetworkFileAdapter.ts` 抽象 SMB / WebDAV 文件访问。
 - `services/extensions/ExtensionInstaller.ts` 管理外部 ZIP 插件安装到用户数据目录。
@@ -173,16 +175,23 @@ MusicBox 当前有两类播放实现：
 
 ## 音乐库与元数据
 
-音乐库数据由主进程缓存，renderer 通过 `libraryGateway` 和 `LibraryBridge` 获取。缓存文件存放在 Electron userData 目录：
+音乐库数据由主进程持久化，renderer 通过 `libraryGateway` 和 `LibraryBridge` 获取。索引、来源和用户数据具有不同生命周期，相关文件存放在 Electron userData 目录：
 
-- `music-library-cache.json`：歌曲、歌单、扫描目录、忽略列表、统计信息。
-- `music-folders-settings.json`：音乐文件夹和自动扫描设置。
+- `music-library-cache.json`：可重建的音轨索引和扫描统计，以及需要保留的歌单、收藏和忽略列表。
+- `music-library-sources.json`：持续追踪的目录来源、精确文件来源及歌单目录绑定。
+- `music-folders-settings.json`：设置页音乐文件夹列表和自动扫描计划。
 - `window-config.json`：主窗口尺寸和桌面歌词位置。
 - `extensions.json`、`extensions/`、`extension-storage/`：外部插件和插件存储。
+
+文件夹导入统一注册为持续来源，单个或多个文件导入统一注册为精确来源；主页、设置页和歌单目录绑定共享这套来源模型。索引重建只清除音轨元数据、扫描记录和统计，随后扫描全部已注册来源；歌单、收藏、忽略列表、来源和绑定保持不变。歌单同时保存手动成员和目录绑定派生的成员，界面歌曲数以当前索引可解析的成员为准。
 
 收藏以 `music-library-cache.json` 中固定的系统歌单 `system:favorites` 持久化，歌曲的 `favorite` 状态由该歌单派生。Renderer 通过 `FavoriteService` 串行修改状态，并订阅 preload 转发的收藏变化事件，使播放器与歌曲页面保持同步。
 
 元数据读取主要依赖 `music-metadata` 等 Node 侧库；写入和复杂处理由 `metadata_editor.py` helper 支持，完整打包时通过 `npm run build:python` 生成平台可执行文件。
+
+## 封面缓存
+
+封面缓存清理跨越 renderer 内存缓存和主进程磁盘缓存。默认目录 `userData/CoverCache` 由应用完整管理；自定义位置使用专用 `MusicBoxCoverCache` 子目录，并通过所有权标记和文件清单只删除应用创建的文件。清理不会修改音频内嵌封面、歌单自定义封面或来源不明的用户图片。
 
 ## 插件系统
 
