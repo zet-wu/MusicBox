@@ -235,14 +235,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         importLibraryFiles: (paths: string[], targetPlaylistId?: string) =>
             ipcRenderer.invoke('library:importLibraryFiles', paths, targetPlaylistId),
         getLibrarySources: () => ipcRenderer.invoke('library:getLibrarySources'),
+        getLibraryDirectoryOverviews: () => ipcRenderer.invoke('library:getLibraryDirectoryOverviews'),
         registerLibraryDirectory: (path: string) =>
             ipcRenderer.invoke('library:registerLibraryDirectory', path),
         removeLibraryDirectory: (path: string) =>
             ipcRenderer.invoke('library:removeLibraryDirectory', path),
         removeLibrarySource: (sourceId: string) => ipcRenderer.invoke('library:removeLibrarySource', sourceId),
+        rescanLibrarySource: (sourceId: string) => ipcRenderer.invoke('library:rescanLibrarySource', sourceId),
         getPlaylistBindings: (playlistId: string) => ipcRenderer.invoke('library:getPlaylistBindings', playlistId),
         bindDirectoryToPlaylist: (playlistId: string, path: string) =>
             ipcRenderer.invoke('library:bindDirectoryToPlaylist', playlistId, path),
+        bindLibrarySourceToPlaylist: (playlistId: string, sourceId: string) =>
+            ipcRenderer.invoke('library:bindLibrarySourceToPlaylist', playlistId, sourceId),
         unbindDirectoryFromPlaylist: (bindingId: string, mode: 'keep' | 'remove') =>
             ipcRenderer.invoke('library:unbindDirectoryFromPlaylist', bindingId, mode),
         rescanPlaylistBinding: (bindingId: string) =>

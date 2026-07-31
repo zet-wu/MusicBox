@@ -118,11 +118,14 @@ export interface ElectronLibraryAPI {
     importLibraryDirectory(path: string): Promise<LibraryImportResult>;
     importLibraryFiles(paths: string[], targetPlaylistId?: string): Promise<LibraryImportResult>;
     getLibrarySources(): Promise<LibrarySource[]>;
+    getLibraryDirectoryOverviews(): Promise<LibraryDirectoryOverview[]>;
     registerLibraryDirectory(path: string): Promise<Result & {source?: LibrarySource}>;
     removeLibraryDirectory(path: string): Promise<Result & {removedTrackCount?: number}>;
     removeLibrarySource(sourceId: string): Promise<Result & {removedTrackCount?: number}>;
+    rescanLibrarySource(sourceId: string): Promise<Result>;
     getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]>;
     bindDirectoryToPlaylist(playlistId: string, path: string): Promise<Result & {binding?: PlaylistSourceBinding}>;
+    bindLibrarySourceToPlaylist(playlistId: string, sourceId: string): Promise<Result & {binding?: PlaylistSourceBinding}>;
     unbindDirectoryFromPlaylist(bindingId: string, mode: 'keep' | 'remove'): Promise<Result>;
     rescanPlaylistBinding(bindingId: string): Promise<Result>;
     restorePlaylistBindingExclusions(bindingId: string): Promise<Result & {restoredCount?: number}>;
@@ -187,6 +190,26 @@ export interface LibrarySource {
     knownFiles: LibrarySourceKnownFile[];
     createdAt: number;
     lastScanAt?: number;
+}
+
+export interface FolderPlaylistBindingSummary {
+    id: string;
+    playlistId: string;
+    playlistName: string;
+    availableTrackCount: number;
+    excludedTrackCount: number;
+    createdAt: number;
+    lastSyncAt?: number;
+}
+
+export interface LibraryDirectoryOverview {
+    id: string;
+    path: string;
+    origin: LibrarySource['origin'];
+    createdAt: number;
+    lastScanAt?: number;
+    trackCount: number;
+    bindings: FolderPlaylistBindingSummary[];
 }
 
 export interface PlaylistSourceBinding {

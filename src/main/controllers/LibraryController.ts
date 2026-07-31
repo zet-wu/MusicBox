@@ -50,6 +50,26 @@ export interface LibraryImportResult {
     error?: string;
 }
 
+export interface FolderPlaylistBindingSummary {
+    id: string;
+    playlistId: string;
+    playlistName: string;
+    availableTrackCount: number;
+    excludedTrackCount: number;
+    createdAt: number;
+    lastSyncAt?: number;
+}
+
+export interface LibraryDirectoryOverview {
+    id: string;
+    path: string;
+    origin: string;
+    createdAt: number;
+    lastScanAt?: number;
+    trackCount: number;
+    bindings: FolderPlaylistBindingSummary[];
+}
+
 interface PlaylistCoverUpdateResult {
     coverUpdated: boolean;
     coverPath?: string;
@@ -1174,6 +1194,59 @@ export class LibraryController extends BaseController {
         return this.librarySourceManager.getSources();
     }
 
+    @IpcHandle('library:getLibraryDirectoryOverviews')
+    async getLibraryDirectoryOverviews(): Promise<LibraryDirectoryOverview[]> {
+        await this.ensureLibrarySourcesLoaded();
+        const bindings = this.librarySourceManager.getPlaylistBindings();
+        const playlistsById = new Map(
+            this.libraryCacheManager.getAllPlaylists().map(playlist => [playlist.id, playlist])
+        );
+
+        return this.librarySourceManager.getSources()
+            .filter(source => source.type === 'directory')
+            .map(source => ({
+                id: source.id,
+                path: source.path,
+                origin: source.origin,
+                createdAt: source.createdAt,
+                lastScanAt: source.lastScanAt,
+                trackCount: this.getTracksForSource(source.id).length,
+                bindings: bindings
+                    .filter(binding => binding.sourceId === source.id)
+                    .flatMap(binding => {
+                        const playlist = playlistsById.get(binding.playlistId);
+                        if (!playlist) return [];
+                        const excludedPaths = new Set(binding.excludedPaths);
+                        return [{
+                            id: binding.id,
+                            playlistId: binding.playlistId,
+                            playlistName: playlist.name,
+                            availableTrackCount: binding.managedFiles.filter(file => (
+                                file.trackId && !excludedPaths.has(file.canonicalPath)
+                            )).length,
+                            excludedTrackCount: binding.excludedPaths.length,
+                            createdAt: binding.createdAt,
+                            lastSyncAt: binding.lastSyncAt
+                        }];
+                    })
+            }));
+    }
+
+    @IpcHandle('library:rescanLibrarySource')
+    async rescanLibrarySource(sourceId: string): Promise<{success: boolean; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const source = this.librarySourceManager.getSource(sourceId);
+            if (!source) throw new Error('音乐库来源不存在');
+            if (source.type !== 'directory') throw new Error('只能重新扫描音乐文件夹来源');
+            const success = await this.scanDirectorySource(source.path, source.id);
+            this.emitSourcesUpdated();
+            return {success, error: success ? undefined : '重新扫描文件夹失败'};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
     @IpcHandle('library:registerLibraryDirectory')
     async registerLibraryDirectory(
         directoryPath: string
@@ -1253,6 +1326,36 @@ export class LibraryController extends BaseController {
         }
     }
 
+    @IpcHandle('library:bindLibrarySourceToPlaylist')
+    async bindLibrarySourceToPlaylist(
+        playlistId: string,
+        sourceId: string
+    ): Promise<{success: boolean; binding?: any; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const playlist = this.libraryCacheManager.getPlaylistById(playlistId);
+            if (!playlist) throw new Error('歌单不存在');
+            if (playlist.systemType === 'favorites') throw new Error('收藏歌单不支持绑定文件夹');
+            const source = this.librarySourceManager.getSource(sourceId);
+            if (!source) throw new Error('音乐库来源不存在');
+            if (source.type !== 'directory') throw new Error('只能绑定音乐文件夹来源');
+
+            const {binding} = await this.librarySourceManager.createPlaylistBinding(playlistId, source.id);
+            await this.librarySourceManager.synchronizeSourceBindings(source.id);
+            const addedTrackIds = this.recomputePlaylistMembership(playlistId);
+            await this.libraryCacheManager.saveCache();
+            await this.maybeSetAutomaticPlaylistCover(playlistId, addedTrackIds);
+            this.emitPlaylistsUpdated();
+            this.emitSourcesUpdated();
+            return {
+                success: true,
+                binding: this.librarySourceManager.getPlaylistBinding(binding.id)
+            };
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
     @IpcHandle('library:rescanPlaylistBinding')
     async rescanPlaylistBinding(bindingId: string): Promise<{success: boolean; error?: string}> {
         try {
@@ -1262,6 +1365,7 @@ export class LibraryController extends BaseController {
             const source = this.librarySourceManager.getSource(binding.sourceId);
             if (!source) throw new Error('音乐库来源不存在');
             const success = await this.scanDirectorySource(source.path, source.id);
+            this.emitSourcesUpdated();
             return {success, error: success ? undefined : '重新扫描文件夹失败'};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -1281,6 +1385,7 @@ export class LibraryController extends BaseController {
             await this.libraryCacheManager.saveCache();
             await this.maybeSetAutomaticPlaylistCover(binding.playlistId, addedTrackIds);
             this.emitPlaylistsUpdated();
+            this.emitSourcesUpdated();
             return {success: true, restoredCount};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -1307,6 +1412,7 @@ export class LibraryController extends BaseController {
             this.recomputePlaylistMembership(binding.playlistId);
             await this.libraryCacheManager.saveCache();
             this.emitPlaylistsUpdated();
+            this.emitSourcesUpdated();
             return {success: true};
         } catch (error: any) {
             return {success: false, error: error.message};
