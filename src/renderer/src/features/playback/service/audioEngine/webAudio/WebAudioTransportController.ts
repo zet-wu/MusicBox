@@ -256,11 +256,16 @@ class WebAudioTransportController {
     }
 
     private async transitionToPaused(): Promise<void> {
+        const mediaElement = this.options.getMediaElement();
+        // 自然结束会先触发 pause 再触发 ended，结束状态由 handleSourceEnded 统一处理。
+        if (mediaElement?.ended) {
+            return;
+        }
+
         if (!this.playing) {
             return;
         }
 
-        const mediaElement = this.options.getMediaElement();
         if (mediaElement) {
             this.pauseTime = this.clampPosition(mediaElement.currentTime || 0, this.getMaxPosition());
         }

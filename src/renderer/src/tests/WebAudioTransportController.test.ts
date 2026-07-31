@@ -9,6 +9,7 @@ function createHarness() {
         src: 'blob:track',
         currentTime: 10,
         paused: false,
+        ended: false,
         play: vi.fn(async () => undefined),
         pause: vi.fn(),
         removeAttribute: vi.fn(),
@@ -18,6 +19,7 @@ function createHarness() {
         onpause: null
     } as unknown as HTMLAudioElement;
     const playbackStateChanged = vi.fn(async (_isPlaying: boolean) => undefined);
+    const trackEnded = vi.fn();
     const controller = new WebAudioTransportController({
         getAudioContext: () => ({
             state: 'running',
@@ -26,7 +28,7 @@ function createHarness() {
         getMediaElement: () => mediaElement,
         getDuration: () => 180,
         connectSourceToChain: vi.fn(),
-        onTrackEnded: vi.fn(),
+        onTrackEnded: trackEnded,
         getPlaybackStateChangedCallback: () => playbackStateChanged,
         getPositionChangedCallback: () => null
     });
@@ -35,7 +37,14 @@ function createHarness() {
     return {
         controller,
         mediaElement,
-        playbackStateChanged
+        playbackStateChanged,
+        trackEnded,
+        setEnded: (ended: boolean) => {
+            Object.defineProperty(mediaElement, 'ended', {
+                configurable: true,
+                value: ended
+            });
+        }
     };
 }
 
@@ -61,6 +70,26 @@ describe('WebAudioTransportController', () => {
             expect(harness.controller.isPaused()).toBe(true);
             expect(harness.playbackStateChanged).toHaveBeenCalledOnce();
             expect(harness.playbackStateChanged).toHaveBeenCalledWith(false);
+        });
+    });
+
+    it('自然结束先触发暂停事件时仍通知播放下一首', async () => {
+        const harness = createHarness();
+        controllers.push(harness.controller);
+        await harness.controller.play();
+        harness.playbackStateChanged.mockClear();
+
+        harness.mediaElement.currentTime = 180;
+        harness.setEnded(true);
+        harness.mediaElement.onpause?.(new Event('pause'));
+        harness.mediaElement.onended?.(new Event('ended'));
+
+        await vi.waitFor(() => {
+            expect(harness.controller.isPlaying()).toBe(false);
+            expect(harness.controller.isPaused()).toBe(false);
+            expect(harness.playbackStateChanged).toHaveBeenCalledOnce();
+            expect(harness.playbackStateChanged).toHaveBeenCalledWith(false);
+            expect(harness.trackEnded).toHaveBeenCalledOnce();
         });
     });
 
