@@ -81,38 +81,68 @@ export class PageComponentBindings {
 
             case 'artistsPage':
                 if (components.artistsPage) {
-                    components.artistsPage.on('trackPlayed', async (track: Track, index: number) => {
+                    components.artistsPage.on('trackPlayed', async (
+                        track: Track,
+                        index: number,
+                        tracks?: Track[],
+                        mode?: 'shuffle' | 'sequence'
+                    ) => {
+                        if (tracks?.length) {
+                            await app.playTrackFromPlaylist(track, index, tracks, mode);
+                            return;
+                        }
                         await app.handleTrackPlayed(track, index);
                     });
 
-                    components.artistsPage.on('playAll', async (tracks: Track[]) => {
+                    components.artistsPage.on('playAllTracks', async (tracks: Track[]) => {
                         await app.handlePlayAllTracks(tracks);
                     });
-                    components.artistsPage.on('shuffleAll', async (tracks: Track[]) => {
-                        await app.handleShuffleAllTracks(tracks);
+                    components.artistsPage.on('appendAllTracks', async (tracks: Track[]) => {
+                        await app.addTracksToQueue(tracks);
                     });
-
-                    components.artistsPage.on('addToPlaylist', (track: Track) => {
-                        app.addToPlaylist(track);
+                    components.artistsPage.on('trackRightClick', (
+                        track: Track,
+                        index: number,
+                        x: number,
+                        y: number,
+                        selectedTracks: Set<number>,
+                        selectedTrackItems: Track[]
+                    ) => {
+                        content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
                     });
                 }
                 break;
 
             case 'albumsPage':
                 if (components.albumsPage) {
-                    components.albumsPage.on('trackPlayed', async (track: Track, index: number) => {
+                    components.albumsPage.on('trackPlayed', async (
+                        track: Track,
+                        index: number,
+                        tracks?: Track[],
+                        mode?: 'shuffle' | 'sequence'
+                    ) => {
+                        if (tracks?.length) {
+                            await app.playTrackFromPlaylist(track, index, tracks, mode);
+                            return;
+                        }
                         await app.handleTrackPlayed(track, index);
                     });
 
-                    components.albumsPage.on('playAll', async (tracks: Track[]) => {
+                    components.albumsPage.on('playAllTracks', async (tracks: Track[]) => {
                         await app.handlePlayAllTracks(tracks);
                     });
-                    components.albumsPage.on('shuffleAll', async (tracks: Track[]) => {
-                        await app.handleShuffleAllTracks(tracks);
+                    components.albumsPage.on('appendAllTracks', async (tracks: Track[]) => {
+                        await app.addTracksToQueue(tracks);
                     });
-
-                    components.albumsPage.on('addToPlaylist', (track: Track) => {
-                        app.addToPlaylist(track);
+                    components.albumsPage.on('trackRightClick', (
+                        track: Track,
+                        index: number,
+                        x: number,
+                        y: number,
+                        selectedTracks: Set<number>,
+                        selectedTrackItems: Track[]
+                    ) => {
+                        content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
                     });
                 }
                 break;

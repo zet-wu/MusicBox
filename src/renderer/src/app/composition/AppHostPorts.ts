@@ -271,6 +271,8 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
             handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),
+            playTrackFromPlaylist: (track, index, tracks, mode) => app.playTrackFromPlaylist(track, index, tracks, mode),
+            addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
             addToPlaylist: (track) => app.addToPlaylist(track)
         },
         playback: {

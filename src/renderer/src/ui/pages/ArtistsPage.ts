@@ -14,6 +14,7 @@ import {
     trackCoverNetworkPreferenceService
 } from "@/features/settings/service";
 import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
+import {TrackCollectionDetail} from "@ui/components/TrackCollectionDetail";
 import type {VirtualItem} from "@tanstack/virtual-core";
 import type {Unsubscribe} from "@api/types/common";
 import type {ArtistViewMode} from "@api/types/settings";
@@ -52,6 +53,7 @@ class ArtistsPage extends Component {
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private isVisible: boolean;
     private artistVirtualizer: ElementVirtualizer | null;
+    private readonly trackCollectionDetail: TrackCollectionDetail;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -68,6 +70,24 @@ class ArtistsPage extends Component {
         this.coverGeneration = 0;
         this.isVisible = false;
         this.artistVirtualizer = null;
+        this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
+            onBack: () => {
+                this.selectedArtist = null;
+                this.renderArtistsList();
+            },
+            onTrackPlayed: (track, index, tracks, mode) => {
+                this.emit('trackPlayed', track, index, tracks, mode);
+            },
+            onPlayAll: (tracks) => {
+                this.emit('playAllTracks', tracks);
+            },
+            onAppendAll: (tracks) => {
+                this.emit('appendAllTracks', tracks);
+            },
+            onTrackRightClick: (track, index, x, y, selectedTracks, selectedTrackItems) => {
+                this.emit('trackRightClick', track, index, x, y, selectedTracks, selectedTrackItems);
+            }
+        });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverFetchingInProgress = false;
@@ -120,6 +140,7 @@ class ArtistsPage extends Component {
         this.coverGeneration++;
         this.isVisible = false;
         this.destroyArtistVirtualizer();
+        this.trackCollectionDetail.hide();
         this.selectedArtist = null;
         this.stopHeroVisualization();
         if (this.container) {
@@ -130,6 +151,7 @@ class ArtistsPage extends Component {
     destroy(): void {
         this.stopHeroVisualization();
         this.destroyArtistVirtualizer();
+        this.trackCollectionDetail.destroy();
 
         this.tracks.length = 0;
         this.artists.length = 0;
@@ -179,6 +201,7 @@ class ArtistsPage extends Component {
     }
 
     renderArtistsList(): void {
+        this.trackCollectionDetail.hide();
         this.container.innerHTML = `
             <div class="page-content artists-page modern-artists">
                 <!-- hero区域 -->
@@ -1303,6 +1326,18 @@ class ArtistsPage extends Component {
         if (!this.selectedArtist) return;
 
         const artist = this.selectedArtist;
+        this.destroyArtistVirtualizer();
+        this.stopHeroVisualization();
+        this.trackCollectionDetail.show({
+            title: artist.name,
+            description: '艺术家歌曲',
+            cover: artist.cover,
+            backLabel: '返回星河',
+            metadata: [`${artist.albums.size} 张专辑`],
+            tracks: [...artist.tracks]
+        });
+        return;
+
         const albums = this.groupTracksByAlbum(artist.tracks);
         const popularity = this.calculateArtistPopularity(artist);
 

@@ -5,6 +5,7 @@
 
 import {formatTime} from "@utils/index.js";
 import {Component} from "@ui/base/Component";
+import {TrackCollectionDetail} from "@ui/components/TrackCollectionDetail";
 import {
     libraryPageDataService,
     type LibraryAlbumItem as AlbumItem
@@ -49,6 +50,7 @@ class AlbumsPage extends Component {
     private albumGroupingUnsubscribe: Unsubscribe | null;
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private coverGeneration: number;
+    private readonly trackCollectionDetail: TrackCollectionDetail;
     isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -84,6 +86,24 @@ class AlbumsPage extends Component {
             }
         });
         this.coverGeneration = 0;
+        this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
+            onBack: () => {
+                this.selectedAlbum = null;
+                this.renderAlbumsList();
+            },
+            onTrackPlayed: (track, index, tracks, mode) => {
+                this.emit('trackPlayed', track, index, tracks, mode);
+            },
+            onPlayAll: (tracks) => {
+                this.emit('playAllTracks', tracks);
+            },
+            onAppendAll: (tracks) => {
+                this.emit('appendAllTracks', tracks);
+            },
+            onTrackRightClick: (track, index, x, y, selectedTracks, selectedTrackItems) => {
+                this.emit('trackRightClick', track, index, x, y, selectedTracks, selectedTrackItems);
+            }
+        });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverQueue.length = 0;
@@ -136,6 +156,7 @@ class AlbumsPage extends Component {
         this.coverGeneration++;
         this.isVisible = false;
         this.selectedAlbum = null;
+        this.trackCollectionDetail.hide();
         if (this.container) this.container.innerHTML = '';
     }
 
@@ -154,6 +175,7 @@ class AlbumsPage extends Component {
         this.albumGroupingUnsubscribe = null;
         this.coverPreferenceUnsubscribe?.();
         this.coverPreferenceUnsubscribe = null;
+        this.trackCollectionDetail.destroy();
         super.destroy();
     }
 
@@ -323,6 +345,7 @@ class AlbumsPage extends Component {
 
     // 专辑墙
     renderAlbumsList(): void {
+        this.trackCollectionDetail.hide();
         const sizes = {s: 110, m: 150, l: 200};
         const coverSize = sizes[this.viewSize] || sizes.m;
         const total = this.albums.length;
@@ -398,6 +421,18 @@ class AlbumsPage extends Component {
         if (!this.selectedAlbum) return;
         const album = this.selectedAlbum;
         const tracks = [...album.tracks].sort((a, b) => ((a as any).disc || 0) - ((b as any).disc || 0) || ((a as any).track || 0) - ((b as any).track || 0));
+        this.trackCollectionDetail.show({
+            title: album.name,
+            description: album.artist,
+            cover: album.cover,
+            backLabel: '返回专辑',
+            metadata: [
+                album.year ? String(album.year) : '年份未知'
+            ],
+            tracks
+        });
+        return;
+
         const duration = this.formatDuration(album.totalDuration);
         const cover = album.cover || 'assets/images/default-cover.svg';
         this.container.innerHTML = `
