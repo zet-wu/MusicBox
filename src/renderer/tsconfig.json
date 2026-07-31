@@ -36,6 +36,7 @@
   "exclude": [
     "node_modules",
     "public",
-    "src/tests/LibraryFavorites.test.js"
+    "src/tests/LibraryFavorites.test.js",
+    "src/tests/LibraryCachePersistence.test.js"
   ]
 }
