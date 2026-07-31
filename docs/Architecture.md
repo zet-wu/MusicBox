@@ -187,9 +187,9 @@ MusicBox 当前有两类播放实现：
 - `window-config.json`：主窗口尺寸和桌面歌词位置。
 - `extensions.json`、`extensions/`、`extension-storage/`：外部插件和插件存储。
 
-文件夹导入统一注册为持续来源，单个或多个文件导入统一注册为精确来源；主页、设置页和歌单目录绑定共享这套来源模型。索引重建只清除音轨元数据、扫描记录和统计，随后扫描全部已注册来源；歌单、收藏、忽略列表、来源和绑定保持不变。歌单同时保存手动成员和目录绑定派生的成员，界面歌曲数以当前索引可解析的成员为准。
+文件夹导入统一注册为持续来源，单个或多个文件导入统一注册为精确来源；主页、设置页和歌单目录绑定共享这套来源模型。索引重建只清除音轨元数据、扫描记录和统计，随后扫描全部已注册来源；歌单、收藏、忽略列表、来源和绑定保持不变。歌单同时保存手动成员和目录绑定派生的成员，提供给界面的歌曲数和总时长只统计当前索引可解析的成员。
 
-收藏以 `music-library-cache.json` 中固定的系统歌单 `system:favorites` 持久化，歌曲的 `favorite` 状态由该歌单派生。Renderer 通过 `FavoriteService` 串行修改状态，并订阅 preload 转发的收藏变化事件，使播放器与歌曲页面保持同步。
+收藏以 `music-library-cache.json` 中固定的系统歌单 `system:favorites` 持久化，不包含在用户歌单枚举中；歌曲的 `favorite` 状态由该歌单派生。Renderer 通过 `FavoriteService` 串行修改状态，并订阅 preload 转发的收藏变化事件，使播放器与歌曲页面保持同步。
 
 元数据读取主要依赖 `music-metadata` 等 Node 侧库；写入和复杂处理由 `metadata_editor.py` helper 支持，完整打包时通过 `npm run build:python` 生成平台可执行文件。
 
