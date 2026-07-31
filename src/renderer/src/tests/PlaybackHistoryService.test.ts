@@ -61,16 +61,19 @@ describe('RecentPlaybackHistoryService', () => {
         service = new RecentPlaybackHistoryService();
     });
 
-    it('不读取或迁移旧版播放历史缓存', () => {
+    it('初始化时直接丢弃旧版播放历史缓存', () => {
         localStorage.setItem('musicbox_cache_musicbox-play-history', JSON.stringify({
             data: [createTrack(1)]
         }));
         localStorage.setItem('musicbox_cache_musicbox-play-count-stats', JSON.stringify({
             data: {'歌曲 1_艺术家 1_专辑 1': 12}
         }));
+        service = new RecentPlaybackHistoryService();
 
         expect(service.loadHistory()).toEqual([]);
         expect(service.loadPlayCountStats()).toEqual({});
+        expect(localStorage.getItem('musicbox_cache_musicbox-play-history')).toBeNull();
+        expect(localStorage.getItem('musicbox_cache_musicbox-play-count-stats')).toBeNull();
     });
 
     it('最近播放只保留最新 100 首而累计统计不受上限影响', () => {

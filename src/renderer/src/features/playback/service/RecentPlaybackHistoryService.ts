@@ -4,7 +4,11 @@ import {cacheManager} from "@/shared/cache";
 import type {PlaybackStartedEvent} from "@api/types/events";
 import type {Track} from "@api/types/library";
 
-const PLAYBACK_HISTORY_STORAGE_KEY = 'musicbox-playback-history-v1';
+const PLAYBACK_HISTORY_STORAGE_KEY = 'musicbox-playback-history';
+const OBSOLETE_PLAYBACK_HISTORY_STORAGE_KEYS = [
+    'musicbox-play-history',
+    'musicbox-play-count-stats'
+] as const;
 const PLAYBACK_HISTORY_VERSION = 1;
 const RECENT_TRACK_LIMIT = 100;
 
@@ -49,6 +53,12 @@ type HistoryChangedListener = () => void;
 export class RecentPlaybackHistoryService {
     private readonly listeners = new Set<HistoryChangedListener>();
     private lastRecordedSessionId: string | null = null;
+
+    constructor() {
+        if (typeof localStorage !== 'undefined') {
+            OBSOLETE_PLAYBACK_HISTORY_STORAGE_KEYS.forEach(key => cacheManager.removeLocalCache(key));
+        }
+    }
 
     loadHistory(limit?: number): RecentTrack[] {
         const tracks = this.loadState().recent;
