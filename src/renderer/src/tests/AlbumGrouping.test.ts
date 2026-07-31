@@ -108,18 +108,21 @@ describe('媒体库页面设置', () => {
         expect(settings.splitAlbumsByArtist).toBe(false);
         expect(settings.artistViewMode).toBe('grid');
         expect(settings.albumViewMode).toBe('grid');
+        expect(settings.playlistViewMode).toBe('grid');
     });
 
     it('保留专辑拆分和独立列表设置', () => {
         const settings = settingsStore.getInitialValues({
             splitAlbumsByArtist: true,
             artistViewMode: 'list',
-            albumViewMode: 'list'
+            albumViewMode: 'list',
+            playlistViewMode: 'list'
         });
 
         expect(settings.splitAlbumsByArtist).toBe(true);
         expect(settings.artistViewMode).toBe('list');
         expect(settings.albumViewMode).toBe('list');
+        expect(settings.playlistViewMode).toBe('list');
     });
 });
 

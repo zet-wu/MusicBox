@@ -3,6 +3,7 @@ export type PlaylistDoubleClickMode = 'shuffle' | 'sequence';
 export type PlaylistInfoAlignment = 'left' | 'center' | 'right';
 export type ArtistViewMode = 'grid' | 'list';
 export type AlbumViewMode = 'grid' | 'list';
+export type PlaylistViewMode = 'grid' | 'list';
 
 export interface DesktopLyricsSettings {
     fontSize?: number;
@@ -25,6 +26,7 @@ export interface MusicBoxSettings {
     albumsPage?: boolean;
     artistViewMode?: ArtistViewMode;
     albumViewMode?: AlbumViewMode;
+    playlistViewMode?: PlaylistViewMode;
     splitAlbumsByArtist?: boolean;
     showTrackCovers?: boolean;
     autoFetchMissingTrackCovers?: boolean;
