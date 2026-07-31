@@ -6,8 +6,6 @@ import {Component} from "@ui/base/Component";
 import {playlistDialogActionService} from "@/features/playlists/service/PlaylistDialogActionService";
 import type {Playlist, Track} from "@api/types/library";
 
-type TrackToAdd = Track;
-
 interface PlaylistResult {
     success: boolean;
     playlist?: Playlist;
@@ -16,7 +14,7 @@ interface PlaylistResult {
 
 class CreatePlaylistDialog extends Component {
     private isVisible: boolean;
-    private currentTrackToAdd: TrackToAdd | null;
+    private currentTracksToAdd: Track[];
     private listenersSetup: boolean;
     private overlay!: HTMLElement;
     public dialog!: HTMLElement;
@@ -30,18 +28,20 @@ class CreatePlaylistDialog extends Component {
     constructor() {
         super(null, false);
         this.isVisible = false;
-        this.currentTrackToAdd = null; // 用于记录要添加到新歌单的歌曲
+        this.currentTracksToAdd = []; // 用于记录要添加到新歌单的歌曲
         this.listenersSetup = false; // 事件监听器是否已设置
     }
 
-    show(trackToAdd: TrackToAdd | null = null): void {
+    show(tracksToAdd: Track | Track[] | null = null): void {
         if (!this.listenersSetup) {
             this.setupElements();
             this.setupEventListeners();
             this.listenersSetup = true;
         }
         this.isVisible = true;
-        this.currentTrackToAdd = trackToAdd;
+        this.currentTracksToAdd = tracksToAdd
+            ? (Array.isArray(tracksToAdd) ? [...tracksToAdd] : [tracksToAdd])
+            : [];
         this.overlay.style.display = 'flex';
 
         // 重置表单
@@ -59,7 +59,7 @@ class CreatePlaylistDialog extends Component {
     hide(): void {
         this.isVisible = false;
         this.overlay.style.display = 'none';
-        this.currentTrackToAdd = null;
+        this.currentTracksToAdd = [];
     }
 
     destroy(): void {
@@ -141,7 +141,11 @@ class CreatePlaylistDialog extends Component {
             // 显示加载状态
             this.confirmBtn.disabled = true;
             this.confirmBtn.textContent = '创建中...';
-            const result = await playlistDialogActionService.createPlaylist(name, description, this.currentTrackToAdd) as PlaylistResult;
+            const result = await playlistDialogActionService.createPlaylist(
+                name,
+                description,
+                this.currentTracksToAdd
+            ) as PlaylistResult;
             if (result.success && result.playlist) {
                 // 触发歌单创建事件
                 this.emit('playlistCreated', result.playlist);

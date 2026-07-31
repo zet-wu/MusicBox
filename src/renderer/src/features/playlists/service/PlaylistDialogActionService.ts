@@ -16,6 +16,7 @@ export interface RenamePlaylistActionResult {
 export interface AddToPlaylistActionResult {
     success: boolean;
     playlist?: Playlist;
+    addedCount: number;
     error?: string;
 }
 
@@ -38,33 +39,44 @@ export class PlaylistDialogActionService {
         return tracks.filter(track => !track.fileId || !existingTrackIds.includes(track.fileId));
     }
 
-    async addTrackToPlaylist(
+    async addTracksToPlaylist(
         playlistId: string,
-        track: Track,
+        tracks: Track[],
         playlists: Playlist[]
     ): Promise<AddToPlaylistActionResult> {
-        if (!track.fileId) {
-            return {success: false, error: '当前歌曲缺少文件标识，无法添加到歌单'};
-        }
+        const trackIds = tracks.flatMap(track => track.fileId ? [track.fileId] : []);
+        if (trackIds.length === 0) return {success: false, addedCount: 0, error: '所选歌曲缺少文件标识'};
 
-        const result = await libraryDataService.addToPlaylist(playlistId, track.fileId);
+        const result = await libraryDataService.addToPlaylist(playlistId, trackIds) as {
+            success: boolean;
+            results?: Array<{success: boolean}>;
+            error?: string;
+        };
+        const addedCount = result.results?.filter(item => item.success).length
+            ?? (result.success ? trackIds.length : 0);
         return {
-            success: result.success,
+            success: addedCount > 0,
             playlist: playlists.find(p => p.id === playlistId),
-            error: result.error
+            addedCount,
+            error: addedCount > 0 ? undefined : (result.error || '所选歌曲已在歌单中')
         };
     }
 
-    async createPlaylist(name: string, description: string, trackToAdd?: Track | null): Promise<CreatePlaylistActionResult> {
+    async createPlaylist(
+        name: string,
+        description: string,
+        tracksToAdd: Track[] = []
+    ): Promise<CreatePlaylistActionResult> {
         const result = await libraryDataService.createPlaylist(name, description);
         if (!result.success || !result.playlist) {
             return result;
         }
 
-        if (trackToAdd?.fileId) {
+        const trackIds = tracksToAdd.flatMap(track => track.fileId ? [track.fileId] : []);
+        if (trackIds.length > 0) {
             try {
-                await libraryDataService.addToPlaylist(result.playlist.id, trackToAdd.fileId);
-                console.log('✅ PlaylistDialogActionService: 歌曲已添加到新歌单');
+                await libraryDataService.addToPlaylist(result.playlist.id, trackIds);
+                console.log(`✅ PlaylistDialogActionService: ${trackIds.length} 首歌曲已添加到新歌单`);
             } catch (error) {
                 console.warn('⚠️ PlaylistDialogActionService: 添加歌曲到新歌单失败', error);
             }

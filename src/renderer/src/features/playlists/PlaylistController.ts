@@ -17,7 +17,7 @@ export interface PlaylistAppHost {
 }
 
 interface PlaylistUI {
-    showAddToPlaylistDialog(track: Track): Promise<void>;
+    showAddToPlaylistDialog(tracks: Track[]): Promise<void>;
     showPlaylistDetail(playlist: Playlist): Promise<void>;
     showMusicLibrarySelectionDialog(playlist: Playlist): Promise<void>;
     reloadPlaylistDetailTracks(): Promise<void>;
@@ -101,8 +101,8 @@ export class PlaylistController {
         }
     }
 
-    async handleAddToCustomPlaylist(track: Track, _index: number): Promise<void> {
-        await this.ui.showAddToPlaylistDialog(track);
+    async handleAddToCustomPlaylist(tracks: Track[], _index: number): Promise<void> {
+        await this.ui.showAddToPlaylistDialog(tracks);
     }
 
     async handlePlaylistCreated(): Promise<void> {

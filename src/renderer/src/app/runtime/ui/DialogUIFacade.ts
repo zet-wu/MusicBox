@@ -14,12 +14,12 @@ export class DialogUIFacade {
         this.app.components.settings?.switchToSection(sectionName);
     }
 
-    showCreatePlaylistDialog(track?: Track): void {
-        this.app.components.createPlaylistDialog?.show(track);
+    showCreatePlaylistDialog(tracks?: Track | Track[]): void {
+        this.app.components.createPlaylistDialog?.show(tracks);
     }
 
-    async showAddToPlaylistDialog(track: Track): Promise<void> {
-        await this.app.components.addToPlaylistDialog?.show(track);
+    async showAddToPlaylistDialog(tracks: Track[]): Promise<void> {
+        await this.app.components.addToPlaylistDialog?.show(tracks);
     }
 
     showRenamePlaylistDialog(playlist: Playlist): void {

@@ -38,7 +38,7 @@ export interface PlaybackComponentBindingHost {
     addToPlaylist(track: Track): void | Promise<void>;
     addTracksToQueue(tracks: Track[]): Promise<void>;
     playTracksNext(tracks: Track[]): Promise<void>;
-    handleAddToCustomPlaylist(track: Track, index: number): Promise<void>;
+    handleAddToCustomPlaylist(tracks: Track[], index: number): Promise<void>;
     handleDeleteTrack(track: Track, index: number): Promise<void>;
     handleBatchDelete(selectedTracks: Set<number> | null | undefined, track: Track, index: number): Promise<void>;
     handleEditTrackInfo(track: Track, index: number): Promise<void>;
@@ -131,8 +131,8 @@ export function bindPlaybackComponentEvents({
         void app.playTracksNext(tracks?.length ? tracks : [track]);
     });
 
-    components.contextMenu.on('addToCustomPlaylist', async ({track, index}: ContextMenuPayload) => {
-        await app.handleAddToCustomPlaylist(track, index);
+    components.contextMenu.on('addToCustomPlaylist', async ({track, tracks, index}: ContextMenuPayload) => {
+        await app.handleAddToCustomPlaylist(tracks?.length ? tracks : [track], index);
     });
 
     components.contextMenu.on('delete', async ({track, index}: ContextMenuPayload) => {

@@ -358,8 +358,8 @@ export class MusicBoxApp extends EventEmitter {
     }
 
     // 处理添加到自定义歌单
-    async handleAddToCustomPlaylist(track: Track, _index: number): Promise<void> {
-        await this.playlistController.handleAddToCustomPlaylist(track, _index);
+    async handleAddToCustomPlaylist(tracks: Track[], _index: number): Promise<void> {
+        await this.playlistController.handleAddToCustomPlaylist(tracks, _index);
     }
 
     // 处理歌单创建成功

@@ -8,7 +8,7 @@ import type {Playlist, Track} from "@api/types/library";
 
 class AddToPlaylistDialog extends Component {
     private isVisible: boolean;
-    private currentTrack: Track | null;
+    private currentTracks: Track[];
     private playlists: Array<Playlist & {trackIds?: string[]}>;
     private listenersSetup: boolean;
     private overlay!: HTMLElement;
@@ -20,19 +20,19 @@ class AddToPlaylistDialog extends Component {
     constructor() {
         super(null, false);
         this.isVisible = false;
-        this.currentTrack = null;
+        this.currentTracks = [];
         this.playlists = [];
         this.listenersSetup = false; // 事件监听器是否已设置
     }
 
-    async show(track: Track): Promise<void> {
+    async show(tracks: Track[]): Promise<void> {
         if (!this.listenersSetup) {
             this.setupElements();
             this.setupEventListeners();
             this.listenersSetup = true;
         }
         this.isVisible = true;
-        this.currentTrack = track;
+        this.currentTracks = [...tracks];
         this.overlay.style.display = 'flex';
 
         // 加载歌单列表
@@ -42,11 +42,11 @@ class AddToPlaylistDialog extends Component {
     hide(): void {
         this.isVisible = false;
         this.overlay.style.display = 'none';
-        this.currentTrack = null;
+        this.currentTracks = [];
     }
 
     destroy(): void {
-        this.currentTrack = null;
+        this.currentTracks = [];
         this.playlists = [];
         this.listenersSetup = false;
         super.destroy();
@@ -65,8 +65,9 @@ class AddToPlaylistDialog extends Component {
         this.addEventListenerManaged(this.cancelBtn, 'click', () => this.hide());
         // 创建新歌单按钮
         this.addEventListenerManaged(this.createNewBtn, 'click', () => {
+            const tracks = [...this.currentTracks];
             this.hide();
-            this.emit('createNewPlaylist', this.currentTrack);
+            this.emit('createNewPlaylist', tracks);
         });
 
         // 点击遮罩层关闭
@@ -130,19 +131,28 @@ class AddToPlaylistDialog extends Component {
     }
 
     async addToPlaylist(playlistId: string): Promise<void> {
-        if (!this.currentTrack?.fileId) {
-            this.emit('notification', {type: 'error', message: '当前歌曲缺少文件标识，无法添加到歌单'});
+        const validTracks = this.currentTracks.filter(track => track.fileId);
+        if (validTracks.length === 0) {
+            this.emit('notification', {type: 'error', message: '所选歌曲缺少文件标识，无法添加到歌单'});
             return;
         }
 
         try {
-            const result = await playlistDialogActionService.addTrackToPlaylist(playlistId, this.currentTrack, this.playlists);
+            const result = await playlistDialogActionService.addTracksToPlaylist(
+                playlistId,
+                validTracks,
+                this.playlists
+            );
             if (result.success) {
                 const playlist = result.playlist;
-                this.emit('notification', {type: 'info', message: `已添加到歌单 "${playlist?.name || '未知'}"`});
+                const skippedCount = this.currentTracks.length - result.addedCount;
+                const message = skippedCount > 0
+                    ? `已添加 ${result.addedCount} 首，跳过 ${skippedCount} 首`
+                    : `已添加 ${result.addedCount} 首到歌单 "${playlist?.name || '未知'}"`;
+                this.emit('notification', {type: 'info', message});
 
                 // 触发添加成功事件
-                this.emit('trackAdded', {playlist, track: this.currentTrack});
+                this.emit('tracksAdded', {playlist, tracks: validTracks});
                 this.hide();
             } else {
                 console.error('❌ 添加到歌单失败:', result.error);

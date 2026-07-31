@@ -53,7 +53,7 @@ export interface MusicBoxCompositionHost {
     clearRuntimeData(): void;
     confirm(options: ConfirmOptions): Promise<boolean>;
     destroyComponent(componentName: string): void;
-    handleAddToCustomPlaylist(track: Track, index: number): Promise<void>;
+    handleAddToCustomPlaylist(tracks: Track[], index: number): Promise<void>;
     handleBatchDelete(selectedTracks: Set<number> | null | undefined, track: Track, index: number): Promise<void>;
     handleDeleteTrack(track: Track, index: number): Promise<void>;
     handleDriveRemoved(drive?: unknown): Promise<void>;

@@ -20,6 +20,7 @@ class ContextMenu extends Component {
     private addToPlaylistItem!: HTMLElement;
     private addToPlaylistLabel!: HTMLElement;
     private addToCustomPlaylistItem!: HTMLElement;
+    private addToCustomPlaylistLabel!: HTMLElement;
     private editInfoItem!: HTMLElement;
     private deleteItem!: HTMLElement;
     private batchDeleteItem!: HTMLElement;
@@ -61,7 +62,7 @@ class ContextMenu extends Component {
         this.playItem.style.display = isMulti ? 'none' : '';
         this.playNextItem.style.display = '';
         this.addToPlaylistItem.style.display = '';
-        this.addToCustomPlaylistItem.style.display = isMulti ? 'none' : '';
+        this.addToCustomPlaylistItem.style.display = '';
         this.editInfoItem.style.display = isMulti ? 'none' : '';
         this.deleteItem.style.display = isMulti ? 'none' : '';
         this.batchDeleteItem.style.display = isMulti ? '' : 'none';
@@ -73,6 +74,9 @@ class ContextMenu extends Component {
         this.addToPlaylistLabel.textContent = selectionCount > 1
             ? `添加到播放列表 (${selectionCount} 首)`
             : '添加到播放列表';
+        this.addToCustomPlaylistLabel.textContent = selectionCount > 1
+            ? `添加到歌单 (${selectionCount} 首)`
+            : '添加到歌单';
 
         // 菜单位置
         this.menu.style.left = `${x}px`;
@@ -114,6 +118,9 @@ class ContextMenu extends Component {
         this.addToPlaylistItem = this.element.querySelector('#context-add-to-playlist') as HTMLElement;
         this.addToPlaylistLabel = this.element.querySelector('#context-add-to-playlist-label') as HTMLElement;
         this.addToCustomPlaylistItem = this.element.querySelector('#context-add-to-custom-playlist') as HTMLElement;
+        this.addToCustomPlaylistLabel = this.element.querySelector(
+            '#context-add-to-custom-playlist-label'
+        ) as HTMLElement;
         this.editInfoItem = this.element.querySelector('#context-edit-info') as HTMLElement;
         this.deleteItem = this.element.querySelector('#context-delete') as HTMLElement;
         this.batchDeleteItem = this.element.querySelector('#context-batch-delete') as HTMLElement;
@@ -145,7 +152,11 @@ class ContextMenu extends Component {
         });
 
         this.addEventListenerManaged(this.addToCustomPlaylistItem, 'click', () => {
-            this.emit('addToCustomPlaylist', {track: this.currentTrack, index: this.currentIndex});
+            this.emit('addToCustomPlaylist', {
+                track: this.currentTrack,
+                tracks: this.selectedTrackItems,
+                index: this.currentIndex
+            });
             this.hide();
         });
 

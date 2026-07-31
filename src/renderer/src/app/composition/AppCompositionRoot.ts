@@ -197,7 +197,7 @@ export function createAppComposition({
             pause: () => playbackController.pause()
         },
         ui: {
-            showAddToPlaylistDialog: (track) => ui.dialogs.showAddToPlaylistDialog(track),
+            showAddToPlaylistDialog: (tracks) => ui.dialogs.showAddToPlaylistDialog(tracks),
             showPlaylistDetail: (playlist) => ui.content.showPlaylistDetail(playlist),
             showMusicLibrarySelectionDialog: (playlist) => ui.dialogs.showMusicLibrarySelectionDialog(playlist),
             reloadPlaylistDetailTracks: () => ui.content.reloadPlaylistDetailTracks(),

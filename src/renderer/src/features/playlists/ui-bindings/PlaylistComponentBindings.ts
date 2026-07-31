@@ -15,7 +15,7 @@ interface PlaylistBindingComponents {
 }
 
 interface PlaylistBindingUI {
-    showCreatePlaylistDialog(track?: Track): void;
+    showCreatePlaylistDialog(tracks?: Track | Track[]): void;
     showContextMenu(
         x: number,
         y: number,
@@ -52,9 +52,9 @@ interface ComponentNotificationPayload {
     type?: 'info' | 'success' | 'error' | 'warning';
 }
 
-interface PlaylistTrackAddedPayload {
+interface PlaylistTracksAddedPayload {
     playlist: Playlist;
-    track: Track;
+    tracks: Track[];
 }
 
 interface PlaylistComponentBindingContext {
@@ -77,12 +77,12 @@ export function bindPlaylistComponentEvents({
         notify(data);
     });
 
-    components.addToPlaylistDialog.on('createNewPlaylist', (track: Track) => {
-        ui.showCreatePlaylistDialog(track);
+    components.addToPlaylistDialog.on('createNewPlaylist', (tracks: Track[]) => {
+        ui.showCreatePlaylistDialog(tracks);
     });
 
-    components.addToPlaylistDialog.on('trackAdded', async ({playlist, track}: PlaylistTrackAddedPayload) => {
-        await app.handleTrackAddedToPlaylist(playlist, track);
+    components.addToPlaylistDialog.on('tracksAdded', async ({playlist, tracks}: PlaylistTracksAddedPayload) => {
+        await app.handleTrackAddedToPlaylist(playlist, tracks[0]);
     });
     components.addToPlaylistDialog.on('notification', (data: ComponentNotificationPayload) => {
         notify(data);
