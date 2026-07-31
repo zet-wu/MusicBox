@@ -81,6 +81,20 @@ class PlaylistCoverActionService {
         }
     }
 
+    async setCoverFromTrack(playlistId: string, trackId: string): Promise<PlaylistCoverActionResult> {
+        try {
+            const result = await libraryDataService.setPlaylistCoverFromTrack(playlistId, trackId);
+            if (result.success && result.coverPath) {
+                appNotificationService.showInfo('已使用歌曲内嵌封面');
+                return {changed: true, coverImage: result.coverPath};
+            }
+            throw new Error(result.error || '从歌曲设置封面失败');
+        } catch (error) {
+            appNotificationService.showError(getErrorMessage(error) || '从歌曲设置封面失败，请重试');
+            return {changed: false};
+        }
+    }
+
     isValidImageFile(filePath: unknown): filePath is string {
         if (!filePath || typeof filePath !== 'string') {
             return false;

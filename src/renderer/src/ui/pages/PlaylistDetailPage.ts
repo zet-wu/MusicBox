@@ -29,6 +29,7 @@ import type {Unsubscribe} from "@api/types/common";
 import type {Playlist, Track} from "@api/types/library";
 import type {PlaylistInfoAlignment} from "@api/types/settings";
 import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
+import {PlaylistCoverTrackDialog} from "@ui/dialogs/PlaylistCoverTrackDialog";
 import type {VirtualItem} from "@tanstack/virtual-core";
 
 type PlaylistDetailTrack = Track & {
@@ -75,6 +76,7 @@ class PlaylistDetailPage extends Component {
     private networkCoverPreferenceUnsubscribe: Unsubscribe | null = null;
     private trackVirtualizer: ElementVirtualizer | null = null;
     private readonly coverLoadQueue = new CoverLoadQueue(4);
+    private readonly playlistCoverTrackDialog = new PlaylistCoverTrackDialog();
     private viewGeneration = 0;
 
     constructor(container: string | Element | null) {
@@ -178,6 +180,7 @@ class PlaylistDetailPage extends Component {
         this.searchTrackIds = null;
 
         this.hideCoverContextMenu();
+        this.playlistCoverTrackDialog.hide();
 
         if (this.container) {
             this.container.innerHTML = '';
@@ -205,6 +208,7 @@ class PlaylistDetailPage extends Component {
             this.networkCoverPreferenceUnsubscribe = null;
         }
         this.hideCoverContextMenu();
+        this.playlistCoverTrackDialog.destroy();
         super.destroy();
     }
 
@@ -621,6 +625,8 @@ class PlaylistDetailPage extends Component {
         this.hideCoverContextMenu();
         if (actionId === 'add-cover') {
             await this.selectAndSetCover();
+        } else if (actionId === 'cover-from-track') {
+            await this.selectCoverFromTrack();
         } else if (actionId === 'remove-cover') {
             await this.removeCover();
         }
@@ -1293,6 +1299,12 @@ class PlaylistDetailPage extends Component {
                 </svg>
                 <span>${hasCustomCover ? '更换封面' : '添加封面'}</span>
             </div>
+            <div class="context-menu-item" id="cover-from-track">
+                <svg class="menu-icon" viewBox="0 0 24 24">
+                    <path d="M12,3V13.55A4,4 0 1,0 14,17V7H18V3H12Z"/>
+                </svg>
+                <span>从歌曲选择</span>
+            </div>
             ${hasCustomCover ? `
             <div class="context-menu-item" id="remove-cover">
                 <svg class="menu-icon" viewBox="0 0 24 24">
@@ -1340,6 +1352,17 @@ class PlaylistDetailPage extends Component {
             this.emit('playlistUpdated', this.currentPlaylist);
             this.emit('playlistCoverUpdated', this.currentPlaylist);
         }
+    }
+
+    async selectCoverFromTrack(): Promise<void> {
+        if (!this.currentPlaylist || !getCollectionCapabilities(this.getCollectionType()).canEditCover) return;
+        const playlist = this.currentPlaylist;
+        const result = await this.playlistCoverTrackDialog.show(playlist.id, this.sourceTracks);
+        if (!result?.changed || this.currentPlaylist !== playlist) return;
+        playlist.coverImage = result.coverImage || null;
+        this.updateCoverDisplay();
+        this.emit('playlistUpdated', playlist);
+        this.emit('playlistCoverUpdated', playlist);
     }
 
     // 设置歌单封面
