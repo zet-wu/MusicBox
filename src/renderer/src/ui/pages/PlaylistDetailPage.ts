@@ -26,6 +26,8 @@ import {playlistTrackMutationService} from "@/features/playlists/service/Playlis
 import type {Unsubscribe} from "@api/types/common";
 import type {Playlist, Track} from "@api/types/library";
 import type {PlaylistInfoAlignment} from "@api/types/settings";
+import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
+import type {VirtualItem} from "@tanstack/virtual-core";
 
 type PlaylistDetailTrack = Track & {
     fileId?: string;
@@ -68,6 +70,8 @@ class PlaylistDetailPage extends Component {
     private coverDisplayPreferenceUnsubscribe: Unsubscribe | null = null;
     private playlistInfoAlignmentUnsubscribe: Unsubscribe | null = null;
     private favoriteUnsubscribe: Unsubscribe | null = null;
+    private trackVirtualizer: ElementVirtualizer | null = null;
+    private readonly loadingTrackCovers = new Set<string>();
 
     constructor(container: string | Element | null) {
         super(container);
@@ -116,7 +120,7 @@ class PlaylistDetailPage extends Component {
 
         // 每次显示新歌单时刷新数据和视图，事件由容器级委托保持稳定
         await this.loadPlaylistCover();
-        await this.loadPlaylistTracks();
+        await this.loadPlaylistTracks(false);
         this.render();
 
         // 平滑显示页面
@@ -149,6 +153,7 @@ class PlaylistDetailPage extends Component {
 
     hide(): void {
         this.isVisible = false;
+        this.destroyTrackVirtualizer();
         this.currentPlaylist = null;
         this.tracks = [];
         this.sourceTracks = [];
@@ -162,6 +167,7 @@ class PlaylistDetailPage extends Component {
     }
 
     destroy(): void {
+        this.destroyTrackVirtualizer();
         if (this.coverDisplayPreferenceUnsubscribe) {
             this.coverDisplayPreferenceUnsubscribe();
             this.coverDisplayPreferenceUnsubscribe = null;
@@ -364,6 +370,7 @@ class PlaylistDetailPage extends Component {
             </div>
         `;
 
+        this.mountTrackVirtualizer();
     }
 
     setupEventListeners(): void {
@@ -755,7 +762,6 @@ class PlaylistDetailPage extends Component {
             `;
         }
 
-        const capabilities = getCollectionCapabilities(this.getCollectionType());
         return `
             <div class="modern-tracks-table ${this.showCovers ? 'with-covers' : ''}">
                 <div class="tracks-table-header">
@@ -770,9 +776,19 @@ class PlaylistDetailPage extends Component {
                     </div>
                     <div class="header-cell cell-actions"></div>
                 </div>
-                <div class="tracks-table-body">
-                    ${this.tracks.map((track, index) => `
-                        <div class="track-row ${this.selectedTracks.has(index) ? 'selected' : ''}" data-track-index="${index}">
+                <div class="tracks-table-body virtual-track-body"></div>
+            </div>
+        `;
+    }
+
+    private renderTrackRow(track: PlaylistDetailTrack, index: number, virtualItem: VirtualItem, scrollMargin: number): string {
+        const capabilities = getCollectionCapabilities(this.getCollectionType());
+        const translateY = virtualItem.start - scrollMargin;
+        return `
+                        <div class="track-row ${this.selectedTracks.has(index) ? 'selected' : ''} ${index === this.tracks.length - 1 ? 'is-last-track' : ''}"
+                             data-index="${index}"
+                             data-track-index="${index}"
+                             style="transform: translateY(${translateY}px);">
                             <div class="track-cell cell-number">
                                 <div class="track-number-container">
                                     <span class="track-number">${index + 1}</span>
@@ -819,10 +835,59 @@ class PlaylistDetailPage extends Component {
                                 </div>
                             </div>
                         </div>
-                    `).join('')}
-                </div>
-            </div>
         `;
+    }
+
+    private mountTrackVirtualizer(): void {
+        this.destroyTrackVirtualizer();
+        if (!this.container || this.tracks.length === 0) {
+            return;
+        }
+
+        const body = this.container.querySelector<HTMLElement>('.virtual-track-body');
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (!body || !scrollElement) {
+            return;
+        }
+
+        const scrollMargin = this.getScrollMargin(body, scrollElement);
+        this.trackVirtualizer = new ElementVirtualizer({
+            count: this.tracks.length,
+            estimateSize: () => this.showCovers ? 73 : 65,
+            getItemKey: (index) => this.getTrackIdentity(this.tracks[index]) || index,
+            getScrollElement: () => scrollElement,
+            scrollMargin,
+            overscan: 8,
+            onChange: (items, totalSize) => {
+                if (!this.isVisible || !this.trackVirtualizer) {
+                    return;
+                }
+
+                body.style.height = `${totalSize}px`;
+                body.innerHTML = items
+                    .map((item) => {
+                        const track = this.tracks[item.index];
+                        return track ? this.renderTrackRow(track, item.index, item, scrollMargin) : '';
+                    })
+                    .join('');
+
+                body.querySelectorAll<HTMLElement>('.track-row').forEach((row) => {
+                    this.trackVirtualizer?.measureElement(row);
+                });
+            }
+        });
+        this.trackVirtualizer.mount();
+    }
+
+    private destroyTrackVirtualizer(): void {
+        this.trackVirtualizer?.destroy();
+        this.trackVirtualizer = null;
+    }
+
+    private getScrollMargin(body: HTMLElement, scrollElement: HTMLElement): number {
+        const bodyRect = body.getBoundingClientRect();
+        const scrollRect = scrollElement.getBoundingClientRect();
+        return bodyRect.top - scrollRect.top + scrollElement.scrollTop;
     }
 
     async playTrack(track: PlaylistDetailTrack, index: number): Promise<void> {
@@ -1056,6 +1121,12 @@ class PlaylistDetailPage extends Component {
     }
 
     async loadTrackCoverAsync(track: PlaylistDetailTrack): Promise<void> {
+        const coverKey = track.filePath || this.getTrackIdentity(track);
+        if (!coverKey || this.loadingTrackCovers.has(coverKey)) {
+            return;
+        }
+        this.loadingTrackCovers.add(coverKey);
+
         try {
             // 使用requestIdleCallback优化性能，在浏览器空闲时加载封面
             const loadCover = async () => {
@@ -1098,12 +1169,14 @@ class PlaylistDetailPage extends Component {
                 } else {
                     console.warn(`⚠️ PlaylistDetailPage: 封面加载失败 - ${track.title}:`, coverResult.error || '未知错误');
                 }
+                this.loadingTrackCovers.delete(coverKey);
             };
 
             this.requestIdleCallbackManaged(() => {
                 void loadCover();
             });
         } catch (error) {
+            this.loadingTrackCovers.delete(coverKey);
             console.warn('PlaylistDetailPage: 加载封面失败:', error);
         }
     }
@@ -1312,6 +1385,7 @@ class PlaylistDetailPage extends Component {
                 existingSection.replaceWith(nextSection);
             }
         }
+        this.mountTrackVirtualizer();
 
         const trackCount = this.tracks.length;
         const countElement = this.container.querySelector('.meta-track-count');
