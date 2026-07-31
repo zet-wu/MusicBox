@@ -15,6 +15,7 @@ import {EmbeddedCoverService, type EmbeddedCoverResult} from '../services/librar
 import {PlaylistCoverStorage} from '../services/library/PlaylistCoverStorage';
 import {
     LibrarySourceManager,
+    partitionPlaylistBindings,
     type LibrarySourceKnownFile,
     type PlaylistSourceBinding
 } from '../services/library/LibrarySourceManager';
@@ -1137,7 +1138,16 @@ export class LibraryController extends BaseController {
 
     private async synchronizeBindingsForSource(sourceId: string): Promise<void> {
         const bindings = await this.librarySourceManager.synchronizeSourceBindings(sourceId);
-        const playlistIds = Array.from(new Set(bindings.map(binding => binding.playlistId)));
+        const {activeBindings, orphanBindings} = partitionPlaylistBindings(
+            bindings,
+            this.libraryCacheManager.getAllPlaylists().map(playlist => playlist.id)
+        );
+        if (orphanBindings.length > 0) {
+            console.warn(
+                `⚠️ 跳过 ${orphanBindings.length} 条孤儿歌单绑定，来源: ${sourceId}`
+            );
+        }
+        const playlistIds = Array.from(new Set(activeBindings.map(binding => binding.playlistId)));
         const additions = playlistIds.map(playlistId => ({
             playlistId,
             trackIds: this.recomputePlaylistMembership(playlistId)
@@ -1152,8 +1162,13 @@ export class LibraryController extends BaseController {
     }
 
     private recomputePlaylistMembership(playlistId: string): string[] {
+        const existingPlaylist = this.libraryCacheManager.getPlaylistById(playlistId);
+        if (!existingPlaylist) {
+            console.warn(`⚠️ 跳过不存在歌单的成员物化: ${playlistId}`);
+            return [];
+        }
         const previousTrackIds = new Set(
-            this.libraryCacheManager.getPlaylistById(playlistId)?.trackIds || []
+            existingPlaylist.trackIds
         );
         const bindings = this.librarySourceManager.getPlaylistBindings()
             .filter(binding => binding.playlistId === playlistId);

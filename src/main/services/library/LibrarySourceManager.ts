@@ -38,6 +38,25 @@ export interface PlaylistSourceBinding {
     lastSyncAt?: number;
 }
 
+export interface PlaylistBindingPartition {
+    activeBindings: PlaylistSourceBinding[];
+    orphanBindings: PlaylistSourceBinding[];
+}
+
+export function partitionPlaylistBindings(
+    bindings: PlaylistSourceBinding[],
+    validPlaylistIds: Iterable<string>
+): PlaylistBindingPartition {
+    const validIds = new Set(validPlaylistIds);
+    const activeBindings: PlaylistSourceBinding[] = [];
+    const orphanBindings: PlaylistSourceBinding[] = [];
+
+    for (const binding of bindings) {
+        (validIds.has(binding.playlistId) ? activeBindings : orphanBindings).push(binding);
+    }
+    return {activeBindings, orphanBindings};
+}
+
 interface LibrarySourceData {
     version: 1;
     sources: LibrarySource[];
