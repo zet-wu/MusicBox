@@ -46,7 +46,7 @@ export class PlaylistBindingDialog extends Component {
                         </div>
                         <div class="modal-body">
                             <div class="playlist-binding-toolbar">
-                                <button class="btn btn-primary" data-binding-action="add">绑定新文件夹</button>
+                                <button class="btn btn-primary" data-binding-action="add">绑定文件夹</button>
                             </div>
                             <div class="playlist-binding-list" id="playlist-binding-list"></div>
                         </div>
@@ -129,7 +129,7 @@ export class PlaylistBindingDialog extends Component {
             return;
         }
         if (action === 'add') {
-            if (this.currentPlaylist && await playlistBindingService.addBinding(this.currentPlaylist.id)) {
+            if (this.currentPlaylist && await playlistBindingService.addBindings(this.currentPlaylist.id)) {
                 await this.handleChanged();
             }
             return;

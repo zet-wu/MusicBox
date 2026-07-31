@@ -31,6 +31,16 @@ export class DialogController extends BaseController {
         return (!result.canceled && result.filePaths.length > 0) ? result.filePaths[0] : null;
     }
 
+    @IpcHandle('dialog:openDirectories')
+    async openDirectories(): Promise<string[]> {
+        const win = this.windowManager.getMainWindow();
+        const result: any = await dialog.showOpenDialog(win as any, {
+            properties: ['openDirectory', 'multiSelections'],
+            title: 'Select Music Folders'
+        });
+        return result.canceled ? [] : result.filePaths;
+    }
+
     @IpcHandle('dialog:selectFolder')
     async selectFolder(): Promise<{ filePaths: string[]; canceled: boolean }> {
         const win = this.windowManager.getMainWindow();

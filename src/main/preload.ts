@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 文件对话框
     openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
+    openDirectories: () => ipcRenderer.invoke('dialog:openDirectories'),
     selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
     openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
     openImageFile: () => ipcRenderer.invoke('dialog:openImageFile'),

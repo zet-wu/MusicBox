@@ -39,6 +39,10 @@ class FileGateway {
         return getElectronAPI().openDirectory();
     }
 
+    openDirectories(): Promise<string[]> {
+        return getElectronAPI().openDirectories();
+    }
+
     openFiles(): Promise<string[]> {
         return getElectronAPI().openFiles();
     }

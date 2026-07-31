@@ -29,6 +29,10 @@ export class MediaFileDialogService {
         return await this.openDirectory();
     }
 
+    async openDirectories(): Promise<string[]> {
+        return await this.wrapFileOperation(() => fileGateway.openDirectories(), []);
+    }
+
     async openFiles(): Promise<string[]> {
         return await this.wrapFileOperation(() => fileGateway.openFiles(), []);
     }

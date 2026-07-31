@@ -9,18 +9,34 @@ export class PlaylistBindingService {
         return await libraryDataService.getPlaylistBindings(playlistId);
     }
 
-    async addBinding(playlistId: string): Promise<boolean> {
-        const directoryPath = await mediaFileDialogService.openDirectory();
-        if (!directoryPath) return false;
+    async addBindings(playlistId: string): Promise<boolean> {
+        const directoryPaths = await mediaFileDialogService.openDirectories();
+        if (directoryPaths.length === 0) return false;
 
-        appNotificationService.showInfo('正在绑定并扫描文件夹...');
-        const result = await libraryDataService.bindDirectoryToPlaylist(playlistId, directoryPath);
-        if (!result.success) {
-            appNotificationService.showError(result.error || '绑定文件夹失败');
-            return false;
+        appNotificationService.showInfo(`正在绑定并扫描 ${directoryPaths.length} 个文件夹...`);
+        let successCount = 0;
+        const errors: string[] = [];
+        for (const directoryPath of directoryPaths) {
+            const result = await libraryDataService.bindDirectoryToPlaylist(playlistId, directoryPath);
+            if (result.success) {
+                successCount++;
+            } else {
+                errors.push(result.error || directoryPath);
+            }
         }
-        appNotificationService.showSuccess('文件夹已绑定，歌曲将持续同步到歌单');
-        return true;
+
+        if (errors.length === 0) {
+            appNotificationService.showSuccess(
+                `${successCount} 个文件夹已绑定，歌曲将持续同步到歌单`
+            );
+        } else if (successCount > 0) {
+            appNotificationService.showError(
+                `已绑定 ${successCount} 个文件夹，${errors.length} 个失败：${errors.join('；')}`
+            );
+        } else {
+            appNotificationService.showError(`绑定文件夹失败：${errors.join('；')}`);
+        }
+        return successCount > 0;
     }
 
     async rescan(bindingId: string): Promise<boolean> {

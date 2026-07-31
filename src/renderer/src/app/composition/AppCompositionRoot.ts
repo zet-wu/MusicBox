@@ -131,8 +131,7 @@ export function createAppComposition({
     const fileImportController = new FileImportController({
         app: hostPorts.fileImport,
         integrations: {
-            openDirectory: () => mediaFileDialogService.openDirectory(),
-            openDirectoryDialog: () => mediaFileDialogService.openDirectoryDialog(),
+            openDirectories: () => mediaFileDialogService.openDirectories(),
             openFiles: () => mediaFileDialogService.openFiles(),
             loadTrack: (filePath) => playbackController.loadTrack(filePath),
             play: () => playbackController.play()

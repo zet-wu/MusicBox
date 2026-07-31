@@ -88,6 +88,9 @@ interface ElectronAPI {
     // 通用目录选择对话框（返回字符串路径，用于音乐目录扫描等）
     openDirectory: () => Promise<string | null>;
 
+    // 选择多个音乐目录
+    openDirectories: () => Promise<string[]>;
+
     // 选择多个音乐文件
     openFiles: () => Promise<string[]>;
 

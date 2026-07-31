@@ -1,6 +1,6 @@
 import type {Track} from "@api/types/library";
-import {mediaFileDialogService} from "@/features/media/service";
-import {appFileImportActionService} from "@/features/appShell/service";
+import {appFileImportActionService} from "@/features/appShell/service/AppFileImportActionService";
+import {mediaFileDialogService} from "@/features/media/service/MediaFileDialogService";
 import {libraryService} from "./LibraryService";
 
 export interface HomeLibraryActionResult {
@@ -13,15 +13,20 @@ export class HomeLibraryActionService {
         return await libraryService.getTracks();
     }
 
-    async scanSelectedFolder(): Promise<HomeLibraryActionResult> {
-        const directory = await mediaFileDialogService.openDirectory();
-        if (!directory) {
+    async scanSelectedFolders(): Promise<HomeLibraryActionResult> {
+        const directories = await mediaFileDialogService.openDirectories();
+        if (directories.length === 0) {
             return {changed: false, tracks: []};
         }
 
-        const success = await libraryService.scanDirectory(directory);
-        const tracks = success ? await libraryService.getTracks() : [];
-        return {changed: success, tracks};
+        let successCount = 0;
+        for (const directory of directories) {
+            if (await libraryService.scanDirectory(directory)) {
+                successCount++;
+            }
+        }
+        const tracks = successCount > 0 ? await libraryService.getTracks() : [];
+        return {changed: successCount > 0, tracks};
     }
 
     async addMusicFiles(): Promise<HomeLibraryActionResult> {

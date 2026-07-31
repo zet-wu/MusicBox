@@ -15,8 +15,7 @@ export interface FileImportHost {
 }
 
 interface FileImportIntegrations {
-    openDirectory(): Promise<string | null>;
-    openDirectoryDialog(): Promise<string | null>;
+    openDirectories(): Promise<string[]>;
     openFiles(): Promise<string[]>;
     loadTrack(filePath: string): Promise<boolean>;
     play(): Promise<boolean>;
@@ -42,16 +41,7 @@ export class FileImportController {
 
     async scanMusicFolder(): Promise<void> {
         try {
-            const folderPath = await this.integrations.openDirectory();
-            if (folderPath) {
-                this.app.showScanProgress();
-                const success = await libraryDataService.scanDirectory(folderPath);
-                if (success) {
-                    showToast('音乐目录扫描成功', 'success');
-                } else {
-                    showToast('音乐目录扫描失败', 'error');
-                }
-            }
+            await this.selectAndScanDirectories();
         } catch (error) {
             showToast('音乐目录扫描失败', 'error');
         }
@@ -129,10 +119,7 @@ export class FileImportController {
 
     async openDirectoryDialog(): Promise<void> {
         try {
-            const directory = await this.integrations.openDirectoryDialog();
-            if (directory) {
-                await this.scanDirectory(directory);
-            }
+            await this.selectAndScanDirectories();
         } catch (error) {
             this.app.showError('无法打开目录选择框');
         }
@@ -180,6 +167,27 @@ export class FileImportController {
         } catch (error) {
             console.error('扫描失败：', error);
             this.app.showError('扫描失败');
+        }
+    }
+
+    private async selectAndScanDirectories(): Promise<void> {
+        const directories = await this.integrations.openDirectories();
+        if (directories.length === 0) return;
+
+        this.app.showScanProgress();
+        let successCount = 0;
+        for (const directory of directories) {
+            if (await libraryDataService.scanDirectory(directory)) {
+                successCount++;
+            }
+        }
+
+        if (successCount === directories.length) {
+            this.app.showSuccess(`已添加并扫描 ${successCount} 个音乐文件夹`);
+        } else if (successCount > 0) {
+            this.app.showError(`已扫描 ${successCount} 个文件夹，${directories.length - successCount} 个失败`);
+        } else {
+            this.app.showError('音乐文件夹扫描失败');
         }
     }
 

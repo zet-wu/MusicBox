@@ -578,7 +578,7 @@ class HomePage extends Component {
                                 <svg viewBox="0 0 24 24">
                                     <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
                                 </svg>
-                                <span>扫描音乐文件夹</span>
+                                <span>添加音乐文件夹</span>
                             </button>
                             <button class="quick-start-btn secondary" id="add-files-btn">
                                 <svg viewBox="0 0 24 24">
@@ -637,7 +637,7 @@ class HomePage extends Component {
         if (scanBtn) {
             scanBtn.addEventListener('click', async () => {
                 try {
-                    const result = await homeLibraryActionService.scanSelectedFolder();
+                    const result = await homeLibraryActionService.scanSelectedFolders();
                     if (result.changed) {
                         this.tracks = result.tracks;
                         this.render();
