@@ -146,6 +146,7 @@ class Settings extends Component {
         this.viewCacheStatsBtn = this.element.querySelector('#view-cache-stats-btn');
         this.validateCacheBtn = this.element.querySelector('#validate-cache-btn');
         this.clearCacheBtn = this.element.querySelector('#clear-cache-btn');
+        this.clearCoverCacheBtn = this.element.querySelector('#clear-cover-cache-btn');
         this.clearIgnoreListBtn = this.element.querySelector('#clear-ignore-list-btn');
         this.cacheStatsDescription = this.element.querySelector('#cache-stats-description');
 
@@ -706,6 +707,7 @@ class Settings extends Component {
             viewCacheStatsButton: this.viewCacheStatsBtn,
             validateCacheButton: this.validateCacheBtn,
             clearCacheButton: this.clearCacheBtn,
+            clearCoverCacheButton: this.clearCoverCacheBtn,
             cacheStatsDescription: this.cacheStatsDescription,
             testEmbeddedLyricsButton: this.testEmbeddedLyricsBtn,
             lyricsHighlightOpacitySlider: this.lyricsHighlightOpacitySlider,

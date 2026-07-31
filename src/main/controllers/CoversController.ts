@@ -7,6 +7,8 @@ import * as http from 'http';
 import {BaseController, Controller, IpcHandle} from '../decorators/IpcHandler';
 import {cleanCoverFileName} from '../utils/string';
 import {generateCoverSearchPatterns, findBestCoverMatch} from '../utils/FileSearch';
+import {isSafePath} from '../utils/pathSecurity';
+import {CoverCacheStorage} from '../services/library/CoverCacheStorage';
 
 interface DirCache {
     files: string[];
@@ -60,7 +62,7 @@ async function downloadImageFromUrl(url: string, filePath: string): Promise<{ su
 export class CoversController extends BaseController {
     private dirCache = new Map<string, DirCache>();
 
-    constructor() {
+    constructor(private readonly coverCacheStorage = new CoverCacheStorage()) {
         super();
     }
 
@@ -71,6 +73,37 @@ export class CoversController extends BaseController {
         const files = await fs.promises.readdir(coverDir);
         this.dirCache.set(coverDir, {files, expiresAt: now + DIR_CACHE_TTL});
         return files;
+    }
+
+    @IpcHandle('covers:resolveCacheDirectory')
+    async resolveCacheDirectory(selectedDirectory?: string | null): Promise<{
+        success: boolean;
+        path?: string;
+        isDefault?: boolean;
+        error?: string;
+    }> {
+        try {
+            const resolved = await this.coverCacheStorage.resolveCacheDirectory(selectedDirectory);
+            return {success: true, ...resolved};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('covers:clearCache')
+    async clearCache(coverDirectory: string): Promise<{
+        success: boolean;
+        deletedFileCount?: number;
+        preservedUnknownFileCount?: number;
+        error?: string;
+    }> {
+        try {
+            this.dirCache.clear();
+            return {success: true, ...await this.coverCacheStorage.clearCache(coverDirectory)};
+        } catch (error: any) {
+            this.dirCache.clear();
+            return {success: false, error: error.message};
+        }
     }
 
     @IpcHandle('covers:checkLocalCover')
@@ -124,32 +157,45 @@ export class CoversController extends BaseController {
         dataType: string
     ): Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string }> {
         try {
-            await fs.promises.mkdir(coverDir, {recursive: true});
-            const fullPath = path.join(coverDir, fileName);
-            const invalidate = () => this.dirCache.delete(coverDir);
+            const managed = await this.coverCacheStorage.assertManagedDirectory(coverDir);
+            if (path.basename(fileName) !== fileName) {
+                return {success: false, error: '封面文件名无效'};
+            }
+            await fs.promises.mkdir(managed.path, {recursive: true});
+            const fullPath = path.join(managed.path, fileName);
+            if (!isSafePath(fullPath, [managed.path])) {
+                return {success: false, error: '封面文件路径超出缓存目录'};
+            }
+            const invalidate = () => this.dirCache.delete(managed.path);
+            const finalize = async () => {
+                try {
+                    await this.coverCacheStorage.recordManagedFile(managed.path, fileName);
+                } catch (error) {
+                    await fs.promises.unlink(fullPath).catch(() => undefined);
+                    throw error;
+                }
+                invalidate();
+                return {success: true, filePath: fullPath, fileName};
+            };
 
             if (dataType === 'arrayBuffer') {
                 await fs.promises.writeFile(fullPath, Buffer.from(imageData));
-                invalidate();
-                return {success: true, filePath: fullPath, fileName};
+                return await finalize();
             } else if (dataType === 'string' || typeof imageData === 'string') {
                 if (imageData.startsWith('http')) {
                     const result = await downloadImageFromUrl(imageData, fullPath);
-                    if (result.success) invalidate();
-                    return result.success ? {success: true, filePath: fullPath, fileName} : {
+                    return result.success ? await finalize() : {
                         success: false,
                         error: result.error
                     };
                 } else {
                     const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
                     await fs.promises.writeFile(fullPath, base64Data, 'base64');
-                    invalidate();
-                    return {success: true, filePath: fullPath, fileName};
+                    return await finalize();
                 }
             } else if (imageData instanceof Buffer) {
                 await fs.promises.writeFile(fullPath, imageData);
-                invalidate();
-                return {success: true, filePath: fullPath, fileName};
+                return await finalize();
             }
             return {success: false, error: `不支持的图片数据格式: ${typeof imageData}`};
         } catch (error: any) {

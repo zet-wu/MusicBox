@@ -204,6 +204,18 @@ export interface ElectronLyricsAPI {
 }
 
 export interface ElectronCoversAPI {
+    resolveCacheDirectory(selectedDirectory?: string | null): Promise<{
+        success: boolean;
+        path?: string;
+        isDefault?: boolean;
+        error?: string;
+    }>;
+    clearCache(coverDirectory: string): Promise<{
+        success: boolean;
+        deletedFileCount?: number;
+        preservedUnknownFileCount?: number;
+        error?: string;
+    }>;
     checkLocalCover(
         coverDir: string,
         title: string,

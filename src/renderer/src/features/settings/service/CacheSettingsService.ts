@@ -76,6 +76,19 @@ class CacheSettingsService {
                 : undefined
         };
     }
+
+    async clearCoverCache(): Promise<CacheActionDisplay> {
+        const result = await cacheMaintenanceService.clearCoverCache();
+        return {
+            success: result.success,
+            message: result.success
+                ? `封面缓存已清除，共删除 ${result.deletedFileCount} 个磁盘缓存项`
+                : result.error || '清除封面缓存失败',
+            description: result.success && result.preservedUnknownFileCount > 0
+                ? `已保留 ${result.preservedUnknownFileCount} 个无法确认归属的文件。`
+                : result.success ? '内存封面、Blob URL 和应用管理的磁盘封面缓存已释放。' : undefined
+        };
+    }
 }
 
 export const cacheSettingsService = new CacheSettingsService();

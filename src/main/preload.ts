@@ -365,6 +365,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 本地封面缓存
     covers: {
+        resolveCacheDirectory: (selectedDirectory?: string | null) =>
+            ipcRenderer.invoke('covers:resolveCacheDirectory', selectedDirectory),
+        clearCache: (coverDirectory: string) => ipcRenderer.invoke('covers:clearCache', coverDirectory),
         checkLocalCover: (coverDir: string, title: string, artist: string, album: string, isAlbum = false) =>
             ipcRenderer.invoke('covers:checkLocalCover', coverDir, title, artist, album, isAlbum),
         saveCoverFile: (coverDir: string, fileName: string, imageData: any, dataType: string) =>

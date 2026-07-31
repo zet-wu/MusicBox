@@ -3,6 +3,16 @@ import {urlValidator} from '@utils/URLValidator';
 import type {CoverResult, ImageFormat} from '@api/types';
 import {embeddedCoverManager} from './EmbeddedCoverManager';
 import {localCoverManager} from './LocalCoverManager';
+import {mediaAssetsService} from './MediaAssetsService';
+
+export interface CoverCacheClearResult {
+    success: boolean;
+    memoryCleared: boolean;
+    diskCleared: boolean;
+    deletedFileCount: number;
+    preservedUnknownFileCount: number;
+    error?: string;
+}
 
 export class CoverLookupService {
     private readonly transientObjectUrls = new Set<string>();
@@ -163,19 +173,50 @@ export class CoverLookupService {
         localCoverManager.clearCacheForTrack(title, artist, album);
     }
 
-    clearAllCache(): void {
-        if (typeof (embeddedCoverManager as any).clearAllCache === 'function') {
-            (embeddedCoverManager as any).clearAllCache();
+    async clearAllCache(): Promise<CoverCacheClearResult> {
+        this.clearMemoryCache();
+
+        const coverDirectory = localCoverManager.getCoverDirectory();
+        if (!coverDirectory) {
+            return {
+                success: true,
+                memoryCleared: true,
+                diskCleared: true,
+                deletedFileCount: 0,
+                preservedUnknownFileCount: 0
+            };
         }
-        if (typeof (localCoverManager as any).clearAllCache === 'function') {
-            (localCoverManager as any).clearAllCache();
+
+        const diskResult = await mediaAssetsService.clearCoverCache(coverDirectory);
+        if (!diskResult.success) {
+            return {
+                success: false,
+                memoryCleared: true,
+                diskCleared: false,
+                deletedFileCount: 0,
+                preservedUnknownFileCount: 0,
+                error: diskResult.error || '清除磁盘封面缓存失败'
+            };
         }
-        this.clearTransientObjectUrls();
+
         console.log('✅ Success: 已清除所有封面缓存');
+        return {
+            success: true,
+            memoryCleared: true,
+            diskCleared: true,
+            deletedFileCount: diskResult.deletedFileCount || 0,
+            preservedUnknownFileCount: diskResult.preservedUnknownFileCount || 0
+        };
     }
 
     destroy(): void {
-        this.clearAllCache();
+        this.clearMemoryCache();
+    }
+
+    private clearMemoryCache(): void {
+        embeddedCoverManager.clearCache();
+        localCoverManager.clearCache();
+        this.clearTransientObjectUrls();
     }
 
     private createEmbeddedCoverResult(embeddedResult: any): CoverResult {

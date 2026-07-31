@@ -4,6 +4,7 @@
  */
 
 import {coverLookupService} from '@/features/mediaAssets/service/CoverLookupService';
+import type {CoverCacheClearResult} from '@/features/mediaAssets/service/CoverLookupService';
 import {BaseAPI, Validator} from "@api/core";
 import type {CoverResult} from "@api/types";
 
@@ -46,8 +47,8 @@ export class CoverAPI extends BaseAPI {
         coverLookupService.clearCacheForTrack(title, artist, album);
     }
 
-    clearAllCache(): void {
-        coverLookupService.clearAllCache();
+    async clearAllCache(): Promise<CoverCacheClearResult> {
+        return await coverLookupService.clearAllCache();
     }
 }
 

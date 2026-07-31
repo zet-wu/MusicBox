@@ -1,12 +1,7 @@
 import {settingsShellService} from "@/features/appShell/service";
 import {localCoverManager} from "@/features/mediaAssets/service/LocalCoverManager";
 import {localLyricsManager} from "@/features/mediaAssets/service/LocalLyricsManager";
-
-interface PathResult {
-    success?: boolean;
-    path?: string;
-    error?: string;
-}
+import {mediaAssetsService} from "@/features/mediaAssets/service/MediaAssetsService";
 
 interface DirectoryResult {
     directory: string | null;
@@ -33,31 +28,18 @@ class MediaDirectorySettingsService {
     }
 
     async resolveCoverCacheDirectory(savedDirectory: string | null): Promise<DirectoryResult> {
-        if (savedDirectory) {
-            return {directory: savedDirectory, shouldPersist: false};
-        }
-
-        const defaultPathResult = await settingsShellService.getDefaultCoverCachePath() as PathResult;
-        if (!defaultPathResult.success || !defaultPathResult.path) {
+        const resolved = await mediaAssetsService.resolveCoverCacheDirectory(savedDirectory);
+        if (!resolved.success || !resolved.path) {
             return {
                 directory: null,
                 shouldPersist: false,
-                error: defaultPathResult.error || '获取默认封面缓存路径失败'
-            };
-        }
-
-        const ensureResult = await settingsShellService.ensureDirectoryExists(defaultPathResult.path) as PathResult;
-        if (!ensureResult.success) {
-            return {
-                directory: null,
-                shouldPersist: false,
-                error: ensureResult.error || '创建默认封面缓存目录失败'
+                error: resolved.error || '获取封面缓存路径失败'
             };
         }
 
         return {
-            directory: defaultPathResult.path,
-            shouldPersist: true
+            directory: resolved.path,
+            shouldPersist: !savedDirectory
         };
     }
 }

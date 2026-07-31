@@ -2,6 +2,7 @@ export interface CacheSettingsElements {
     viewCacheStatsButton: HTMLButtonElement | null;
     validateCacheButton: HTMLButtonElement | null;
     clearCacheButton: HTMLButtonElement | null;
+    clearCoverCacheButton: HTMLButtonElement | null;
     cacheStatsDescription: HTMLElement | null;
 }
 
@@ -16,6 +17,10 @@ class CacheSettingsRenderer {
 
     setClearLoading(elements: CacheSettingsElements, loading: boolean): void {
         this.setButtonState(elements.clearCacheButton, loading, '重建中...', '重建索引');
+    }
+
+    setCoverClearLoading(elements: CacheSettingsElements, loading: boolean): void {
+        this.setButtonState(elements.clearCoverCacheButton, loading, '清除中...', '清除封面缓存');
     }
 
     updateDescription(elements: CacheSettingsElements, description: string): void {

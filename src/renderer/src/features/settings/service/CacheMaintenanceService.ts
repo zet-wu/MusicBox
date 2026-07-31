@@ -3,6 +3,10 @@ import {libraryService} from "@/features/library/service/LibraryService";
 import type {Result} from "@api/types/common";
 import type {CacheValidationResult} from "@api/types/events";
 import type {LibraryIndexRebuildResult} from "@api/types/electron";
+import {
+    coverLookupService,
+    type CoverCacheClearResult
+} from "@/features/mediaAssets/service/CoverLookupService";
 
 export interface CacheStatisticsView {
     totalTracks: number;
@@ -22,6 +26,10 @@ class CacheMaintenanceService {
 
     rebuildLibraryIndex(): Promise<LibraryIndexRebuildResult> {
         return libraryService.rebuildLibraryIndex();
+    }
+
+    clearCoverCache(): Promise<CoverCacheClearResult> {
+        return coverLookupService.clearAllCache();
     }
 
     clearIgnoreList(): Promise<Result> {

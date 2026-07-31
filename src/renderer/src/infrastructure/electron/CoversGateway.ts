@@ -14,9 +14,31 @@ export interface CoverImageDataResult {
     error?: string;
 }
 
+export interface CoverCacheDirectoryResult {
+    success: boolean;
+    path?: string;
+    isDefault?: boolean;
+    error?: string;
+}
+
+export interface CoverDiskCacheClearResult {
+    success: boolean;
+    deletedFileCount?: number;
+    preservedUnknownFileCount?: number;
+    error?: string;
+}
+
 class CoversGateway extends ElectronNamespaceAdapter<'covers'> {
     constructor() {
         super('covers');
+    }
+
+    resolveCacheDirectory(selectedDirectory?: string | null): Promise<CoverCacheDirectoryResult> {
+        return this.call('resolveCacheDirectory', selectedDirectory);
+    }
+
+    clearCache(coverDirectory: string): Promise<CoverDiskCacheClearResult> {
+        return this.call('clearCache', coverDirectory);
     }
 
     checkLocalCover(

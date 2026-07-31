@@ -1,4 +1,8 @@
 import {coversGateway, lyricsGateway} from '@/infrastructure/electron';
+import type {
+    CoverCacheDirectoryResult,
+    CoverDiskCacheClearResult
+} from '@/infrastructure/electron/CoversGateway';
 import type {EmbeddedLyricsData} from '@api/types/electron';
 
 export interface LocalCoverFileResult {
@@ -36,6 +40,14 @@ export interface EmbeddedLyricsResult {
 }
 
 export class MediaAssetsService {
+    async resolveCoverCacheDirectory(selectedDirectory?: string | null): Promise<CoverCacheDirectoryResult> {
+        return await coversGateway.resolveCacheDirectory(selectedDirectory);
+    }
+
+    async clearCoverCache(coverDirectory: string): Promise<CoverDiskCacheClearResult> {
+        return await coversGateway.clearCache(coverDirectory);
+    }
+
     async checkLocalCover(
         coverDir: string,
         title: string,

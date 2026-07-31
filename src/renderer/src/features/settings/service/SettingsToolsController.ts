@@ -21,6 +21,7 @@ export interface SettingsToolsElements {
     viewCacheStatsButton: HTMLButtonElement | null;
     validateCacheButton: HTMLButtonElement | null;
     clearCacheButton: HTMLButtonElement | null;
+    clearCoverCacheButton: HTMLButtonElement | null;
     cacheStatsDescription: HTMLElement | null;
     testEmbeddedLyricsButton: HTMLButtonElement | null;
     lyricsHighlightOpacitySlider: HTMLInputElement | null;
@@ -112,8 +113,13 @@ class SettingsToolsController {
                 return;
             }
 
+            const resolved = await mediaDirectorySettingsService.resolveCoverCacheDirectory(selectedPath);
+            if (!resolved.directory) {
+                showToast(resolved.error || '创建封面缓存目录失败', 'error');
+                return;
+            }
             callbacks.updateSetting('coverCacheDirectory', selectedPath);
-            this.applyCoverDirectory(elements, selectedPath);
+            this.applyCoverDirectory(elements, resolved.directory);
         } catch (error) {
             console.error('❌ Settings: 选择封面缓存目录失败:', error);
         }
@@ -138,6 +144,10 @@ class SettingsToolsController {
 
         scope.listen(elements.clearCacheButton, 'click', async () => {
             await this.rebuildLibraryIndex(elements);
+        });
+
+        scope.listen(elements.clearCoverCacheButton, 'click', async () => {
+            await this.clearCoverCache(elements);
         });
     }
 
@@ -199,6 +209,30 @@ class SettingsToolsController {
             showToast('重建音乐库索引失败', 'error');
         } finally {
             cacheSettingsRenderer.setClearLoading(this.toCacheSettingsElements(elements), false);
+        }
+    }
+
+    private async clearCoverCache(elements: SettingsToolsElements): Promise<void> {
+        const confirmed = await appConfirmationService.confirm({
+            title: '清除封面缓存',
+            message: '确定要清除封面缓存吗？这会释放内存封面和 MusicBox 管理的磁盘缓存，不会修改音乐文件中的内嵌封面、歌单自定义封面或其他用户图片。',
+            type: 'warning',
+            confirmText: '清除封面缓存'
+        });
+        if (!confirmed) return;
+
+        try {
+            cacheSettingsRenderer.setCoverClearLoading(this.toCacheSettingsElements(elements), true);
+            const result = await cacheSettingsService.clearCoverCache();
+            showToast(result.message, result.success ? 'success' : 'error');
+            if (result.success && result.description) {
+                cacheSettingsRenderer.updateDescription(this.toCacheSettingsElements(elements), result.description);
+            }
+        } catch (error) {
+            console.error('清除封面缓存失败:', error);
+            showToast('清除封面缓存失败', 'error');
+        } finally {
+            cacheSettingsRenderer.setCoverClearLoading(this.toCacheSettingsElements(elements), false);
         }
     }
 
@@ -269,6 +303,7 @@ class SettingsToolsController {
             viewCacheStatsButton: elements.viewCacheStatsButton,
             validateCacheButton: elements.validateCacheButton,
             clearCacheButton: elements.clearCacheButton,
+            clearCoverCacheButton: elements.clearCoverCacheButton,
             cacheStatsDescription: elements.cacheStatsDescription
         };
     }
