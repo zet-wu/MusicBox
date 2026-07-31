@@ -1,6 +1,7 @@
 import type {LibraryDirectoryOverview} from '@api/types/electron';
 import type {Unsubscribe} from '@api/types/common';
-import {appConfirmationService, appNotificationService} from '@/features/appShell/service';
+import {appConfirmationService} from '@/features/appShell/service/AppConfirmationService';
+import {appNotificationService} from '@/features/appShell/service/AppNotificationService';
 import {mediaFileDialogService} from '@/features/media/service/MediaFileDialogService';
 import {systemGateway} from '@/infrastructure/electron/SystemGateway';
 import {libraryDataService} from './LibraryDataService';
