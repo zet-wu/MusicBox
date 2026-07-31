@@ -106,7 +106,7 @@ export interface EmbeddedTrackCover {
 export interface ElectronLibraryAPI {
     scanDirectory(path: string): Promise<boolean>;
     importLibraryDirectory(path: string): Promise<LibraryImportResult>;
-    importLibraryFiles(paths: string[]): Promise<LibraryImportResult>;
+    importLibraryFiles(paths: string[], targetPlaylistId?: string): Promise<LibraryImportResult>;
     getLibrarySources(): Promise<LibrarySource[]>;
     removeLibrarySource(sourceId: string): Promise<Result & {removedTrackCount?: number}>;
     getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]>;

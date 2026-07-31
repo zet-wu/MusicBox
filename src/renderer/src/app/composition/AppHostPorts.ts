@@ -74,12 +74,10 @@ export interface MusicBoxCompositionHost {
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
     handleSearchCleared(): void;
     handleSearchResults(results: Track[]): void;
-    handleShowAddSongsDialog(playlist: Playlist): Promise<void>;
     handleTrackAddedToPlaylist(playlist?: Playlist, track?: Track): Promise<void>;
     handleTrackIndexChanged(index: number): void;
     handleTrackInfoUpdated(data: unknown): Promise<void>;
     handleTrackPlayed(track: Track, index: number): Promise<void>;
-    handleTracksAddedToPlaylist(data?: unknown): Promise<void>;
     handleViewChange(view: AppView): Promise<void>;
     hideCacheLoadingStatus(): void;
     hideAllPages(): void;
@@ -318,7 +316,6 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handlePlaylistCreated: (playlist) => app.handlePlaylistCreated(playlist),
             handleTrackAddedToPlaylist: (playlist, track) => app.handleTrackAddedToPlaylist(playlist, track),
             handlePlaylistRenamed: (playlist) => app.handlePlaylistRenamed(playlist),
-            handleTracksAddedToPlaylist: (data) => app.handleTracksAddedToPlaylist(data),
             handleTrackInfoUpdated: (data) => app.handleTrackInfoUpdated(data),
             handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
@@ -326,7 +323,6 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
             playTrackFromPlaylist: (track, index, tracks, mode) => app.playTrackFromPlaylist(track, index, tracks, mode),
             handlePlaylistUpdated: (playlist) => app.handlePlaylistUpdated(playlist),
-            handleShowAddSongsDialog: (playlist) => app.handleShowAddSongsDialog(playlist),
             handlePlaylistCoverUpdated: (playlist) => app.handlePlaylistCoverUpdated(playlist)
         },
         pluginBootstrap: {

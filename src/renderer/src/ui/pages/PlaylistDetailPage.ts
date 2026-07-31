@@ -22,6 +22,7 @@ import {
     type CollectionType
 } from "@/features/playlists/domain/CollectionCapabilities";
 import {playlistDataService} from "@/features/playlists/service/PlaylistDataService";
+import {playlistFileImportService} from "@/features/playlists/service/PlaylistFileImportService";
 import {playlistFolderImportService} from "@/features/playlists/service/PlaylistFolderImportService";
 import {playlistPlaybackActionService} from "@/features/playlists/service/PlaylistPlaybackActionService";
 import {playlistTrackMutationService} from "@/features/playlists/service/PlaylistTrackMutationService";
@@ -362,7 +363,7 @@ class PlaylistDetailPage extends Component {
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
                             </svg>
-                            <span>添加歌曲</span>
+                            <span>从文件添加歌曲</span>
                         </button>
                         <button class="action-btn add-from-folder" id="playlist-add-from-folder">
                             <svg class="icon" viewBox="0 0 24 24">
@@ -504,7 +505,7 @@ class PlaylistDetailPage extends Component {
                 await this.appendAllTracks();
                 break;
             case 'playlist-add-songs':
-                this.showAddSongsDialog();
+                await this.addFromFiles();
                 break;
             case 'playlist-add-from-folder':
                 await this.addFromFolder();
@@ -521,7 +522,7 @@ class PlaylistDetailPage extends Component {
                 break;
             default:
                 if (button.classList.contains('empty-action-btn')) {
-                    this.showAddSongsDialog();
+                    await this.addFromFiles();
                 }
         }
     }
@@ -964,11 +965,19 @@ class PlaylistDetailPage extends Component {
         if (tracks) this.emit('appendAllTracks', tracks);
     }
 
-    showAddSongsDialog(): void {
-        if (!getCollectionCapabilities(this.getCollectionType()).canAddSongs) {
+    async addFromFiles(): Promise<void> {
+        if (
+            !this.currentPlaylist
+            || !getCollectionCapabilities(this.getCollectionType()).canAddSongs
+        ) {
             return;
         }
-        this.emit('showAddSongsDialog', this.currentPlaylist);
+
+        const result = await playlistFileImportService.addFromFiles(this.currentPlaylist.id);
+        if (result.changed) {
+            await this.loadPlaylistTracks();
+            this.emit('playlistUpdated', this.currentPlaylist);
+        }
     }
 
     // 从文件夹添加音乐

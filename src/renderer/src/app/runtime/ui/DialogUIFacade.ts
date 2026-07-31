@@ -26,10 +26,6 @@ export class DialogUIFacade {
         this.app.components.renamePlaylistDialog?.show(playlist);
     }
 
-    async showMusicLibrarySelectionDialog(playlist: Playlist): Promise<void> {
-        await this.app.components.musicLibrarySelectionDialog?.show(playlist);
-    }
-
     async showEditTrackInfoDialog(track: Track): Promise<void> {
         await this.app.components.editTrackInfoDialog?.show(track);
     }

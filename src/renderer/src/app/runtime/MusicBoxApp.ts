@@ -403,15 +403,7 @@ export class MusicBoxApp extends EventEmitter {
     }
 
     // 处理显示添加歌曲对话框
-    async handleShowAddSongsDialog(playlist: Playlist): Promise<void> {
-        await this.playlistController.handleShowAddSongsDialog(playlist);
-    }
-
     // 处理歌曲添加到歌单成功
-    async handleTracksAddedToPlaylist(): Promise<void> {
-        await this.playlistController.handleTracksAddedToPlaylist();
-    }
-
     // 处理歌单封面更新
     async handlePlaylistCoverUpdated(playlist: Playlist): Promise<void> {
         await this.playlistController.handlePlaylistCoverUpdated(playlist);

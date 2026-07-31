@@ -1080,12 +1080,20 @@ export class LibraryController extends BaseController {
     }
 
     @IpcHandle('library:importLibraryFiles')
-    async importLibraryFiles(filePaths: string[]): Promise<LibraryImportResult> {
+    async importLibraryFiles(
+        filePaths: string[],
+        targetPlaylistId?: string
+    ): Promise<LibraryImportResult> {
         const tracks: CachedTrack[] = [];
         const failedPaths: string[] = [];
 
         try {
             await this.ensureLibrarySourcesLoaded();
+            if (targetPlaylistId) {
+                const playlist = this.libraryCacheManager.getPlaylistById(targetPlaylistId);
+                if (!playlist) throw new Error('歌单不存在');
+                if (playlist.systemType === 'favorites') throw new Error('收藏歌单不支持从文件导入');
+            }
             for (const filePath of Array.from(new Set(filePaths || []))) {
                 try {
                     const track = await this.importLibraryFile(filePath);
@@ -1096,6 +1104,17 @@ export class LibraryController extends BaseController {
                 }
             }
 
+            if (targetPlaylistId && tracks.length > 0) {
+                for (const track of tracks) {
+                    try {
+                        this.libraryCacheManager.addTrackToPlaylist(targetPlaylistId, track.fileId);
+                    } catch (error: any) {
+                        if (error.message !== '歌曲已在歌单中') throw error;
+                    }
+                }
+                await this.libraryCacheManager.saveCache();
+                this.emitPlaylistsUpdated();
+            }
             this.windowManager.sendToMainWindow('library:updated', this.libraryCacheManager.getTracks());
             this.emitSourcesUpdated();
             return {

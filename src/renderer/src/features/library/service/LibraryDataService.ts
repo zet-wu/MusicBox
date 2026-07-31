@@ -1,6 +1,6 @@
 import {libraryGateway} from '@/infrastructure/electron';
 import type {Result} from '@api/types/common';
-import type {EmbeddedTrackCover, LibraryIndexRebuildResult} from '@api/types/electron';
+import type {EmbeddedTrackCover, LibraryImportResult, LibraryIndexRebuildResult} from '@api/types/electron';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 
 export type PlaylistMutationResult = {
@@ -231,6 +231,21 @@ export class LibraryDataService {
             () => libraryGateway.scanDirectory(path),
             'library.scanDirectory',
             false
+        );
+    }
+
+    async importLibraryFiles(paths: string[], targetPlaylistId?: string): Promise<LibraryImportResult> {
+        if (!Array.isArray(paths) || paths.some(filePath => typeof filePath !== 'string')) {
+            throw new LibraryInputError('paths', 'string[]', paths);
+        }
+        if (targetPlaylistId !== undefined) {
+            this.assertNonEmptyString(targetPlaylistId, 'targetPlaylistId');
+        }
+
+        return await this.callGateway(
+            () => libraryGateway.importLibraryFiles(paths, targetPlaylistId),
+            'library.importLibraryFiles',
+            {success: false, tracks: [], failedPaths: paths, error: '导入音乐文件失败'}
         );
     }
 

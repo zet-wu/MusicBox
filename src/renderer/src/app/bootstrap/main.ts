@@ -44,7 +44,6 @@ import '@ui/modals/UpdateModal';
 import '@ui/dialogs/AddToPlaylistDialog';
 import '@ui/dialogs/CreatePlaylistDialog';
 import '@ui/dialogs/EditTrackInfoDialog';
-import '@ui/dialogs/MusicLibrarySelectionDialog';
 import '@ui/dialogs/RenamePlaylistDialog';
 
 import './app';

@@ -9,7 +9,6 @@ interface PlaylistBindingComponents {
     createPlaylistDialog: ComponentEventSource;
     addToPlaylistDialog: ComponentEventSource;
     renamePlaylistDialog: ComponentEventSource;
-    musicLibrarySelectionDialog: ComponentEventSource;
     editTrackInfoDialog: ComponentEventSource;
     playlistDetailPage: ComponentEventSource;
 }
@@ -30,7 +29,6 @@ export interface PlaylistComponentBindingHost {
     handlePlaylistCreated(playlist?: Playlist): Promise<void>;
     handleTrackAddedToPlaylist(playlist?: Playlist, track?: Track): Promise<void>;
     handlePlaylistRenamed(playlist?: Playlist): Promise<void>;
-    handleTracksAddedToPlaylist(data?: unknown): Promise<void>;
     handleTrackInfoUpdated(data: unknown): Promise<void>;
     handleTrackPlayed(track: Track, index: number): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
@@ -43,7 +41,6 @@ export interface PlaylistComponentBindingHost {
         mode?: 'shuffle' | 'sequence'
     ): Promise<void>;
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
-    handleShowAddSongsDialog(playlist: Playlist): Promise<void>;
     handlePlaylistCoverUpdated(playlist: Playlist): Promise<void>;
 }
 
@@ -95,13 +92,6 @@ export function bindPlaylistComponentEvents({
         notify(data);
     });
 
-    components.musicLibrarySelectionDialog.on('tracksAdded', async (data: unknown) => {
-        await app.handleTracksAddedToPlaylist(data);
-    });
-    components.musicLibrarySelectionDialog.on('notification', (data: ComponentNotificationPayload) => {
-        notify(data);
-    });
-
     components.editTrackInfoDialog.on('trackUpdated', async (data: unknown) => {
         await app.handleTrackInfoUpdated(data);
     });
@@ -142,10 +132,6 @@ export function bindPlaylistComponentEvents({
 
     components.playlistDetailPage.on('playlistUpdated', async (playlist: Playlist) => {
         await app.handlePlaylistUpdated(playlist);
-    });
-
-    components.playlistDetailPage.on('showAddSongsDialog', async (playlist: Playlist) => {
-        await app.handleShowAddSongsDialog(playlist);
     });
 
     components.playlistDetailPage.on('playlistCoverUpdated', async (playlist: Playlist) => {

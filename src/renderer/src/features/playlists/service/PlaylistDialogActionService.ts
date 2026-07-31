@@ -20,23 +20,9 @@ export interface AddToPlaylistActionResult {
     error?: string;
 }
 
-export interface AddSelectedTracksResult {
-    successCount: number;
-    failCount: number;
-}
-
 export class PlaylistDialogActionService {
     async getPlaylists(): Promise<Playlist[]> {
         return await libraryDataService.getPlaylists();
-    }
-
-    async getSelectableTracks(existingTrackIds?: string[]): Promise<Track[]> {
-        const tracks = await libraryDataService.getTracks();
-        if (!existingTrackIds) {
-            return tracks;
-        }
-
-        return tracks.filter(track => !track.fileId || !existingTrackIds.includes(track.fileId));
     }
 
     async addTracksToPlaylist(
@@ -89,29 +75,6 @@ export class PlaylistDialogActionService {
         return await libraryDataService.renamePlaylist(playlistId, newName, description);
     }
 
-    async addSelectedTracks(playlistId: string, selectedTrackIds: string[]): Promise<AddSelectedTracksResult> {
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const trackId of selectedTrackIds) {
-            try {
-                const result = await libraryDataService.addToPlaylist(playlistId, trackId);
-
-                if (result.success) {
-                    successCount++;
-                } else {
-                    failCount++;
-                    console.warn('❌ 添加歌曲失败:', trackId, result.error);
-                }
-            } catch (error) {
-                failCount++;
-                console.error('❌ 添加歌曲异常:', trackId, error);
-            }
-        }
-
-        console.log(`✅ PlaylistDialogActionService: 批量添加歌曲完成: 成功 ${successCount}, 失败 ${failCount}`);
-        return {successCount, failCount};
-    }
 }
 
 export const playlistDialogActionService = new PlaylistDialogActionService();

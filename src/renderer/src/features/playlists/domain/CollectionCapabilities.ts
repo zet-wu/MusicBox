@@ -12,7 +12,7 @@ export function getCollectionCapabilities(collectionType: CollectionType): Colle
     switch (collectionType) {
         case 'favorites':
             return {
-                canAddSongs: true,
+                canAddSongs: false,
                 canClear: true,
                 canEditCover: false,
                 canRemoveTracks: false,

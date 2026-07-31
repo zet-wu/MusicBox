@@ -23,7 +23,6 @@ import {AddToPlaylistDialog} from "@ui/dialogs/AddToPlaylistDialog";
 import {ConfirmDialog} from "@ui/dialogs/ConfirmDialog";
 import {CreatePlaylistDialog} from "@ui/dialogs/CreatePlaylistDialog";
 import {EditTrackInfoDialog} from "@ui/dialogs/EditTrackInfoDialog";
-import {MusicLibrarySelectionDialog} from "@ui/dialogs/MusicLibrarySelectionDialog";
 import {RenamePlaylistDialog} from "@ui/dialogs/RenamePlaylistDialog";
 
 import {cacheManager} from "@/shared/cache";
@@ -66,7 +65,6 @@ export class ComponentRegistry {
         this.components.createPlaylistDialog = new CreatePlaylistDialog();
         this.components.addToPlaylistDialog = new AddToPlaylistDialog();
         this.components.renamePlaylistDialog = new RenamePlaylistDialog();
-        this.components.musicLibrarySelectionDialog = new MusicLibrarySelectionDialog();
         this.components.editTrackInfoDialog = new EditTrackInfoDialog();
 
         this.components.playlistDetailPage = new PlaylistDetailPage('#content-area');
