@@ -23,12 +23,15 @@ import {libraryDataService} from '@/features/library/service/LibraryDataService'
 import {PlaylistController} from '@/features/playlists/PlaylistController';
 import {PlaybackHistoryController} from '@/features/playback/PlaybackHistoryController';
 import {playbackController} from '@/features/playback/PlaybackController';
+import {SystemMediaSessionController} from '@/features/playback/SystemMediaSessionController';
 import {PlaybackAppController} from '@/features/playback/ui-bindings/PlaybackAppController';
 import {playbackService} from '@/features/playback/service/PlaybackService';
 import {desktopLyricsService} from '@/features/desktopLyrics/service/DesktopLyricsService';
 import {equalizerService} from '@/features/equalizer/service/EqualizerService';
 import {mediaFileDialogService} from '@/features/media/service';
+import {coverLookupService} from '@/features/mediaAssets/service/CoverLookupService';
 import {extensionHostService} from '@/features/extensions/service';
+import {trackCoverNetworkPreferenceService} from '@/features/settings/service';
 import {appShellRuntimeHost} from '@/features/appShell/service';
 import type {AudioEngineManagerBridge} from '@/features/equalizer/service';
 
@@ -51,6 +54,7 @@ export interface AppComposition {
     networkDriveRouteController: NetworkDriveRouteController;
     playbackQueueSyncService: PlaybackQueueSyncService;
     playbackHistoryController: PlaybackHistoryController;
+    systemMediaSessionController: SystemMediaSessionController;
     notifier: AppNotifier;
     playbackController: PlaybackAppController;
     playlistController: PlaylistController;
@@ -111,6 +115,24 @@ export function createAppComposition({
     playbackQueueSyncService.start();
     const playbackHistoryController = new PlaybackHistoryController();
     playbackHistoryController.start();
+    const systemMediaSessionController = new SystemMediaSessionController({
+        playback: playbackController,
+        defaultArtwork: new URL('assets/images/default-cover.svg', window.location.href).href,
+        resolveArtwork: async (track) => {
+            const result = await coverLookupService.getCover(
+                track.title,
+                track.artist,
+                track.album,
+                track.filePath,
+                false,
+                {allowNetwork: trackCoverNetworkPreferenceService.isEnabled()}
+            );
+            return result.success && typeof result.imageUrl === 'string'
+                ? result.imageUrl
+                : null;
+        }
+    });
+    systemMediaSessionController.start();
 
     const shortcutController = new ShortcutController({
         app: hostPorts.shortcuts,
@@ -243,6 +265,7 @@ export function createAppComposition({
         networkDriveRouteController,
         playbackQueueSyncService,
         playbackHistoryController,
+        systemMediaSessionController,
         notifier,
         playbackController: playbackAppController,
         playlistController,
