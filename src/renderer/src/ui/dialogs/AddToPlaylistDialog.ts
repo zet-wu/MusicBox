@@ -113,7 +113,7 @@ class AddToPlaylistDialog extends Component {
                 </svg>
                 <div class="playlist-info">
                     <div class="playlist-name">${this.escapeHtml(playlist.name)}</div>
-                    <div class="playlist-count">${playlist.trackIds ? playlist.trackIds.length : 0} 首歌曲</div>
+                    <div class="playlist-count">${playlist.resolvedTrackCount ?? 0} 首歌曲</div>
                 </div>
             </div>
         `).join('');

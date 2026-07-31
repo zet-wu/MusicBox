@@ -290,7 +290,7 @@ class PlaylistDetailPage extends Component {
         const capabilities = getCollectionCapabilities(this.getCollectionType());
         const createdDate = new Date(this.currentPlaylist.createdAt || Date.now());
         // 使用实际加载的tracks数量，确保UI状态与数据一致
-        const trackCount = this.tracks ? this.tracks.length : (this.currentPlaylist.trackIds ? this.currentPlaylist.trackIds.length : 0);
+        const trackCount = this.tracks ? this.tracks.length : (this.currentPlaylist.resolvedTrackCount ?? 0);
         const totalDuration = this.calculateTotalDuration();
 
         this.container.innerHTML = `

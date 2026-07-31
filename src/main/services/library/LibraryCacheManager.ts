@@ -46,6 +46,10 @@ export interface Playlist {
     systemType?: 'favorites';
 }
 
+export interface ResolvedPlaylist extends Playlist {
+    resolvedTrackCount: number;
+}
+
 export interface GetTracksOptions {
     favorite?: boolean;
     albumId?: string;
@@ -612,8 +616,16 @@ export class LibraryCacheManager {
         return this.cache.playlists?.find(p => p.id === playlistId);
     }
 
-    getAllPlaylists(): Playlist[] {
-        return this.getUserPlaylists();
+    getAllPlaylists(): ResolvedPlaylist[] {
+        const availableTrackIds = new Set(this.cache.tracks.map(track => track.fileId));
+        return this.getUserPlaylists().map(playlist => ({
+            ...playlist,
+            trackIds: [...playlist.trackIds],
+            resolvedTrackCount: playlist.trackIds.reduce(
+                (count, trackId) => count + (availableTrackIds.has(trackId) ? 1 : 0),
+                0
+            )
+        }));
     }
 
     updatePlaylistCover(playlistId: string, coverImagePath: string): boolean {

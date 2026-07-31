@@ -427,7 +427,7 @@ class Navigation extends Component {
             // 收缩状态：只显示封面或图标
             return `
                 <li>
-                    <div class="playlist-sidebar-item collapsed-item" data-playlist-id="${playlist.id}" title="${this.escapeHtml(playlist.name)} (${playlist.trackIds ? playlist.trackIds.length : 0} 首歌曲)">
+                    <div class="playlist-sidebar-item collapsed-item" data-playlist-id="${playlist.id}" title="${this.escapeHtml(playlist.name)} (${playlist.resolvedTrackCount ?? 0} 首歌曲)">
                         ${playlist.coverImage ? `
                             <img class="sidebar-playlist-cover" src="file://${playlist.coverImage}" alt="歌单封面" />
                         ` : `
@@ -451,7 +451,7 @@ class Navigation extends Component {
                             </svg>
                         `}
                         <span class="playlist-name">${this.escapeHtml(playlist.name)}</span>
-                        <span class="playlist-count">${playlist.trackIds ? playlist.trackIds.length : 0}</span>
+                        <span class="playlist-count">${playlist.resolvedTrackCount ?? 0}</span>
                         <div class="sidebar-playlist-actions">
                             <button class="sidebar-playlist-action-btn" data-action="rename">
                                 <svg class="icon" viewBox="0 0 24 24">

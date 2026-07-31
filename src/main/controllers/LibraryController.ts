@@ -168,7 +168,15 @@ export class LibraryController extends BaseController {
             const tracks = playlist.trackIds
                 .map((id: string) => allTracks.find((t: any) => t.fileId === id))
                 .filter(Boolean);
-            return {success: true, playlist, tracks};
+            return {
+                success: true,
+                playlist: {
+                    ...playlist,
+                    trackIds: [...playlist.trackIds],
+                    resolvedTrackCount: tracks.length
+                },
+                tracks
+            };
         } catch (error: any) {
             return {success: false, error: error.message};
         }
