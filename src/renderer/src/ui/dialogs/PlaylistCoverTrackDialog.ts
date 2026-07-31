@@ -7,6 +7,10 @@ type CoverTrack = Track & {
     fileId?: string;
 };
 
+const COVER_PREVIEW_TIMEOUT_MS = 10_000;
+
+class CoverPreviewTimeoutError extends Error {}
+
 export class PlaylistCoverTrackDialog extends Component {
     private overlay!: HTMLElement;
     private list!: HTMLElement;
@@ -136,8 +140,12 @@ export class PlaylistCoverTrackDialog extends Component {
 
         const status = item.querySelector<HTMLElement>('.playlist-cover-track-status');
         try {
-            const cover = await libraryDataService.getTrackCover(track.filePath);
-            if (generation !== this.generation || !cover?.data) return;
+            const cover = await this.getTrackCoverWithTimeout(track.filePath);
+            if (generation !== this.generation) return;
+            if (!cover?.data) {
+                if (status) status.textContent = '无内嵌封面';
+                return;
+            }
             const bytes = cover.data instanceof Uint8Array ? cover.data : new Uint8Array(cover.data);
             const imageBuffer = new ArrayBuffer(bytes.byteLength);
             new Uint8Array(imageBuffer).set(bytes);
@@ -155,10 +163,25 @@ export class PlaylistCoverTrackDialog extends Component {
         } catch (error) {
             console.warn('⚠️ 检查歌曲内嵌封面失败:', error);
             if (generation !== this.generation) return;
-            if (status) status.textContent = '无内嵌封面';
+            if (status) {
+                status.textContent = error instanceof CoverPreviewTimeoutError ? '检测超时' : '检测失败';
+            }
         }
-        if (generation === this.generation && item.disabled && status) {
-            status.textContent = '无内嵌封面';
+    }
+
+    private async getTrackCoverWithTimeout(filePath: string) {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        try {
+            return await Promise.race([
+                libraryDataService.getTrackCover(filePath),
+                new Promise<never>((_resolve, reject) => {
+                    timeoutId = setTimeout(() => {
+                        reject(new CoverPreviewTimeoutError('内嵌封面检测超时'));
+                    }, COVER_PREVIEW_TIMEOUT_MS);
+                })
+            ]);
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId);
         }
     }
 
