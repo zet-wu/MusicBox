@@ -30,7 +30,7 @@ src/renderer/src/features/
   equalizer/               图形/参量均衡器
   events/                  应用事件服务
   extensions/              插件管理功能
-  library/                 音乐库来源、索引重建、扫描、元数据编辑
+  library/                 音乐库来源管理、索引重建、扫描、元数据编辑
   media/                   文件选择、音频读取、媒体文件系统
   mediaAssets/             歌词、封面、本地/在线/内嵌资源
   networkDrive/            SMB / WebDAV 网络磁盘
@@ -85,6 +85,8 @@ extensions -> public Extension API
 - 配置跨功能依赖，例如 `desktopLyricsService` 获取播放快照，`equalizerService` 获取当前音频引擎。
 
 当新功能需要跨模块协作时，应优先在组合根注入一个明确端口，而不是在模块内部读取全局对象。
+
+目录来源管理由 `FolderSourcesPage` 经 library feature service 调用类型化 Electron gateway；文件夹卡片只消费目录概览，不直接接触完整来源文件清单。文件夹与歌单的反向绑定使用独立弹窗，并通过页面组件绑定层接入 Dialog facade，避免页面直接访问全局应用对象。
 
 ## 运行时 facade
 
