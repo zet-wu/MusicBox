@@ -1,5 +1,6 @@
 import {libraryGateway} from '@/infrastructure/electron';
 import type {Result} from '@api/types/common';
+import type {LibraryIndexClearResult} from '@api/types/electron';
 import type {CacheValidationResult, MusicBoxAPIEvents, ScanProgress} from '@api/types/events';
 import type {Track} from '@api/types/track';
 import {libraryDataService} from './LibraryDataService';
@@ -116,18 +117,21 @@ export class LibraryBridge {
         }
     }
 
-    async clearCache(): Promise<boolean> {
+    async clearLibraryIndex(): Promise<LibraryIndexClearResult> {
         try {
-            const success = await libraryDataService.clearCache();
-            if (success) {
+            const result = await libraryDataService.clearLibraryIndex();
+            if (result.success) {
                 this.emit('libraryUpdated', []);
-                return true;
+                return result;
             }
 
-            throw new Error('清空缓存失败');
+            return result;
         } catch (error) {
-            console.error('❌ 清空缓存失败:', error);
-            return false;
+            console.error('❌ 清除音乐库索引失败:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            };
         }
     }
 

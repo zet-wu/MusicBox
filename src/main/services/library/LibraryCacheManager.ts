@@ -54,6 +54,13 @@ export interface GetTracksOptions {
     year?: number;
 }
 
+export interface LibraryIndexClearSummary {
+    clearedTrackCount: number;
+    preservedPlaylistCount: number;
+    preservedPlaylistReferenceCount: number;
+    preservedIgnoredFileCount: number;
+}
+
 export const FAVORITES_PLAYLIST_ID = 'system:favorites';
 
 interface CacheStatistics {
@@ -426,7 +433,17 @@ export class LibraryCacheManager {
         this.cache.statistics.scanDuration = scanDuration;
     }
 
-    clearCache(): Promise<void> {
+    async clearLibraryIndex(): Promise<LibraryIndexClearSummary> {
+        const summary: LibraryIndexClearSummary = {
+            clearedTrackCount: this.cache.tracks.length,
+            preservedPlaylistCount: this.cache.playlists.length,
+            preservedPlaylistReferenceCount: this.cache.playlists.reduce(
+                (total, playlist) => total + playlist.trackIds.length,
+                0
+            ),
+            preservedIgnoredFileCount: this.cache.ignoredFiles.length
+        };
+
         this.cache = {
             lastUpdated: Date.now(),
             scannedDirectories: [],
@@ -435,7 +452,8 @@ export class LibraryCacheManager {
             ignoredFiles: this.cache.ignoredFiles || [],
             statistics: {totalTracks: 0, totalSize: 0, totalPlaylists: 0, lastScanTime: 0, scanDuration: 0}
         };
-        return this.saveCache();
+        await this.saveCache();
+        return summary;
     }
 
     getAllTracks(): CachedTrack[] {

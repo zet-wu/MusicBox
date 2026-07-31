@@ -2,6 +2,7 @@ import {libraryDataService} from "@/features/library/service/LibraryDataService"
 import {libraryService} from "@/features/library/service/LibraryService";
 import type {Result} from "@api/types/common";
 import type {CacheValidationResult} from "@api/types/events";
+import type {LibraryIndexClearResult} from "@api/types/electron";
 
 export interface CacheStatisticsView {
     totalTracks: number;
@@ -19,8 +20,8 @@ class CacheMaintenanceService {
         return libraryService.validateCache();
     }
 
-    clear(): Promise<boolean> {
-        return libraryService.clearCache();
+    clearLibraryIndex(): Promise<LibraryIndexClearResult> {
+        return libraryService.clearLibraryIndex();
     }
 
     clearIgnoreList(): Promise<Result> {

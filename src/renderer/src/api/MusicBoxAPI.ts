@@ -12,6 +12,7 @@ import {DesktopLyricsSync} from '@/features/desktopLyrics/service/DesktopLyricsS
 import {LibraryBridge} from '@/features/library/service/LibraryBridge';
 import type {Result} from '@api/types/common';
 import type {CacheValidationResult} from '@api/types/events';
+import type {LibraryIndexClearResult} from '@api/types/electron';
 import type {
     DesktopLyricsPlaybackState,
     PlaybackQueueSnapshot,
@@ -729,8 +730,8 @@ export class MusicBoxAPI extends EventEmitter {
         return await this.libraryBridge.validateCache();
     }
 
-    async clearCache(): Promise<boolean> {
-        return await this.libraryBridge.clearCache();
+    async clearLibraryIndex(): Promise<LibraryIndexClearResult> {
+        return await this.libraryBridge.clearLibraryIndex();
     }
 
     // 歌单封面管理方法

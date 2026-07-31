@@ -1,5 +1,6 @@
 import type {Result} from '@api/types/common';
 import type {CacheValidationResult, ScanProgress} from '@api/types/events';
+import type {LibraryIndexClearResult} from '@api/types/electron';
 import type {CacheStatistics, GetTracksOptions, Playlist} from '@api/types/library';
 import type {Track} from '@api/types/library';
 import {libraryService} from './service';
@@ -63,8 +64,8 @@ class LibraryController {
         return await libraryService.validateCache();
     }
 
-    async clearCache(): Promise<boolean> {
-        return await libraryService.clearCache();
+    async clearLibraryIndex(): Promise<LibraryIndexClearResult> {
+        return await libraryService.clearLibraryIndex();
     }
 
     async clearIgnoreList(): Promise<Result> {

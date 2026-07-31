@@ -2,7 +2,7 @@ import {ElectronNamespaceAdapter} from './ElectronBridge';
 import type {Result, Unsubscribe} from '@api/types/common';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 import type {CacheValidationResult, ScanProgress} from '@api/types/events';
-import type {EmbeddedTrackCover, FavoritesChangedData} from '@api/types/electron';
+import type {EmbeddedTrackCover, FavoritesChangedData, LibraryIndexClearResult} from '@api/types/electron';
 
 export interface PlaylistResult {
     success: boolean;
@@ -59,8 +59,8 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.call('loadCachedTracks');
     }
 
-    clearCache(): Promise<boolean> {
-        return this.call('clearCache');
+    clearLibraryIndex(): Promise<LibraryIndexClearResult> {
+        return this.call('clearLibraryIndex');
     }
 
     clearIgnoreList(): Promise<Result> {

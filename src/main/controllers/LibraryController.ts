@@ -7,7 +7,8 @@ import {
     FAVORITES_PLAYLIST_ID,
     LibraryCacheManager,
     CachedTrack,
-    GetTracksOptions
+    GetTracksOptions,
+    LibraryIndexClearSummary
 } from '../services/library/LibraryCacheManager';
 import {MetadataHandler} from '../services/library/MetadataHandler';
 import {EmbeddedCoverService, type EmbeddedCoverResult} from '../services/library/EmbeddedCoverService';
@@ -640,15 +641,15 @@ export class LibraryController extends BaseController {
         }
     }
 
-    @IpcHandle('library:clearCache')
-    async clearCache(): Promise<boolean> {
+    @IpcHandle('library:clearLibraryIndex')
+    async clearLibraryIndex(): Promise<({success: true} & LibraryIndexClearSummary) | {success: false; error: string}> {
         try {
-            await this.libraryCacheManager.clearCache();
-            console.log('✅ 音乐库缓存已清空');
-            return true;
+            const summary = await this.libraryCacheManager.clearLibraryIndex();
+            console.log(`✅ 音乐库索引已清除，共移除 ${summary.clearedTrackCount} 首歌曲`);
+            return {success: true, ...summary};
         } catch (error: any) {
-            console.error('❌ 清空缓存失败:', error);
-            return false;
+            console.error('❌ 清除音乐库索引失败:', error);
+            return {success: false, error: error.message};
         }
     }
 

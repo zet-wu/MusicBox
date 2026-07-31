@@ -1,5 +1,6 @@
 import type {Result} from '@api/types/common';
 import type {CacheValidationResult, MusicBoxAPIEvents, ScanProgress} from '@api/types/events';
+import type {LibraryIndexClearResult} from '@api/types/electron';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 import {appEventService} from '@/features/events/service/AppEventService';
 import {libraryGateway} from '@/infrastructure/electron';
@@ -86,8 +87,8 @@ export class LibraryService {
         return await this.bridge.validateCache();
     }
 
-    async clearCache(): Promise<boolean> {
-        return await this.bridge.clearCache();
+    async clearLibraryIndex(): Promise<LibraryIndexClearResult> {
+        return await this.bridge.clearLibraryIndex();
     }
 
     emitLibraryUpdated(tracks: Track[] = []): void {

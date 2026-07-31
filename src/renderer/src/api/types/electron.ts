@@ -79,6 +79,15 @@ export interface PlaylistDetailResult {
     error?: string;
 }
 
+export interface LibraryIndexClearResult {
+    success: boolean;
+    clearedTrackCount?: number;
+    preservedPlaylistCount?: number;
+    preservedPlaylistReferenceCount?: number;
+    preservedIgnoredFileCount?: number;
+    error?: string;
+}
+
 export interface FavoritesChangedData {
     trackIds: string[];
     favorite?: boolean;
@@ -113,7 +122,7 @@ export interface ElectronLibraryAPI {
     loadCachedTracks(): Promise<Track[]>;
     validateCache(): Promise<CacheValidationResult>;
     getCacheStatistics(): Promise<CacheStatistics | null>;
-    clearCache(): Promise<boolean>;
+    clearLibraryIndex(): Promise<LibraryIndexClearResult>;
     removeTrack(trackFileId: string): Promise<Result>;
     getTracksByDrive(driveId: string): Promise<Track[]>;
     removeTracksByDrive(driveId: string): Promise<Result>;

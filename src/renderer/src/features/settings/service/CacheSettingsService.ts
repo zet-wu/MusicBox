@@ -48,12 +48,16 @@ class CacheSettingsService {
         };
     }
 
-    async clearCache(): Promise<CacheActionDisplay> {
-        const success = await cacheMaintenanceService.clear();
+    async clearLibraryIndex(): Promise<CacheActionDisplay> {
+        const result = await cacheMaintenanceService.clearLibraryIndex();
         return {
-            success,
-            message: success ? '缓存已清空' : '清空缓存失败',
-            description: success ? '缓存已清空' : undefined
+            success: result.success,
+            message: result.success
+                ? `音乐库索引已清除，共移除 ${result.clearedTrackCount || 0} 首歌曲`
+                : result.error || '清除音乐库索引失败',
+            description: result.success
+                ? '歌单、收藏、忽略列表和音乐文件夹设置已保留；请重新扫描音乐文件夹以恢复歌曲。'
+                : undefined
         };
     }
 }

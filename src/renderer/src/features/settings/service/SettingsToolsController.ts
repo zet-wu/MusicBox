@@ -137,7 +137,7 @@ class SettingsToolsController {
         });
 
         scope.listen(elements.clearCacheButton, 'click', async () => {
-            await this.clearCache(elements);
+            await this.clearLibraryIndex(elements);
         });
     }
 
@@ -174,12 +174,12 @@ class SettingsToolsController {
         }
     }
 
-    private async clearCache(elements: SettingsToolsElements): Promise<void> {
+    private async clearLibraryIndex(elements: SettingsToolsElements): Promise<void> {
         const confirmed = await appConfirmationService.confirm({
-            title: '清空缓存',
-            message: '确定要清空所有缓存吗？这将删除所有已缓存的音乐文件信息，下次启动时需要重新扫描。',
+            title: '清除音乐库索引',
+            message: '确定要清除音乐库索引吗？歌曲信息会暂时从音乐库消失；歌单、收藏、忽略列表、音乐文件夹设置和原始音乐文件都会保留。清除后需要重新扫描音乐文件夹。',
             type: 'warning',
-            confirmText: '清空'
+            confirmText: '清除索引'
         });
 
         if (!confirmed) {
@@ -188,15 +188,15 @@ class SettingsToolsController {
 
         try {
             cacheSettingsRenderer.setClearLoading(this.toCacheSettingsElements(elements), true);
-            const result = await cacheSettingsService.clearCache();
+            const result = await cacheSettingsService.clearLibraryIndex();
             showToast(result.message, result.success ? 'success' : 'error');
 
             if (result.success) {
                 cacheSettingsRenderer.updateDescription(this.toCacheSettingsElements(elements), result.description || '');
             }
         } catch (error) {
-            console.error('清空缓存失败:', error);
-            showToast('清空缓存失败', 'error');
+            console.error('清除音乐库索引失败:', error);
+            showToast('清除音乐库索引失败', 'error');
         } finally {
             cacheSettingsRenderer.setClearLoading(this.toCacheSettingsElements(elements), false);
         }
