@@ -1,5 +1,5 @@
-import {appConfirmationService} from "@/features/appShell/service";
-import {getTrackPath} from "@/features/playback/domain";
+import {appConfirmationService} from "@/features/appShell/service/AppConfirmationService";
+import {getTrackPath} from "@/features/playback/domain/TrackIdentity";
 import {cacheManager} from "@/shared/cache";
 import type {PlaybackStartedEvent} from "@api/types/events";
 import type {Track} from "@api/types/library";
