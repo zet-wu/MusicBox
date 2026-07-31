@@ -71,9 +71,7 @@ export interface DOMEventBindingHost extends AppDOMEventPort {
     setupFileLoading(): void;
 }
 
-export interface ViewRouterHost extends AppViewStatePort, AppLibraryStatePort {
-    updateTrackList(source?: string): void;
-}
+export interface ViewRouterHost extends AppViewStatePort, AppLibraryStatePort {}
 
 export interface PluginBootstrapHost extends AppInitializationPort, AppEventEmitterPort, AppViewStatePort {
     navigateToView(viewId: string): void;

@@ -16,7 +16,6 @@ import {Navigation} from "@ui/widgets/Navigation";
 import {Player} from '@ui/widgets/Player';
 import {Playlist} from "@ui/widgets/Playlist";
 import {Search} from "@ui/widgets/Search";
-import {TrackList} from "@ui/widgets/TrackList";
 import {NetworkDiskModal} from "@ui/modals/NetworkDiskModal";
 import {PluginManagerModal} from "@ui/modals/PluginManagerModal";
 import {UpdateModal} from "@ui/modals/UpdateModal";
@@ -57,7 +56,6 @@ export class ComponentRegistry {
         this.components.player = new Player();
         this.components.search = new Search();
         this.components.navigation = new Navigation();
-        this.components.trackList = new TrackList('#content-area');
         this.components.playlist = new Playlist(document.getElementById('playlist-panel'));
         this.components.contextMenu = new ContextMenu(document.getElementById('context-menu'));
         this.components.settings = new Settings(document.getElementById('settings-page'));

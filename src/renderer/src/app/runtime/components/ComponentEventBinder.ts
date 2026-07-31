@@ -73,8 +73,16 @@ export class ComponentEventBinder {
                 getCurrentTrackSnapshot: () => playbackUiStateService.getCurrentTrackSnapshot()
             },
             ui: {
-                showContextMenu: (x, y, track, index, selectedTracks, selectedTrackItems) => {
-                    this.ui.content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
+                showContextMenu: (x, y, track, index, selectedTracks, selectedTrackItems, sourceTracks) => {
+                    this.ui.content.showContextMenu(
+                        x,
+                        y,
+                        track,
+                        index,
+                        selectedTracks,
+                        selectedTrackItems,
+                        sourceTracks
+                    );
                 },
                 toggleQueue: () => {
                     this.ui.queue.toggleQueue();
@@ -93,8 +101,16 @@ export class ComponentEventBinder {
                 showPlaylistBindingDialog: (playlist) => (
                     this.ui.dialogs.showPlaylistBindingDialog(playlist)
                 ),
-                showContextMenu: (x, y, track, index, selectedTracks, selectedTrackItems) => {
-                    this.ui.content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
+                showContextMenu: (x, y, track, index, selectedTracks, selectedTrackItems, sourceTracks) => {
+                    this.ui.content.showContextMenu(
+                        x,
+                        y,
+                        track,
+                        index,
+                        selectedTracks,
+                        selectedTrackItems,
+                        sourceTracks
+                    );
                 }
             }
         });

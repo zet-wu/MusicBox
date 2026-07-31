@@ -8,6 +8,7 @@ import type {Playlist, Track} from "@api/types/library";
 export interface ContextMenuDisplayOptions {
     collectionActionsOnly?: boolean;
     playlist?: Playlist;
+    sourceTracks?: Track[];
 }
 
 class ContextMenu extends Component {
@@ -15,9 +16,9 @@ class ContextMenu extends Component {
     private isVisible: boolean;
     private currentTrack: Track | null;
     private currentIndex: number;
-    private selectedTracks: Set<number> | null;
     private selectedTrackItems: Track[];
     private currentPlaylist: Playlist | null;
+    private sourceTracks: Track[];
     private listenersSetup: boolean;
     private menu!: HTMLElement;
     private playItem!: HTMLElement;
@@ -41,9 +42,9 @@ class ContextMenu extends Component {
         this.isVisible = false;
         this.currentTrack = null;
         this.currentIndex = -1;
-        this.selectedTracks = null;
         this.selectedTrackItems = [];
         this.currentPlaylist = null;
+        this.sourceTracks = [];
         this.listenersSetup = false;
     }
 
@@ -64,9 +65,9 @@ class ContextMenu extends Component {
 
         this.currentTrack = track;
         this.currentIndex = index;
-        this.selectedTracks = selectedTracks;
         this.selectedTrackItems = [...selectedTrackItems];
         this.currentPlaylist = options.playlist || null;
+        this.sourceTracks = [...(options.sourceTracks || selectedTrackItems)];
         this.isVisible = true;
 
         // 多选模式：隐藏单曲操作，显示批量删除
@@ -120,9 +121,9 @@ class ContextMenu extends Component {
         this.menu.style.display = 'none';
         this.currentTrack = null;
         this.currentIndex = -1;
-        this.selectedTracks = null;
         this.selectedTrackItems = [];
         this.currentPlaylist = null;
+        this.sourceTracks = [];
     }
 
     destroy(): void {
@@ -152,7 +153,7 @@ class ContextMenu extends Component {
 
     setupEventListeners(): void {
         this.addEventListenerManaged(this.playItem, 'click', () => {
-            this.emit('play', {track: this.currentTrack, index: this.currentIndex});
+            this.emit('play', {track: this.currentTrack, index: this.currentIndex, tracks: this.sourceTracks});
             this.hide();
         });
 
@@ -202,7 +203,11 @@ class ContextMenu extends Component {
         });
 
         this.addEventListenerManaged(this.batchDeleteItem, 'click', () => {
-            this.emit('batchDelete', {selectedTracks: this.selectedTracks, track: this.currentTrack, index: this.currentIndex});
+            this.emit('batchDelete', {
+                selectedTracks: this.selectedTrackItems,
+                track: this.currentTrack,
+                index: this.currentIndex
+            });
             this.hide();
         });
 

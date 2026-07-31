@@ -261,7 +261,7 @@ class PlaylistDetailPage extends Component {
     }
 
     applySearchResults(results: Track[] | null): boolean {
-        if (!this.isVisible || this.getCollectionType() === 'playlist') {
+        if (!this.isVisible) {
             return false;
         }
 
@@ -272,19 +272,6 @@ class PlaylistDetailPage extends Component {
         this.clearSelection();
         this.render();
         return true;
-    }
-
-    async reloadSystemCollection(): Promise<boolean> {
-        if (!this.isVisible || this.getCollectionType() === 'playlist') {
-            return false;
-        }
-
-        await this.loadPlaylistTracks();
-        return true;
-    }
-
-    isSystemCollectionVisible(): boolean {
-        return this.isVisible && this.getCollectionType() !== 'playlist';
     }
 
     render(): void {
@@ -1405,7 +1392,16 @@ class PlaylistDetailPage extends Component {
             .sort((left, right) => left - right)
             .map((selectedIndex) => this.tracks[selectedIndex])
             .filter((item): item is PlaylistDetailTrack => Boolean(item));
-        this.emit('trackRightClick', track, index, x, y, new Set(this.selectedTracks), selectedTrackItems);
+        this.emit(
+            'trackRightClick',
+            track,
+            index,
+            x,
+            y,
+            new Set(this.selectedTracks),
+            selectedTrackItems,
+            this.tracks
+        );
     }
 
     private async refreshFavoritesInPlace(): Promise<void> {

@@ -28,13 +28,11 @@ import type ParametricEqualizerComponent from '@ui/widgets/ParametricEqualizerCo
 import type {Player} from '@ui/widgets/Player';
 import type {Playlist as QueuePlaylist} from '@ui/widgets/Playlist';
 import type {Search} from '@ui/widgets/Search';
-import type {TrackList} from '@ui/widgets/TrackList';
 
 export interface ComponentRegistryMap {
     player: Player;
     search: Search;
     navigation: Navigation & Record<string, any>;
-    trackList: TrackList;
     playlist: QueuePlaylist;
     contextMenu: ContextMenu;
     settings: Settings;

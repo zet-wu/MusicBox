@@ -2,9 +2,8 @@
  * 搜索组件
  */
 
-import {debounce, showToast} from "@utils/index.js";
+import {debounce} from "@utils/index.js";
 import {Component} from "@ui/base/Component";
-import {libraryDataService} from "@/features/library/service/LibraryDataService";
 
 type DebouncedSearch = ((query: string) => void) & {
     cancel?: () => void;
@@ -22,7 +21,7 @@ class Search extends Component {
 
     setupEventListeners(): void {
         this.debouncedSearch = debounce(async (query) => {
-            await this.performSearch(query);
+            this.emit('queryChanged', query);
         }, 200) as DebouncedSearch;
 
         if (!this.element || !this.debouncedSearch) {
@@ -47,18 +46,16 @@ class Search extends Component {
         });
     }
 
-    async performSearch(query: string): Promise<void> {
-        try {
-            const results = await libraryDataService.searchLibrary(query);
-            this.emit('searchResults', results);
-        } catch (error) {
-            console.error('Search failed:', error);
-            showToast('搜索失败', 'error');
-        }
+    clearSearch(): void {
+        this.debouncedSearch?.cancel?.();
+        this.emit('queryChanged', '');
     }
 
-    clearSearch(): void {
-        this.emit('searchCleared');
+    clearValue(): void {
+        if (this.element) {
+            this.element.value = '';
+        }
+        this.clearSearch();
     }
 
     focusInput(): void {

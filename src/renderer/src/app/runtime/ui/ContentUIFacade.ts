@@ -6,26 +6,8 @@ import type {CollectionType} from '@/features/playlists/domain/CollectionCapabil
 export class ContentUIFacade {
     constructor(private readonly app: AppComponentPort) {}
 
-    setTrackListTracks(tracks: Track[]): void {
-        this.app.components.trackList?.setTracks(tracks);
-    }
-
-    showTrackList(): void {
-        this.app.components.trackList?.show();
-    }
-
-    hideTrackList(): void {
-        this.app.components.trackList?.hide();
-    }
-
-    clearTrackListSelection(): void {
-        const trackList = this.app.components.trackList;
-        if (!trackList) {
-            return;
-        }
-
-        trackList.selectedTracks.clear();
-        trackList.lastSelectedIndex = -1;
+    clearPlaylistDetailSelection(): void {
+        this.app.components.playlistDetailPage?.clearSelection();
     }
 
     showContextMenu(
@@ -34,9 +16,18 @@ export class ContentUIFacade {
         track: Track,
         index: number,
         selectedTracks?: Set<number>,
-        selectedTrackItems?: Track[]
+        selectedTrackItems?: Track[],
+        sourceTracks?: Track[]
     ): void {
-        this.app.components.contextMenu?.show(x, y, track, index, selectedTracks, selectedTrackItems);
+        this.app.components.contextMenu?.show(
+            x,
+            y,
+            track,
+            index,
+            selectedTracks,
+            selectedTrackItems,
+            {sourceTracks}
+        );
     }
 
     showCollectionContextMenu(x: number, y: number, tracks: Track[], playlist?: Playlist): void {
@@ -48,7 +39,7 @@ export class ContentUIFacade {
             0,
             null,
             tracks,
-            {collectionActionsOnly: true, playlist}
+            {collectionActionsOnly: true, playlist, sourceTracks: tracks}
         );
     }
 
@@ -62,14 +53,6 @@ export class ContentUIFacade {
 
     applySystemCollectionSearchResults(results: Track[] | null): boolean {
         return this.app.components.playlistDetailPage?.applySearchResults(results) ?? false;
-    }
-
-    async reloadSystemCollection(): Promise<boolean> {
-        return await this.app.components.playlistDetailPage?.reloadSystemCollection() ?? false;
-    }
-
-    isSystemCollectionVisible(): boolean {
-        return this.app.components.playlistDetailPage?.isSystemCollectionVisible() ?? false;
     }
 
     async showNetworkDriveDetail(drive: unknown): Promise<void> {
@@ -162,7 +145,6 @@ export class ContentUIFacade {
         this.app.components.statisticsPage?.hide();
         this.app.components.playlistDetailPage?.hide();
         this.app.components.networkDriveDetailPage?.hide();
-        this.hideTrackList();
     }
 
     updateSidebarSelection(type: string, id: string | null = null): void {

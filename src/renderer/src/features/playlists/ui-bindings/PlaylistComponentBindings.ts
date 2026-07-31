@@ -23,7 +23,8 @@ interface PlaylistBindingUI {
         track: Track,
         index: number,
         selectedTracks?: Set<number>,
-        selectedTrackItems?: Track[]
+        selectedTrackItems?: Track[],
+        sourceTracks?: Track[]
     ): void;
 }
 
@@ -32,7 +33,7 @@ export interface PlaylistComponentBindingHost {
     handleTrackAddedToPlaylist(playlist?: Playlist, track?: Track): Promise<void>;
     handlePlaylistRenamed(playlist?: Playlist): Promise<void>;
     handleTrackInfoUpdated(data: unknown): Promise<void>;
-    handleTrackPlayed(track: Track, index: number): Promise<void>;
+    handleTrackPlayed(track: Track, index: number, tracks?: Track[]): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
     handleShuffleAllTracks(tracks: Track[]): Promise<void>;
     addTracksToQueue(tracks: Track[]): Promise<void>;
@@ -111,8 +112,8 @@ export function bindPlaylistComponentEvents({
             return;
         }
 
-        await app.handleTrackPlayed(track, index);
-        }
+        await app.handleTrackPlayed(track, index, tracks);
+    }
     );
 
     components.playlistDetailPage.on(
@@ -123,9 +124,10 @@ export function bindPlaylistComponentEvents({
             x: number,
             y: number,
             selectedTracks?: Set<number>,
-            selectedTrackItems?: Track[]
+            selectedTrackItems?: Track[],
+            sourceTracks?: Track[]
         ) => {
-            ui.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
+            ui.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems, sourceTracks);
         }
     );
 

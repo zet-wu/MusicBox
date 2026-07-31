@@ -54,7 +54,7 @@ export interface MusicBoxCompositionHost {
     confirm(options: ConfirmOptions): Promise<boolean>;
     destroyComponent(componentName: string): void;
     handleAddToCustomPlaylist(tracks: Track[], index: number): Promise<void>;
-    handleBatchDelete(selectedTracks: Set<number> | null | undefined, track: Track, index: number): Promise<void>;
+    handleBatchDelete(selectedTracks: Track[] | null | undefined, track: Track, index: number): Promise<void>;
     handleDeleteTrack(track: Track, index: number): Promise<void>;
     handleDriveRemoved(drive?: unknown): Promise<void>;
     handleEditTrackInfo(track: Track, index: number): Promise<void>;
@@ -73,12 +73,11 @@ export interface MusicBoxCompositionHost {
     handlePlaylistTrackSelected(track: Track, index: number): void;
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
     handlePlaylistBindingsChanged(): Promise<void>;
-    handleSearchCleared(): void;
-    handleSearchResults(results: Track[]): void;
+    handleSearchQuery(query: string): Promise<void>;
     handleTrackAddedToPlaylist(playlist?: Playlist, track?: Track): Promise<void>;
     handleTrackIndexChanged(index: number): void;
     handleTrackInfoUpdated(data: unknown): Promise<void>;
-    handleTrackPlayed(track: Track, index: number): Promise<void>;
+    handleTrackPlayed(track: Track, index: number, tracks?: Track[]): Promise<void>;
     handleViewChange(view: AppView): Promise<void>;
     hideCacheLoadingStatus(): void;
     hideAllPages(): void;
@@ -117,7 +116,6 @@ export interface MusicBoxCompositionHost {
     updateLibraryTrackDuration(filePath: string, duration: number): void;
     updateScanProgress(progress: ScanProgress): void;
     updateSidebarSelection(type: string, id?: string | null): void;
-    updateTrackList(source?: string): void;
     navigateToView(viewId: string): void;
 }
 
@@ -233,7 +231,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             showCacheLoadingStatus: () => app.showCacheLoadingStatus(),
             hideCacheLoadingStatus: () => app.hideCacheLoadingStatus(),
             showWelcomeScreen: () => app.showWelcomeScreen(),
-            updateTrackList: (source) => app.updateTrackList(source),
+            handleViewChange: (view) => app.handleViewChange(view),
             syncDesktopLyricsButtonState: () => app.syncDesktopLyricsButtonState()
         },
         lifecycle: {
@@ -252,8 +250,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             clearRuntimeData: () => app.clearRuntimeData()
         },
         navigationBindings: {
-            handleSearchResults: (results) => app.handleSearchResults(results),
-            handleSearchCleared: () => app.handleSearchCleared(),
+            handleSearchQuery: (query) => app.handleSearchQuery(query),
             handleViewChange: (view) => app.handleViewChange(view),
             handlePlaylistSelected: (playlist) => app.handlePlaylistSelected(playlist),
             handleNetworkDriveSelected: (drive) => app.handleNetworkDriveSelected(drive)
@@ -269,7 +266,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
         pageBindings: {
             handleDriveRemoved: (drive) => app.handleDriveRemoved(drive),
             handlePlaylistSelected: (playlist) => app.handlePlaylistSelected(playlist),
-            handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
+            handleTrackPlayed: (track, index, tracks) => app.handleTrackPlayed(track, index, tracks),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
             handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),
             playTrackFromPlaylist: (track, index, tracks, mode) => app.playTrackFromPlaylist(track, index, tracks, mode),
@@ -289,7 +286,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             showError: notificationPort.showError
         },
         playbackBindings: {
-            handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
+            handleTrackPlayed: (track, index, tracks) => app.handleTrackPlayed(track, index, tracks),
             handleTrackIndexChanged: (index) => app.handleTrackIndexChanged(index),
             handlePlaylistTrackSelected: (track, index) => app.handlePlaylistTrackSelected(track, index),
             handlePlaylistTrackPlayed: (track, index) => app.handlePlaylistTrackPlayed(track, index),
@@ -321,7 +318,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handleTrackAddedToPlaylist: (playlist, track) => app.handleTrackAddedToPlaylist(playlist, track),
             handlePlaylistRenamed: (playlist) => app.handlePlaylistRenamed(playlist),
             handleTrackInfoUpdated: (data) => app.handleTrackInfoUpdated(data),
-            handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
+            handleTrackPlayed: (track, index, tracks) => app.handleTrackPlayed(track, index, tracks),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
             handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),
             addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
@@ -374,8 +371,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             },
             set filteredLibrary(value: Track[]) {
                 app.filteredLibrary = value;
-            },
-            updateTrackList: (source) => app.updateTrackList(source)
+            }
         }
     };
 }

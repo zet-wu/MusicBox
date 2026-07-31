@@ -5,7 +5,6 @@ interface ComponentEventSource {
 }
 
 interface PlaybackBindingComponents {
-    trackList: ComponentEventSource;
     player: ComponentEventSource;
     playlist: ComponentEventSource;
     contextMenu: ComponentEventSource;
@@ -18,7 +17,8 @@ interface PlaybackBindingUI {
         track: Track,
         index: number,
         selectedTracks?: Set<number>,
-        selectedTrackItems?: Track[]
+        selectedTrackItems?: Track[],
+        sourceTracks?: Track[]
     ): void;
     toggleQueue(): void;
     toggleLyricsForTrack(track: Track | null): Promise<void>;
@@ -29,7 +29,7 @@ interface PlaybackBindingIntegrations {
 }
 
 export interface PlaybackComponentBindingHost {
-    handleTrackPlayed(track: Track, index: number): Promise<void>;
+    handleTrackPlayed(track: Track, index: number, tracks?: Track[]): Promise<void>;
     handleTrackIndexChanged(index: number): void;
     handlePlaylistTrackSelected(track: Track, index: number): void;
     handlePlaylistTrackPlayed(track: Track, index: number): Promise<void>;
@@ -40,7 +40,7 @@ export interface PlaybackComponentBindingHost {
     playTracksNext(tracks: Track[]): Promise<void>;
     handleAddToCustomPlaylist(tracks: Track[], index: number): Promise<void>;
     handleDeleteTrack(track: Track, index: number): Promise<void>;
-    handleBatchDelete(selectedTracks: Set<number> | null | undefined, track: Track, index: number): Promise<void>;
+    handleBatchDelete(selectedTracks: Track[] | null | undefined, track: Track, index: number): Promise<void>;
     handleEditTrackInfo(track: Track, index: number): Promise<void>;
     moveQueueEntry(queueId: string, targetIndex: number): boolean;
 }
@@ -58,7 +58,7 @@ interface TrackEventPayload {
 }
 
 interface ContextMenuPayload extends TrackEventPayload {
-    selectedTracks?: Set<number>;
+    selectedTracks?: Track[];
     tracks?: Track[];
     _index?: number;
 }
@@ -69,24 +69,6 @@ export function bindPlaybackComponentEvents({
     integrations,
     ui
 }: PlaybackComponentBindingContext): void {
-    components.trackList.on('trackPlayed', async (track: Track, index: number) => {
-        await app.handleTrackPlayed(track, index);
-    });
-
-    components.trackList.on(
-        'trackRightClick',
-        (
-            track: Track,
-            index: number,
-            x: number,
-            y: number,
-            selectedTracks?: Set<number>,
-            selectedTrackItems?: Track[]
-        ) => {
-            ui.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
-        }
-    );
-
     components.player.on('togglePlaylist', () => {
         ui.toggleQueue();
     });
@@ -119,8 +101,8 @@ export function bindPlaybackComponentEvents({
         app.moveQueueEntry(queueId, targetIndex);
     });
 
-    components.contextMenu.on('play', async ({track, index}: ContextMenuPayload) => {
-        await app.handleTrackPlayed(track, index);
+    components.contextMenu.on('play', async ({track, index, tracks}: ContextMenuPayload) => {
+        await app.handleTrackPlayed(track, index, tracks);
     });
 
     components.contextMenu.on('addToPlaylist', ({track, tracks}: ContextMenuPayload) => {

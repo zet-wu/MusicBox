@@ -192,10 +192,9 @@ export function createAppComposition({
             setPlaybackPlaylist: (tracks, startIndex) => playbackController.setPlaylist(tracks, startIndex)
         },
         ui: {
-            setTrackListTracks: (tracks) => ui.content.setTrackListTracks(tracks),
             removeTrackFromPlaylistDetail: (track, index) => ui.content.removeTrackFromPlaylistDetail(track, index),
             removeSelectedTracksFromPlaylistDetail: () => ui.content.removeSelectedTracksFromPlaylistDetail(),
-            clearTrackListSelection: () => ui.content.clearTrackListSelection(),
+            clearPlaylistDetailSelection: () => ui.content.clearPlaylistDetailSelection(),
             updatePlayerTrackInfo: (track) => ui.playback.updatePlayerTrackInfo(track),
             isPlaylistDetailVisible: () => ui.content.isPlaylistDetailVisible(),
             updatePlaylistDetailTrack: (filePath, updatedData) => (
@@ -204,8 +203,7 @@ export function createAppComposition({
             applySystemCollectionSearchResults: (results) => (
                 ui.content.applySystemCollectionSearchResults(results)
             ),
-            reloadSystemCollection: () => ui.content.reloadSystemCollection(),
-            isSystemCollectionVisible: () => ui.content.isSystemCollectionVisible()
+            reloadPlaylistDetailTracks: () => ui.content.reloadPlaylistDetailTracks()
         }
     });
 

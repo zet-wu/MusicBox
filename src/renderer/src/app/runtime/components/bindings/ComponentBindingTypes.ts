@@ -10,8 +10,7 @@ import type {AppNotificationPort} from "@/app/runtime/AppRuntimePorts";
 import type {ComponentMap} from "@/app/runtime/components/ComponentTypes";
 
 export interface NavigationComponentBindingHost {
-    handleSearchResults(results: Track[]): void;
-    handleSearchCleared(): void;
+    handleSearchQuery(query: string): Promise<void>;
     handleViewChange(view: AppView): Promise<void>;
     handlePlaylistSelected(playlist: Playlist): Promise<void>;
     handleNetworkDriveSelected(drive: unknown): Promise<void>;
@@ -20,7 +19,7 @@ export interface NavigationComponentBindingHost {
 export interface PageComponentBindingHost {
     handleDriveRemoved(drive?: unknown): Promise<void>;
     handlePlaylistSelected(playlist: Playlist): Promise<void>;
-    handleTrackPlayed(track: Track, index: number): Promise<void>;
+    handleTrackPlayed(track: Track, index: number, tracks?: Track[]): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
     handleShuffleAllTracks(tracks: Track[]): Promise<void>;
     playTrackFromPlaylist(

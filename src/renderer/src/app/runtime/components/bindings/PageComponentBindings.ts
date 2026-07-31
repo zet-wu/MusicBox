@@ -75,8 +75,8 @@ export class PageComponentBindings {
         switch (componentName) {
             case 'recentPage':
                 if (components.recentPage) {
-                    components.recentPage.on('trackPlayed', async (track: Track, index: number) => {
-                        await app.handleTrackPlayed(track, index);
+                    components.recentPage.on('trackPlayed', async (track: Track, index: number, tracks: Track[]) => {
+                        await app.handleTrackPlayed(track, index, tracks);
                     });
 
                     components.recentPage.on('playAll', async (tracks: Track[]) => {
@@ -120,9 +120,10 @@ export class PageComponentBindings {
                         x: number,
                         y: number,
                         selectedTracks: Set<number>,
-                        selectedTrackItems: Track[]
+                        selectedTrackItems: Track[],
+                        sourceTracks: Track[]
                     ) => {
-                        content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
+                        content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems, sourceTracks);
                     });
                     components.artistsPage.on('collectionRightClick', (tracks: Track[], x: number, y: number) => {
                         content.showCollectionContextMenu(x, y, tracks);
@@ -157,9 +158,10 @@ export class PageComponentBindings {
                         x: number,
                         y: number,
                         selectedTracks: Set<number>,
-                        selectedTrackItems: Track[]
+                        selectedTrackItems: Track[],
+                        sourceTracks: Track[]
                     ) => {
-                        content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
+                        content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems, sourceTracks);
                     });
                     components.albumsPage.on('collectionRightClick', (tracks: Track[], x: number, y: number) => {
                         content.showCollectionContextMenu(x, y, tracks);
@@ -203,7 +205,7 @@ export class PageComponentBindings {
                     });
 
                     components.networkDriveDetailPage.on('playTrack', async (track: Track, index: number) => {
-                        await app.handleTrackPlayed(track, index);
+                        await app.handleTrackPlayed(track, index, components.networkDriveDetailPage?.tracks || []);
                     });
 
                     components.networkDriveDetailPage.on('playTracks', async (tracks: Track[]) => {
@@ -212,8 +214,24 @@ export class PageComponentBindings {
 
                     components.networkDriveDetailPage.on(
                         'trackRightClick',
-                        (track: Track, index: number, x: number, y: number) => {
-                            content.showContextMenu(x, y, track, index);
+                        (
+                            track: Track,
+                            index: number,
+                            x: number,
+                            y: number,
+                            selectedTracks?: Set<number>,
+                            selectedTrackItems?: Track[],
+                            sourceTracks?: Track[]
+                        ) => {
+                            content.showContextMenu(
+                                x,
+                                y,
+                                track,
+                                index,
+                                selectedTracks,
+                                selectedTrackItems,
+                                sourceTracks
+                            );
                         }
                     );
                 }

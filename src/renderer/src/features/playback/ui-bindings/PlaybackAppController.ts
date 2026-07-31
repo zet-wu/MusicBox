@@ -65,12 +65,23 @@ export class PlaybackAppController {
         await this.playTrackFromPlaylist(shuffledTracks[0], 0, shuffledTracks);
     }
 
-    async handleTrackPlayed(track: Track, _index: number): Promise<void> {
+    async handleTrackPlayed(track: Track, requestedIndex: number, tracks?: Track[]): Promise<void> {
         const app = this.app;
 
         console.log('🎵 从音乐库播放歌曲:', track.title, '当前视图:', app.currentView);
 
-        const {playlist, index} = this.resolvePlaylistForTrack(track);
+        const sourceIndex = tracks?.findIndex((candidate) => isSameTrack(candidate, track)) ?? -1;
+        const hasMatchingSource = !!tracks?.length && sourceIndex >= 0;
+        const {playlist, index} = hasMatchingSource
+            ? {
+                playlist: tracks,
+                index: requestedIndex >= 0
+                    && requestedIndex < tracks.length
+                    && isSameTrack(tracks[requestedIndex], track)
+                    ? requestedIndex
+                    : sourceIndex
+            }
+            : this.resolvePlaylistForTrack(track);
         if (playlist.length === 0) {
             console.warn('⚠️ 无可播放列表，无法播放:', track.title);
             return;

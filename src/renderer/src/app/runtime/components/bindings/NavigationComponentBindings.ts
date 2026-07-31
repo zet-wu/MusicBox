@@ -1,5 +1,4 @@
 import type {Playlist} from "@api/types/playlist";
-import type {Track} from "@api/types/track";
 import type {AppView} from "@/shared/types/AppContracts";
 
 import type {NavigationComponentBindingContext} from "./ComponentBindingTypes";
@@ -9,12 +8,8 @@ export function bindNavigationComponentEvents({
     components,
     dialogs
 }: NavigationComponentBindingContext): void {
-    components.search.on('searchResults', (results: Track[]) => {
-        app.handleSearchResults(results);
-    });
-
-    components.search.on('searchCleared', () => {
-        app.handleSearchCleared();
+    components.search.on('queryChanged', async (query: string) => {
+        await app.handleSearchQuery(query);
     });
 
     components.navigation.on('viewChanged', async (view: AppView) => {

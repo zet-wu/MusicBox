@@ -274,16 +274,8 @@ export class MusicBoxApp extends EventEmitter {
         await this.libraryController.refreshLibrary(tracks);
     }
 
-    updateTrackList(source = 'unknown'): void {
-        this.libraryController.updateTrackList(source);
-    }
-
-    handleSearchResults(results: Track[]): void {
-        this.libraryController.handleSearchResults(results);
-    }
-
-    handleSearchCleared(): void {
-        this.libraryController.handleSearchCleared();
+    async handleSearchQuery(query: string): Promise<void> {
+        await this.libraryController.handleSearchQuery(query);
     }
 
     setupComponentEvents(componentName: string | null = null): void {
@@ -310,8 +302,8 @@ export class MusicBoxApp extends EventEmitter {
         this.viewRouter.hideAllPages();
     }
 
-    async handleTrackPlayed(track: Track, _index: number): Promise<void> {
-        await this.playbackController.handleTrackPlayed(track, _index);
+    async handleTrackPlayed(track: Track, index: number, tracks?: Track[]): Promise<void> {
+        await this.playbackController.handleTrackPlayed(track, index, tracks);
     }
 
     // 统一的快捷键管理器
@@ -553,7 +545,7 @@ export class MusicBoxApp extends EventEmitter {
         await this.playlistController.playTracksNext(tracks);
     }
 
-    async handleBatchDelete(selectedTracks: Set<number> | null | undefined, track: Track, index: number): Promise<void> {
+    async handleBatchDelete(selectedTracks: Track[] | null | undefined, track: Track, index: number): Promise<void> {
         await this.libraryController.handleBatchDelete(selectedTracks, track, index);
     }
 
