@@ -9,6 +9,8 @@ import {
     libraryPageDataService,
     type LibraryAlbumItem as AlbumItem
 } from "@/features/library/service/LibraryPageDataService";
+import {albumGroupingPreferenceService} from "@/features/settings/service";
+import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/library";
 
 type AlbumViewSize = 's' | 'm' | 'l';
@@ -41,6 +43,7 @@ class AlbumsPage extends Component {
     private _lastTracksHash: string | null;
     private _coversScheduled: boolean;
     private listenersSetup: boolean;
+    private albumGroupingUnsubscribe: Unsubscribe | null;
     isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -65,6 +68,16 @@ class AlbumsPage extends Component {
         this._lastTracksHash = null;      // 上次tracks的哈希值
         this._coversScheduled = false;    // 是否已经调度过封面获取
         this.listenersSetup = false; // 事件监听器是否已设置
+        this.albumGroupingUnsubscribe = albumGroupingPreferenceService.onChanged(() => {
+            this.selectedAlbum = null;
+            this._coversScheduled = false;
+            this._coverQueue.length = 0;
+            this._coverFailures.clear();
+            this.processAlbums();
+            if (this.isVisible) {
+                this.render();
+            }
+        });
         this.isVisible = false;
     }
 
@@ -78,7 +91,9 @@ class AlbumsPage extends Component {
 
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
-            const pageData = await libraryPageDataService.getAlbums(this.sortBy);
+            const pageData = await libraryPageDataService.getAlbums(this.sortBy, {
+                splitByArtist: albumGroupingPreferenceService.shouldSplitByArtist()
+            });
             this.tracks = pageData.tracks;
             this._lastTracksHash = this._generateTracksHash(this.tracks);
             this.albums = pageData.albums;
@@ -110,6 +125,8 @@ class AlbumsPage extends Component {
         this._lastSourceKey = null;
         this._lastTracksHash = null;
         this.listenersSetup = false;
+        this.albumGroupingUnsubscribe?.();
+        this.albumGroupingUnsubscribe = null;
         super.destroy();
     }
 
@@ -140,7 +157,9 @@ class AlbumsPage extends Component {
 
     // 归并专辑
     processAlbums(): void {
-        this.albums = libraryPageDataService.buildAlbums(this.tracks);
+        this.albums = libraryPageDataService.buildAlbums(this.tracks, {
+            splitByArtist: albumGroupingPreferenceService.shouldSplitByArtist()
+        });
         this.sortAlbums(this.sortBy);
         // 补全缺失封面
         this.scheduleCoversForMissing();
