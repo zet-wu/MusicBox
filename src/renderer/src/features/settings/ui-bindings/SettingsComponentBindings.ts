@@ -39,6 +39,7 @@ interface SettingsBindingIntegrations {
     setTrackCoverDisplayPreference(enabled: boolean): void;
     setTrackCoverNetworkPreference(enabled: boolean): void;
     setPlaylistInfoAlignment(alignment: PlaylistInfoAlignment): void;
+    setSplitAlbumsByArtist(splitByArtist: boolean): void;
 }
 
 export function bindSettingsComponentEvents({
@@ -128,6 +129,10 @@ export function bindSettingsComponentEvents({
 
     components.settings.on('playlistInfoAlignmentChanged', (alignment: PlaylistInfoAlignment) => {
         integrations.setPlaylistInfoAlignment(alignment);
+    });
+
+    components.settings.on('splitAlbumsByArtistChanged', (splitByArtist: boolean) => {
+        integrations.setSplitAlbumsByArtist(splitByArtist);
     });
 
     components.settings.on('gaplessPlaybackEnabled', (enabled: boolean) => {

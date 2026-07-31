@@ -1,4 +1,6 @@
 export * from './AppInfoSettingsService';
+export * from './AlbumGroupingPreferenceService';
+export * from './ArtistViewModePreferenceService';
 export * from './AudioEngineSettingsController';
 export * from './AudioEngineSettingsService';
 export * from './CacheMaintenanceService';

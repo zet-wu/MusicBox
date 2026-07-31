@@ -19,6 +19,7 @@ export interface GeneralSettingsElements {
     recentPlayToggle: HTMLInputElement | null;
     artistsPageToggle: HTMLInputElement | null;
     albumsPageToggle: HTMLInputElement | null;
+    splitAlbumsByArtistToggle: HTMLInputElement | null;
     showTrackCoversToggle: HTMLInputElement | null;
     autoFetchMissingTrackCoversToggle: HTMLInputElement | null;
     gaplessPlaybackToggle: HTMLInputElement | null;
@@ -86,6 +87,13 @@ class GeneralSettingsController {
         this.bindCheckedSetting(elements.recentPlayToggle, 'recentPlay', callbacks, scope, 'recentPlayEnabled');
         this.bindCheckedSetting(elements.artistsPageToggle, 'artistsPage', callbacks, scope, 'artistsPageEnabled');
         this.bindCheckedSetting(elements.albumsPageToggle, 'albumsPage', callbacks, scope, 'albumsPageEnabled');
+        this.bindCheckedSetting(
+            elements.splitAlbumsByArtistToggle,
+            'splitAlbumsByArtist',
+            callbacks,
+            scope,
+            'splitAlbumsByArtistChanged'
+        );
         this.bindCheckedSetting(elements.showTrackCoversToggle, 'showTrackCovers', callbacks, scope, 'showTrackCoversEnabled');
         this.bindCheckedSetting(
             elements.autoFetchMissingTrackCoversToggle,

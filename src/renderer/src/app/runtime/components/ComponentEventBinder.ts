@@ -4,6 +4,7 @@ import type {AppUIPorts} from "@/app/runtime/ui/AppUIPorts";
 import {updateNotificationService} from "@/features/appShell/service";
 import {playbackUiStateService} from "@/features/playback/service/PlaybackUiStateService";
 import {playbackService} from "@/features/playback/service/PlaybackService";
+import {albumGroupingPreferenceService} from "@/features/settings/service";
 import {playlistInfoAlignmentPreferenceService} from "@/features/settings/service";
 import {trackCoverDisplayPreferenceService} from "@/features/settings/service";
 import {trackCoverNetworkPreferenceService} from "@/features/settings/service";
@@ -118,6 +119,9 @@ export class ComponentEventBinder {
                 },
                 setPlaylistInfoAlignment: (alignment) => {
                     playlistInfoAlignmentPreferenceService.setAlignment(alignment);
+                },
+                setSplitAlbumsByArtist: (splitByArtist) => {
+                    albumGroupingPreferenceService.setSplitByArtist(splitByArtist);
                 }
             },
             ui: {

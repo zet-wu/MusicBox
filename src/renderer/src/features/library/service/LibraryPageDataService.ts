@@ -23,6 +23,10 @@ export interface LibraryAlbumItem {
     album?: string;
 }
 
+export interface AlbumGroupingOptions {
+    splitByArtist?: boolean;
+}
+
 export interface CoverLookupResult {
     success?: boolean;
     imageUrl?: string;
@@ -52,9 +56,12 @@ export class LibraryPageDataService {
         };
     }
 
-    async getAlbums(sortBy: 'name' | 'artist' | 'tracks' | 'year' = 'name'): Promise<{tracks: Track[]; albums: LibraryAlbumItem[]}> {
+    async getAlbums(
+        sortBy: 'name' | 'artist' | 'tracks' | 'year' = 'name',
+        options: AlbumGroupingOptions = {}
+    ): Promise<{tracks: Track[]; albums: LibraryAlbumItem[]}> {
         const tracks = await this.getTracks();
-        const albums = this.buildAlbums(tracks);
+        const albums = this.buildAlbums(tracks, options);
         this.sortAlbums(albums, sortBy);
         return {tracks, albums};
     }
@@ -109,12 +116,18 @@ export class LibraryPageDataService {
             .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
     }
 
-    buildAlbums(tracks: Track[]): LibraryAlbumItem[] {
+    buildAlbums(tracks: Track[], options: AlbumGroupingOptions = {}): LibraryAlbumItem[] {
         const map = new Map<string, LibraryAlbumItem>();
         tracks.forEach(track => {
-            const albumName = track.album || '未知专辑';
-            const albumArtist = track.albumArtist || track.albumartist || track.artist || '未知艺术家';
-            const key = `${albumName}:::${albumArtist}`;
+            const rawAlbumName = String(track.album || '').trim();
+            const albumName = rawAlbumName || '未知专辑';
+            const albumArtist = String(track.albumArtist || track.albumartist || track.artist || '未知艺术家').trim();
+            const normalizedAlbumName = this.normalizeGroupingValue(albumName);
+            const normalizedArtist = this.normalizeGroupingValue(albumArtist);
+            const shouldIncludeArtist = options.splitByArtist === true || !rawAlbumName;
+            const key = shouldIncludeArtist
+                ? `${normalizedAlbumName}:::${normalizedArtist}`
+                : normalizedAlbumName;
             if (!map.has(key)) {
                 map.set(key, {
                     key,
@@ -129,12 +142,25 @@ export class LibraryPageDataService {
 
             const album = map.get(key)!;
             album.tracks.push(track);
+            if (album.artist !== albumArtist) {
+                album.artist = '多位艺术家';
+            }
             album.totalDuration += track.duration || 0;
             if (!album.cover && track.cover) album.cover = track.cover;
             if (!album.year && track.year) album.year = track.year;
         });
 
-        return Array.from(map.values());
+        const albums = Array.from(map.values());
+        albums.forEach((album) => {
+            album.tracks.sort((a, b) => {
+                const diskA = Number(a.diskNumber ?? a.disc ?? 0);
+                const diskB = Number(b.diskNumber ?? b.disc ?? 0);
+                const trackA = Number(a.trackNumber ?? a.track ?? 0);
+                const trackB = Number(b.trackNumber ?? b.track ?? 0);
+                return diskA - diskB || trackA - trackB;
+            });
+        });
+        return albums;
     }
 
     sortAlbums(albums: LibraryAlbumItem[], sortBy: 'name' | 'artist' | 'tracks' | 'year'): void {
@@ -154,6 +180,10 @@ export class LibraryPageDataService {
             default:
                 break;
         }
+    }
+
+    private normalizeGroupingValue(value: string): string {
+        return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
     }
 }
 
