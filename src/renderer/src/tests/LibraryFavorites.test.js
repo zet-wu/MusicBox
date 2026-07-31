@@ -11,7 +11,7 @@ import {
     LibraryCacheManager
 } from '../../../main/services/library/LibraryCacheManager';
 
-function createTrack(fileId, favorite = false) {
+function createTrack(fileId, favorite = false, duration = 0) {
     return {
         fileId,
         filePath: `C:\\Music\\${fileId}.flac`,
@@ -21,6 +21,7 @@ function createTrack(fileId, favorite = false) {
         addedToCache: 1,
         hasCover: false,
         title: fileId,
+        duration,
         favorite
     };
 }
@@ -94,9 +95,22 @@ describe('LibraryCacheManager 系统收藏', () => {
             ...userPlaylist,
             trackIds: [],
             manualTrackIds: [],
-            resolvedTrackCount: 0
+            resolvedTrackCount: 0,
+            duration: 0
         }]);
         expect(manager.getCacheStatistics().totalPlaylists).toBe(1);
+    });
+
+    it('歌单摘要仅汇总当前存在歌曲的数量和时长', () => {
+        manager.cache.tracks = [createTrack('available', false, 125.5)];
+        const playlist = manager.createPlaylist('摘要测试');
+        manager.addTrackToPlaylist(playlist.id, 'available');
+        manager.getPlaylistById(playlist.id).trackIds.push('missing');
+
+        expect(manager.getAllPlaylists()[0]).toMatchObject({
+            resolvedTrackCount: 1,
+            duration: 125.5
+        });
     });
 
     it('将旧歌单成员迁移为手动成员', () => {
