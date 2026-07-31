@@ -57,6 +57,50 @@ describe('专辑分组', () => {
     });
 });
 
+describe('媒体库浏览排序', () => {
+    it('艺术家名称和歌曲数均支持双向排序', () => {
+        const artists = libraryPageDataService.buildArtists([
+            createTrack({artist: '乙'}),
+            createTrack({artist: '甲'}),
+            createTrack({artist: '乙', title: '第二首'})
+        ]);
+
+        libraryPageDataService.sortArtists(artists, 'tracks', 'desc');
+        expect(artists.map(artist => artist.name)).toEqual(['乙', '甲']);
+
+        libraryPageDataService.sortArtists(artists, 'name', 'asc');
+        expect(artists.map(artist => artist.name)).toEqual(['甲', '乙']);
+    });
+
+    it('专辑歌曲数支持双向排序并保持名称次序稳定', () => {
+        const albums = libraryPageDataService.buildAlbums([
+            createTrack({album: '乙'}),
+            createTrack({album: '甲'}),
+            createTrack({album: '乙', title: '第二首'})
+        ]);
+
+        libraryPageDataService.sortAlbums(albums, 'tracks', 'desc');
+        expect(albums.map(album => album.name)).toEqual(['乙', '甲']);
+
+        libraryPageDataService.sortAlbums(albums, 'tracks', 'asc');
+        expect(albums.map(album => album.name)).toEqual(['甲', '乙']);
+    });
+
+    it('未知年份始终位于已知年份之后', () => {
+        const albums = libraryPageDataService.buildAlbums([
+            createTrack({album: '未知', year: undefined}),
+            createTrack({album: '较早', year: 2001}),
+            createTrack({album: '较晚', year: 2020})
+        ]);
+
+        libraryPageDataService.sortAlbums(albums, 'year', 'asc');
+        expect(albums.map(album => album.name)).toEqual(['较早', '较晚', '未知']);
+
+        libraryPageDataService.sortAlbums(albums, 'year', 'desc');
+        expect(albums.map(album => album.name)).toEqual(['较晚', '较早', '未知']);
+    });
+});
+
 describe('媒体库页面设置', () => {
     it('默认合并专辑并使用艺术家方格视图', () => {
         const settings = settingsStore.getInitialValues({});

@@ -6,8 +6,10 @@ import {urlValidator} from "@utils/URLValidator";
 import {Component} from "@ui/base/Component";
 import {
     libraryPageDataService,
+    type ArtistSortKey,
     type CoverLookupResult as CoverResult,
-    type LibraryArtistInfo as ArtistInfo
+    type LibraryArtistInfo as ArtistInfo,
+    type SortDirection
 } from "@/features/library/service/LibraryPageDataService";
 import {
     artistViewModePreferenceService,
@@ -36,6 +38,9 @@ class ArtistsPage extends Component {
     private filteredArtists: ArtistInfo[];
     private selectedArtist: ArtistInfo | null;
     private viewMode: ArtistViewMode;
+    private sortBy: ArtistSortKey;
+    private sortDirection: SortDirection;
+    private searchQuery: string;
     private listenersSetup: boolean;
     private _coverFailures: Set<string>;
     private _coverLoading: Set<string>;
@@ -53,6 +58,9 @@ class ArtistsPage extends Component {
         this.filteredArtists = [];
         this.selectedArtist = null;
         this.viewMode = artistViewModePreferenceService.getMode();
+        this.sortBy = 'name';
+        this.sortDirection = 'asc';
+        this.searchQuery = '';
         this.listenersSetup = false; // 事件监听器是否已设置
         this._coverFailures = new Set(); // 记录封面获取失败的艺术家
         this._coverLoading = new Set(); // 记录正在加载封面的艺术家
@@ -176,6 +184,7 @@ class ArtistsPage extends Component {
 
     processArtists(): void {
         this.artists = libraryPageDataService.buildArtists(this.tracks as any) as ArtistInfo[];
+        libraryPageDataService.sortArtists(this.artists, this.sortBy, this.sortDirection);
         this.filteredArtists = [...this.artists];
     }
 
@@ -201,8 +210,20 @@ class ArtistsPage extends Component {
                                 <svg class="search-icon" viewBox="0 0 24 24">
                                     <path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L20.71,20L19.29,21.42L13.73,15.44C12.59,16.41 11.11,17 9.5,17A6.5,6.5 0 0,1 3,10.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/>
                                 </svg>
-                                <input type="text" id="artist-search" placeholder="在星河中寻找艺术家..." class="modern-search-input">
+                                <input type="text" id="artist-search" value="${this.escapeHtml(this.searchQuery)}"
+                                       placeholder="在星河中寻找艺术家..." class="modern-search-input">
                             </div>
+                        </div>
+                        <div class="artist-sort-controls">
+                            <select id="artist-sort" aria-label="艺术家排序字段">
+                                <option value="name" ${this.sortBy === 'name' ? 'selected' : ''}>按艺术家名</option>
+                                <option value="tracks" ${this.sortBy === 'tracks' ? 'selected' : ''}>按歌曲数</option>
+                            </select>
+                            <button class="sort-direction-btn" id="artist-sort-direction" type="button"
+                                    title="切换为${this.sortDirection === 'asc' ? '降序' : '升序'}"
+                                    aria-label="当前${this.sortDirection === 'asc' ? '升序' : '降序'}，点击切换">
+                                ${this.sortDirection === 'asc' ? '↑' : '↓'}
+                            </button>
                         </div>
                         <div class="view-mode-toggle">
                             <button class="mode-btn ${this.viewMode === 'grid' ? 'active' : ''}" data-view="grid" title="方格视图">
@@ -252,6 +273,17 @@ class ArtistsPage extends Component {
                 this.filterArtists((e.target as HTMLInputElement).value);
             });
         }
+
+        const sortSelect = this.container.querySelector('#artist-sort') as HTMLSelectElement | null;
+        sortSelect?.addEventListener('change', () => {
+            this.sortBy = sortSelect.value as ArtistSortKey;
+            this.applyArtistSort();
+        });
+
+        this.container.querySelector('#artist-sort-direction')?.addEventListener('click', () => {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            this.applyArtistSort();
+        });
 
         // 视图模式切换
         this.container.querySelectorAll('.mode-btn').forEach((btn: HTMLElement) => {
@@ -625,6 +657,7 @@ class ArtistsPage extends Component {
 
     // 过滤艺术家
     filterArtists(searchTerm: string): void {
+        this.searchQuery = searchTerm;
         if (!searchTerm.trim()) {
             this.filteredArtists = [...this.artists];
         } else {
@@ -635,6 +668,12 @@ class ArtistsPage extends Component {
         }
 
         this.updateArtistsDisplay();
+    }
+
+    private applyArtistSort(): void {
+        libraryPageDataService.sortArtists(this.artists, this.sortBy, this.sortDirection);
+        libraryPageDataService.sortArtists(this.filteredArtists, this.sortBy, this.sortDirection);
+        this.renderArtistsList();
     }
 
     // 更新艺术家显示区域

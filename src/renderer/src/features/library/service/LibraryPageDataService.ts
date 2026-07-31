@@ -27,6 +27,10 @@ export interface AlbumGroupingOptions {
     splitByArtist?: boolean;
 }
 
+export type SortDirection = 'asc' | 'desc';
+export type ArtistSortKey = 'name' | 'tracks';
+export type AlbumSortKey = 'name' | 'artist' | 'tracks' | 'year';
+
 export interface CoverLookupResult {
     success?: boolean;
     imageUrl?: string;
@@ -57,12 +61,13 @@ export class LibraryPageDataService {
     }
 
     async getAlbums(
-        sortBy: 'name' | 'artist' | 'tracks' | 'year' = 'name',
+        sortBy: AlbumSortKey = 'name',
+        sortDirection: SortDirection = 'asc',
         options: AlbumGroupingOptions = {}
     ): Promise<{tracks: Track[]; albums: LibraryAlbumItem[]}> {
         const tracks = await this.getTracks();
         const albums = this.buildAlbums(tracks, options);
-        this.sortAlbums(albums, sortBy);
+        this.sortAlbums(albums, sortBy, sortDirection);
         return {tracks, albums};
     }
 
@@ -153,6 +158,22 @@ export class LibraryPageDataService {
             .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
     }
 
+    sortArtists(
+        artists: LibraryArtistInfo[],
+        sortBy: ArtistSortKey,
+        direction: SortDirection
+    ): void {
+        const multiplier = direction === 'asc' ? 1 : -1;
+        artists.sort((a, b) => {
+            const result = sortBy === 'tracks'
+                ? a.tracks.length - b.tracks.length
+                : a.name.localeCompare(b.name, 'zh-CN');
+            return result === 0
+                ? a.name.localeCompare(b.name, 'zh-CN')
+                : result * multiplier;
+        });
+    }
+
     buildAlbums(tracks: Track[], options: AlbumGroupingOptions = {}): LibraryAlbumItem[] {
         const map = new Map<string, LibraryAlbumItem>();
         tracks.forEach(track => {
@@ -200,23 +221,33 @@ export class LibraryPageDataService {
         return albums;
     }
 
-    sortAlbums(albums: LibraryAlbumItem[], sortBy: 'name' | 'artist' | 'tracks' | 'year'): void {
-        switch (sortBy) {
-            case 'name':
-                albums.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-                break;
-            case 'artist':
-                albums.sort((a, b) => a.artist.localeCompare(b.artist, 'zh-CN'));
-                break;
-            case 'tracks':
-                albums.sort((a, b) => b.tracks.length - a.tracks.length);
-                break;
-            case 'year':
-                albums.sort((a, b) => Number(b.year || 0) - Number(a.year || 0));
-                break;
-            default:
-                break;
-        }
+    sortAlbums(
+        albums: LibraryAlbumItem[],
+        sortBy: AlbumSortKey,
+        direction: SortDirection
+    ): void {
+        const multiplier = direction === 'asc' ? 1 : -1;
+        albums.sort((a, b) => {
+            if (sortBy === 'year') {
+                const yearA = Number(a.year || 0);
+                const yearB = Number(b.year || 0);
+                if (!yearA || !yearB) {
+                    if (!yearA && !yearB) return a.name.localeCompare(b.name, 'zh-CN');
+                    return yearA ? -1 : 1;
+                }
+                const result = yearA - yearB;
+                return result === 0 ? a.name.localeCompare(b.name, 'zh-CN') : result * multiplier;
+            }
+
+            const result = sortBy === 'artist'
+                ? a.artist.localeCompare(b.artist, 'zh-CN')
+                : sortBy === 'tracks'
+                    ? a.tracks.length - b.tracks.length
+                    : a.name.localeCompare(b.name, 'zh-CN');
+            return result === 0
+                ? a.name.localeCompare(b.name, 'zh-CN')
+                : result * multiplier;
+        });
     }
 
     private normalizeGroupingValue(value: string): string {

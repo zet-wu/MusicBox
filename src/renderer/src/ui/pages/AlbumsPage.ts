@@ -6,7 +6,9 @@ import {Component} from "@ui/base/Component";
 import {TrackCollectionDetail} from "@ui/components/TrackCollectionDetail";
 import {
     libraryPageDataService,
-    type LibraryAlbumItem as AlbumItem
+    type AlbumSortKey,
+    type LibraryAlbumItem as AlbumItem,
+    type SortDirection
 } from "@/features/library/service/LibraryPageDataService";
 import {
     albumGroupingPreferenceService,
@@ -16,7 +18,6 @@ import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/library";
 
 type AlbumViewSize = 's' | 'm' | 'l';
-type AlbumSortKey = 'name' | 'artist' | 'tracks' | 'year';
 
 interface SourceRect {
     left: number;
@@ -33,6 +34,7 @@ class AlbumsPage extends Component {
     private selectedAlbum: AlbumItem | null;
     private viewSize: AlbumViewSize;
     private sortBy: AlbumSortKey;
+    private sortDirection: SortDirection;
     private container: any;
     private _lastSourceRect: SourceRect | null;
     private _lastSourceKey: string | null;
@@ -58,6 +60,7 @@ class AlbumsPage extends Component {
         this.selectedAlbum = null; // { key, name, artist, year, cover, tracks:[], totalDuration }
         this.viewSize = 'm'; // s | m | l
         this.sortBy = 'name';
+        this.sortDirection = 'asc';
         this.container = this.element;
         // 共享元素转场：记忆源位置信息与滚动
         this._lastSourceRect = null;   // {left, top, width, height, radius, scrollTop}
@@ -132,7 +135,7 @@ class AlbumsPage extends Component {
 
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
-            const pageData = await libraryPageDataService.getAlbums(this.sortBy, {
+            const pageData = await libraryPageDataService.getAlbums(this.sortBy, this.sortDirection, {
                 splitByArtist: albumGroupingPreferenceService.shouldSplitByArtist()
             });
             this.tracks = pageData.tracks;
@@ -209,7 +212,7 @@ class AlbumsPage extends Component {
         this.albums = libraryPageDataService.buildAlbums(this.tracks, {
             splitByArtist: albumGroupingPreferenceService.shouldSplitByArtist()
         });
-        this.sortAlbums(this.sortBy);
+        this.sortAlbums(this.sortBy, this.sortDirection);
         // 补全缺失封面
         this.scheduleCoversForMissing();
     }
@@ -333,9 +336,10 @@ class AlbumsPage extends Component {
         });
     }
 
-    sortAlbums(sortBy: AlbumSortKey): void {
+    sortAlbums(sortBy: AlbumSortKey, direction: SortDirection): void {
         this.sortBy = sortBy;
-        libraryPageDataService.sortAlbums(this.albums, sortBy);
+        this.sortDirection = direction;
+        libraryPageDataService.sortAlbums(this.albums, sortBy, direction);
     }
 
     render(): void {
@@ -377,6 +381,11 @@ class AlbumsPage extends Component {
                                 <option value="year" ${this.sortBy === 'year' ? 'selected' : ''}>按年份</option>
                             </select>
                         </div>
+                        <button class="sort-direction-btn" id="album-sort-direction" type="button"
+                                title="切换为${this.sortDirection === 'asc' ? '降序' : '升序'}"
+                                aria-label="当前${this.sortDirection === 'asc' ? '升序' : '降序'}，点击切换">
+                            ${this.sortDirection === 'asc' ? '↑' : '↓'}
+                        </button>
                         <div class="search-inline">
                             <input type="text" id="album-query" placeholder="搜索专辑或艺术家…" />
                         </div>
@@ -456,10 +465,14 @@ class AlbumsPage extends Component {
         const sortSelect = this.container.querySelector('#album-sort');
         if (sortSelect) {
             sortSelect.addEventListener('change', () => {
-                this.sortAlbums(sortSelect.value as AlbumSortKey);
+                this.sortAlbums(sortSelect.value as AlbumSortKey, this.sortDirection);
                 this.render();
             });
         }
+        this.container.querySelector('#album-sort-direction')?.addEventListener('click', () => {
+            this.sortAlbums(this.sortBy, this.sortDirection === 'asc' ? 'desc' : 'asc');
+            this.render();
+        });
         // 搜索
         const q = this.container.querySelector('#album-query');
         if (q) {
