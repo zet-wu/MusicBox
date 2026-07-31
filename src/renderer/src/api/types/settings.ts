@@ -2,6 +2,7 @@ export type WasapiShareMode = 'exclusive' | 'shared';
 export type PlaylistDoubleClickMode = 'shuffle' | 'sequence';
 export type PlaylistInfoAlignment = 'left' | 'center' | 'right';
 export type ArtistViewMode = 'grid' | 'list';
+export type AlbumViewMode = 'grid' | 'list';
 
 export interface DesktopLyricsSettings {
     fontSize?: number;
@@ -23,6 +24,7 @@ export interface MusicBoxSettings {
     artistsPage?: boolean;
     albumsPage?: boolean;
     artistViewMode?: ArtistViewMode;
+    albumViewMode?: AlbumViewMode;
     splitAlbumsByArtist?: boolean;
     showTrackCovers?: boolean;
     autoFetchMissingTrackCovers?: boolean;

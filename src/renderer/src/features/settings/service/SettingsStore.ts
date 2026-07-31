@@ -1,6 +1,6 @@
 import {cacheManager} from "@/shared/cache";
 import type {MusicBoxSettings} from "@api/types/settings";
-import type {ArtistViewMode, PlaylistDoubleClickMode, PlaylistInfoAlignment} from "@api/types/settings";
+import type {AlbumViewMode, ArtistViewMode, PlaylistDoubleClickMode, PlaylistInfoAlignment} from "@api/types/settings";
 
 export type SettingValue = string | number | boolean | object | null | undefined;
 
@@ -16,6 +16,7 @@ export interface SettingsInitialValues {
     artistsPage: boolean;
     albumsPage: boolean;
     artistViewMode: ArtistViewMode;
+    albumViewMode: AlbumViewMode;
     splitAlbumsByArtist: boolean;
     showTrackCovers: boolean;
     autoFetchMissingTrackCovers: boolean;
@@ -74,6 +75,7 @@ class SettingsStore {
             artistsPage: this.getBoolean(settings, 'artistsPage', true),
             albumsPage: this.getBoolean(settings, 'albumsPage', true),
             artistViewMode: settings.artistViewMode === 'list' ? 'list' : 'grid',
+            albumViewMode: settings.albumViewMode === 'list' ? 'list' : 'grid',
             splitAlbumsByArtist: this.getBoolean(settings, 'splitAlbumsByArtist', false),
             showTrackCovers: this.getBoolean(settings, 'showTrackCovers', true),
             autoFetchMissingTrackCovers: this.getBoolean(settings, 'autoFetchMissingTrackCovers', false),

@@ -102,21 +102,24 @@ describe('媒体库浏览排序', () => {
 });
 
 describe('媒体库页面设置', () => {
-    it('默认合并专辑并使用艺术家方格视图', () => {
+    it('默认合并专辑并使用媒体库方格视图', () => {
         const settings = settingsStore.getInitialValues({});
 
         expect(settings.splitAlbumsByArtist).toBe(false);
         expect(settings.artistViewMode).toBe('grid');
+        expect(settings.albumViewMode).toBe('grid');
     });
 
-    it('保留专辑拆分和艺术家列表设置', () => {
+    it('保留专辑拆分和独立列表设置', () => {
         const settings = settingsStore.getInitialValues({
             splitAlbumsByArtist: true,
-            artistViewMode: 'list'
+            artistViewMode: 'list',
+            albumViewMode: 'list'
         });
 
         expect(settings.splitAlbumsByArtist).toBe(true);
         expect(settings.artistViewMode).toBe('list');
+        expect(settings.albumViewMode).toBe('list');
     });
 });
 

@@ -1,5 +1,6 @@
 export * from './AppInfoSettingsService';
 export * from './AlbumGroupingPreferenceService';
+export * from './AlbumViewModePreferenceService';
 export * from './ArtistViewModePreferenceService';
 export * from './AudioEngineSettingsController';
 export * from './AudioEngineSettingsService';

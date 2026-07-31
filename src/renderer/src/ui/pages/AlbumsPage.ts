@@ -12,10 +12,12 @@ import {
 } from "@/features/library/service/LibraryPageDataService";
 import {
     albumGroupingPreferenceService,
+    albumViewModePreferenceService,
     trackCoverNetworkPreferenceService
 } from "@/features/settings/service";
 import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/library";
+import type {AlbumViewMode} from "@api/types/settings";
 
 type AlbumViewSize = 's' | 'm' | 'l';
 
@@ -33,8 +35,10 @@ class AlbumsPage extends Component {
     private albums: AlbumItem[];
     private selectedAlbum: AlbumItem | null;
     private viewSize: AlbumViewSize;
+    private viewMode: AlbumViewMode;
     private sortBy: AlbumSortKey;
     private sortDirection: SortDirection;
+    private searchQuery: string;
     private container: any;
     private _lastSourceRect: SourceRect | null;
     private _lastSourceKey: string | null;
@@ -59,8 +63,10 @@ class AlbumsPage extends Component {
         this.albums = [];
         this.selectedAlbum = null; // { key, name, artist, year, cover, tracks:[], totalDuration }
         this.viewSize = 'm'; // s | m | l
+        this.viewMode = albumViewModePreferenceService.getMode();
         this.sortBy = 'name';
         this.sortDirection = 'asc';
+        this.searchQuery = '';
         this.container = this.element;
         // 共享元素转场：记忆源位置信息与滚动
         this._lastSourceRect = null;   // {left, top, width, height, radius, scrollTop}
@@ -367,9 +373,9 @@ class AlbumsPage extends Component {
                             <em class="muted">${total} 张</em>
                         </div>
                         <div class="segmented" role="tablist" aria-label="封面尺寸">
-                            <button class="seg-btn ${this.viewSize === 's' ? 'active' : ''}" data-size="s">小</button>
-                            <button class="seg-btn ${this.viewSize === 'm' ? 'active' : ''}" data-size="m">中</button>
-                            <button class="seg-btn ${this.viewSize === 'l' ? 'active' : ''}" data-size="l">大</button>
+                            <button class="seg-btn ${this.viewSize === 's' ? 'active' : ''}" data-size="s" ${this.viewMode === 'list' ? 'disabled' : ''}>小</button>
+                            <button class="seg-btn ${this.viewSize === 'm' ? 'active' : ''}" data-size="m" ${this.viewMode === 'list' ? 'disabled' : ''}>中</button>
+                            <button class="seg-btn ${this.viewSize === 'l' ? 'active' : ''}" data-size="l" ${this.viewMode === 'list' ? 'disabled' : ''}>大</button>
                         </div>
                     </div>
                     <div class="right cluster">
@@ -387,12 +393,16 @@ class AlbumsPage extends Component {
                             ${this.sortDirection === 'asc' ? '↑' : '↓'}
                         </button>
                         <div class="search-inline">
-                            <input type="text" id="album-query" placeholder="搜索专辑或艺术家…" />
+                            <input type="text" id="album-query" value="${this.escapeHtml(this.searchQuery)}" placeholder="搜索专辑或艺术家…" />
+                        </div>
+                        <div class="segmented" role="tablist" aria-label="视图模式">
+                            <button class="seg-btn ${this.viewMode === 'grid' ? 'active' : ''}" data-view="grid">方格</button>
+                            <button class="seg-btn ${this.viewMode === 'list' ? 'active' : ''}" data-view="list">列表</button>
                         </div>
                     </div>
                 </div>
                 ${total ? `
-                <div class="albumsx-grid" style="--cover:${coverSize}px;">
+                <div class="${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}" style="--cover:${coverSize}px;">
                     ${this.albums.map(a => this.renderAlbumTile(a)).join('')}
                 </div>` : this.renderEmptyState()}
             </div>`;
@@ -416,16 +426,25 @@ class AlbumsPage extends Component {
         const trackCount = album.tracks.length;
         const cover = album.cover || 'assets/images/default-cover.svg';
         const title = this.escapeHtml(album.name);
-        const subtitle = `${this.escapeHtml(album.artist)} · ${album.year || '年份未知'} · ${trackCount} 首`;
+        const artist = this.escapeHtml(album.artist);
+        const subtitle = `${artist} · ${album.year || '年份未知'} · ${trackCount} 首`;
         return `
-            <div class="albumsx-tile" data-album-key="${this.escapeHtml(album.key)}" title="${title}\n${subtitle}">
+            <div class="albumsx-tile ${this.viewMode === 'list' ? 'albumsx-list-item' : ''}"
+                 data-album-key="${this.escapeHtml(album.key)}" title="${title}\n${subtitle}">
                 <div class="art shadow">
                     <img src="${cover}" alt="${title}" loading="lazy"/>
                 </div>
                 <div class="meta">
                     <div class="name clamp-1">${title}</div>
-                    <div class="sub clamp-1">${subtitle}</div>
+                    <div class="sub clamp-1">${this.viewMode === 'list' ? artist : subtitle}</div>
                 </div>
+                ${this.viewMode === 'list' ? `
+                    <div class="album-list-details">
+                        <span>${album.year || '年份未知'}</span>
+                        <span>${trackCount} 首</span>
+                        <span>${this.formatDuration(album.totalDuration)}</span>
+                    </div>
+                ` : ''}
             </div>`;
     }
 
@@ -461,6 +480,16 @@ class AlbumsPage extends Component {
                 }
             });
         });
+        this.container.querySelectorAll('[data-view]').forEach((btn: HTMLElement) => {
+            btn.addEventListener('click', () => {
+                const mode = btn.dataset.view;
+                if (isAlbumViewMode(mode) && mode !== this.viewMode) {
+                    this.viewMode = mode;
+                    albumViewModePreferenceService.setMode(mode);
+                    this.render();
+                }
+            });
+        });
         // 排序
         const sortSelect = this.container.querySelector('#album-sort');
         if (sortSelect) {
@@ -477,16 +506,11 @@ class AlbumsPage extends Component {
         const q = this.container.querySelector('#album-query');
         if (q) {
             q.addEventListener('input', () => {
-                const kw = q.value.trim().toLowerCase();
-                this.container.querySelectorAll('.albumsx-tile').forEach((tile: any) => {
-                    const key = tile.dataset.albumKey;
-                    const album = this.albums.find(a => a.key === key);
-                    if (!album) return;
-                    const hit = (album.name || '').toLowerCase().includes(kw) || (album.artist || '').toLowerCase().includes(kw);
-                    tile.style.display = hit ? '' : 'none';
-                });
+                this.searchQuery = q.value;
+                this.applyAlbumFilter();
             });
         }
+        this.applyAlbumFilter();
         // 专辑卡事件
         this.container.querySelectorAll('.albumsx-tile').forEach((tile: any) => {
             const key = tile.dataset.albumKey;
@@ -507,6 +531,19 @@ class AlbumsPage extends Component {
     showAlbumDetail(album: AlbumItem): void {
         this.selectedAlbum = album;
         this.render();
+    }
+
+    private applyAlbumFilter(): void {
+        const query = this.searchQuery.trim().toLocaleLowerCase();
+        this.container.querySelectorAll('.albumsx-tile').forEach((tile: HTMLElement) => {
+            const key = tile.dataset.albumKey;
+            const album = this.albums.find(item => item.key === key);
+            if (!album) return;
+            const matches = !query
+                || album.name.toLocaleLowerCase().includes(query)
+                || album.artist.toLocaleLowerCase().includes(query);
+            tile.style.display = matches ? '' : 'none';
+        });
     }
 
     formatDuration(seconds?: number): string {
@@ -809,3 +846,7 @@ class AlbumsPage extends Component {
 }
 
 export { AlbumsPage };
+
+function isAlbumViewMode(value: unknown): value is AlbumViewMode {
+    return value === 'grid' || value === 'list';
+}
