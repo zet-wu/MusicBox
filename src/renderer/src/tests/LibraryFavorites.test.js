@@ -114,4 +114,22 @@ describe('LibraryCacheManager 系统收藏', () => {
         expect(cache.playlists[0].manualTrackIds).toEqual(['legacy-favorite']);
         expect(manager.needsPlaylistMembershipMigration()).toBe(true);
     });
+
+    it('区分手动成员与物化成员，并在来源删除时清除引用', () => {
+        const playlist = manager.createPlaylist('绑定测试');
+        manager.addTrackToPlaylist(playlist.id, 'legacy-favorite');
+        manager.setPlaylistMaterializedTracks(playlist.id, ['second']);
+
+        expect(manager.getPlaylistById(playlist.id)).toMatchObject({
+            manualTrackIds: ['legacy-favorite'],
+            trackIds: ['legacy-favorite', 'second']
+        });
+
+        manager.removeTracksFromIndex(['legacy-favorite']);
+        expect(manager.getPlaylistById(playlist.id)).toMatchObject({
+            manualTrackIds: [],
+            trackIds: ['second']
+        });
+        expect(manager.getIgnoreList()).toEqual([]);
+    });
 });

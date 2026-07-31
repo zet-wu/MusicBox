@@ -107,6 +107,13 @@ export interface ElectronLibraryAPI {
     scanDirectory(path: string): Promise<boolean>;
     importLibraryDirectory(path: string): Promise<LibraryImportResult>;
     importLibraryFiles(paths: string[]): Promise<LibraryImportResult>;
+    getLibrarySources(): Promise<LibrarySource[]>;
+    removeLibrarySource(sourceId: string): Promise<Result & {removedTrackCount?: number}>;
+    getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]>;
+    bindDirectoryToPlaylist(playlistId: string, path: string): Promise<Result & {binding?: PlaylistSourceBinding}>;
+    unbindDirectoryFromPlaylist(bindingId: string, mode: 'keep' | 'remove'): Promise<Result>;
+    rescanPlaylistBinding(bindingId: string): Promise<Result>;
+    restorePlaylistBindingExclusions(bindingId: string): Promise<Result & {restoredCount?: number}>;
     scanNetworkDrive(driveId: string | number, relativePath: string): Promise<boolean>;
     scanSingleFile(networkPath: string): Promise<unknown>;
     scanDirectoryForFiles(path: string): Promise<{success: boolean; files: unknown[]; error?: string}>;
@@ -138,6 +145,8 @@ export interface ElectronLibraryAPI {
     getPlaylistCover(playlistId: string): Promise<{success: boolean; coverPath?: string; error?: string}>;
     removePlaylistCover(playlistId: string): Promise<Result>;
     onLibraryUpdated(callback: (event: unknown, data: Track[]) => void): Unsubscribe;
+    onPlaylistsUpdated(callback: (event: unknown, data: Playlist[]) => void): Unsubscribe;
+    onSourcesUpdated(callback: (event: unknown, data: LibrarySource[]) => void): Unsubscribe;
     onFavoritesChanged(callback: (event: unknown, data: FavoritesChangedData) => void): Unsubscribe;
     onScanProgress(callback: (event: unknown, progress: ScanProgress) => void): Unsubscribe;
     onCacheValidationProgress(callback: (progress: ScanProgress) => void): Unsubscribe;
@@ -149,6 +158,36 @@ export interface LibraryImportResult {
     tracks: Track[];
     failedPaths: string[];
     error?: string;
+}
+
+export interface LibrarySourceKnownFile {
+    path: string;
+    canonicalPath: string;
+    trackId?: string;
+}
+
+export interface LibrarySource {
+    id: string;
+    type: 'directory' | 'file';
+    path: string;
+    canonicalPath: string;
+    origin: 'settings' | 'scan' | 'file_import' | 'playlist_binding' | 'migration';
+    knownFiles: LibrarySourceKnownFile[];
+    createdAt: number;
+    lastScanAt?: number;
+}
+
+export interface PlaylistSourceBinding {
+    id: string;
+    playlistId: string;
+    sourceId: string;
+    managedFiles: LibrarySourceKnownFile[];
+    excludedPaths: string[];
+    createdAt: number;
+    lastSyncAt?: number;
+    source?: LibrarySource;
+    availableTrackCount?: number;
+    excludedTrackCount?: number;
 }
 
 export interface ElectronDesktopLyricsAPI {

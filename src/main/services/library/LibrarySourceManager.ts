@@ -60,6 +60,11 @@ export interface LibrarySourceLoadResult {
     fileSourceCount: number;
 }
 
+export interface RemovedLibrarySource {
+    source: LibrarySource;
+    removedBindings: PlaylistSourceBinding[];
+}
+
 const CURRENT_VERSION = 1;
 
 export class LibrarySourceManager {
@@ -173,6 +178,133 @@ export class LibrarySourceManager {
             managedFiles: binding.managedFiles.map(file => ({...file})),
             excludedPaths: [...binding.excludedPaths]
         }));
+    }
+
+    getSource(sourceId: string): LibrarySource | undefined {
+        const source = this.data.sources.find(item => item.id === sourceId);
+        return source ? this.cloneSource(source) : undefined;
+    }
+
+    getPlaylistBinding(bindingId: string): PlaylistSourceBinding | undefined {
+        const binding = this.data.playlistBindings.find(item => item.id === bindingId);
+        return binding ? this.cloneBinding(binding) : undefined;
+    }
+
+    async createPlaylistBinding(
+        playlistId: string,
+        sourceId: string
+    ): Promise<{binding: PlaylistSourceBinding; created: boolean}> {
+        this.assertLoaded();
+        const source = this.data.sources.find(item => item.id === sourceId);
+        if (!source || source.type !== 'directory') throw new Error('只能绑定音乐文件夹来源');
+
+        const id = crypto.createHash('sha256').update(`${playlistId}:${sourceId}`).digest('hex');
+        const existing = this.data.playlistBindings.find(binding => binding.id === id);
+        if (existing) return {binding: this.cloneBinding(existing), created: false};
+
+        const binding: PlaylistSourceBinding = {
+            id,
+            playlistId,
+            sourceId,
+            managedFiles: [],
+            excludedPaths: [],
+            createdAt: Date.now()
+        };
+        this.data.playlistBindings.push(binding);
+        await this.save();
+        return {binding: this.cloneBinding(binding), created: true};
+    }
+
+    async synchronizeSourceBindings(sourceId: string): Promise<PlaylistSourceBinding[]> {
+        this.assertLoaded();
+        const source = this.data.sources.find(item => item.id === sourceId);
+        if (!source) throw new Error('音乐库来源不存在');
+
+        const bindings = this.data.playlistBindings.filter(binding => binding.sourceId === sourceId);
+        const now = Date.now();
+        for (const binding of bindings) {
+            binding.managedFiles = source.knownFiles.map(file => ({...file}));
+            binding.lastSyncAt = now;
+        }
+        if (bindings.length > 0) await this.save();
+        return bindings.map(binding => this.cloneBinding(binding));
+    }
+
+    async excludePlaylistFiles(playlistId: string, filePaths: string[]): Promise<number> {
+        this.assertLoaded();
+        const canonicalPaths = new Set(filePaths.map(filePath => this.canonicalize(filePath)));
+        let changed = 0;
+
+        for (const binding of this.data.playlistBindings.filter(item => item.playlistId === playlistId)) {
+            const managedPaths = new Set(binding.managedFiles.map(file => file.canonicalPath));
+            const exclusions = new Set(binding.excludedPaths);
+            for (const canonicalPath of canonicalPaths) {
+                if (managedPaths.has(canonicalPath) && !exclusions.has(canonicalPath)) {
+                    exclusions.add(canonicalPath);
+                    changed++;
+                }
+            }
+            binding.excludedPaths = Array.from(exclusions);
+        }
+        if (changed > 0) await this.save();
+        return changed;
+    }
+
+    async restorePlaylistBindingExclusions(bindingId: string): Promise<number> {
+        this.assertLoaded();
+        const binding = this.data.playlistBindings.find(item => item.id === bindingId);
+        if (!binding) throw new Error('歌单文件夹绑定不存在');
+        const restoredCount = binding.excludedPaths.length;
+        binding.excludedPaths = [];
+        if (restoredCount > 0) await this.save();
+        return restoredCount;
+    }
+
+    async removePlaylistBinding(bindingId: string): Promise<PlaylistSourceBinding> {
+        this.assertLoaded();
+        const index = this.data.playlistBindings.findIndex(item => item.id === bindingId);
+        if (index === -1) throw new Error('歌单文件夹绑定不存在');
+        const [binding] = this.data.playlistBindings.splice(index, 1);
+        await this.save();
+        return this.cloneBinding(binding);
+    }
+
+    async removePlaylistBindings(playlistId: string): Promise<number> {
+        this.assertLoaded();
+        const before = this.data.playlistBindings.length;
+        this.data.playlistBindings = this.data.playlistBindings.filter(
+            binding => binding.playlistId !== playlistId
+        );
+        const removedCount = before - this.data.playlistBindings.length;
+        if (removedCount > 0) await this.save();
+        return removedCount;
+    }
+
+    async removeSource(sourceId: string): Promise<RemovedLibrarySource> {
+        this.assertLoaded();
+        const index = this.data.sources.findIndex(item => item.id === sourceId);
+        if (index === -1) throw new Error('音乐库来源不存在');
+        const [source] = this.data.sources.splice(index, 1);
+        const removedBindings = this.data.playlistBindings.filter(binding => binding.sourceId === sourceId);
+        this.data.playlistBindings = this.data.playlistBindings.filter(binding => binding.sourceId !== sourceId);
+        await this.save();
+        return {
+            source: this.cloneSource(source),
+            removedBindings: removedBindings.map(binding => this.cloneBinding(binding))
+        };
+    }
+
+    isFileCoveredByOtherSource(filePath: string, excludedSourceId: string): boolean {
+        this.assertLoaded();
+        const canonicalPath = this.canonicalize(filePath);
+        return this.data.sources.some(source => (
+            source.id !== excludedSourceId
+            && (
+                source.knownFiles.some(file => file.canonicalPath === canonicalPath)
+                || (source.type === 'file' && source.canonicalPath === canonicalPath)
+                || (source.type === 'directory' && this.containsPath(source.path, filePath))
+            )
+        ));
     }
 
     canonicalize(sourcePath: string): string {
@@ -341,6 +473,14 @@ export class LibrarySourceManager {
         return {
             ...source,
             knownFiles: source.knownFiles.map(file => ({...file}))
+        };
+    }
+
+    private cloneBinding(binding: PlaylistSourceBinding): PlaylistSourceBinding {
+        return {
+            ...binding,
+            managedFiles: binding.managedFiles.map(file => ({...file})),
+            excludedPaths: [...binding.excludedPaths]
         };
     }
 

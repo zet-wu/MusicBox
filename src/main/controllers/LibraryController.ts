@@ -14,7 +14,8 @@ import {MetadataHandler} from '../services/library/MetadataHandler';
 import {EmbeddedCoverService, type EmbeddedCoverResult} from '../services/library/EmbeddedCoverService';
 import {
     LibrarySourceManager,
-    type LibrarySourceKnownFile
+    type LibrarySourceKnownFile,
+    type PlaylistSourceBinding
 } from '../services/library/LibrarySourceManager';
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
 import {NetworkDriveManager} from '../services/network/NetworkDriveManager';
@@ -56,6 +57,7 @@ export class LibraryController extends BaseController {
         private parseMetadata: (filePath: string, adapter?: any, opts?: any) => Promise<TrackMetadata>,
         private loadMusicFolders: () => Promise<string[]>,
         private librarySourceManager: LibrarySourceManager,
+        private removeMusicFolder: (folderPath: string) => Promise<any>,
         audioEngineState: any
     ) {
         super();
@@ -208,6 +210,8 @@ export class LibraryController extends BaseController {
     @IpcHandle('library:deletePlaylist')
     async deletePlaylist(playlistId: string): Promise<{ success: boolean; error?: string }> {
         try {
+            await this.ensureLibrarySourcesLoaded();
+            await this.librarySourceManager.removePlaylistBindings(playlistId);
             this.libraryCacheManager.deletePlaylist(playlistId);
             await this.libraryCacheManager.saveCache();
             return {success: true};
@@ -266,6 +270,12 @@ export class LibraryController extends BaseController {
         error?: string
     }> {
         try {
+            await this.ensureLibrarySourcesLoaded();
+            const filePaths = trackIds.flatMap(id => {
+                const track = this.libraryCacheManager.getTrackByFileId(id);
+                return track ? [track.filePath] : [];
+            });
+            await this.librarySourceManager.excludePlaylistFiles(playlistId, filePaths);
             const results = trackIds.map(id => {
                 try {
                     this.libraryCacheManager.removeTrackFromPlaylist(playlistId, id);
@@ -274,6 +284,7 @@ export class LibraryController extends BaseController {
                     return {id, success: false, error: e.message};
                 }
             });
+            this.recomputePlaylistMembership(playlistId);
             await this.libraryCacheManager.saveCache();
             if (playlistId === FAVORITES_PLAYLIST_ID) {
                 this.emitFavoritesChanged(
@@ -327,6 +338,7 @@ export class LibraryController extends BaseController {
             await this.ensureLibrarySourcesLoaded();
             const {source} = await this.librarySourceManager.ensureSource('directory', directoryPath, 'scan');
             const success = await this.scanDirectorySource(directoryPath, source.id);
+            this.emitSourcesUpdated();
             return {
                 success,
                 tracks: success ? this.getTracksForSource(source.id) : [],
@@ -430,6 +442,7 @@ export class LibraryController extends BaseController {
                 this.createKnownFiles(files.map(file => file.path)),
                 true
             );
+            await this.synchronizeBindingsForSource(sourceId);
 
             const allTracks = this.libraryCacheManager.getTracks();
             const win = this.windowManager.getMainWindow();
@@ -531,6 +544,7 @@ export class LibraryController extends BaseController {
             this.createKnownFiles(files.map(file => file.path)),
             true
         );
+        await this.synchronizeBindingsForSource(sourceId);
 
         const allTracks = this.libraryCacheManager.getTracks();
         console.log(`✅ 网络扫描完成，找到 ${tracks.length} 个音频文件`);
@@ -871,6 +885,200 @@ export class LibraryController extends BaseController {
         return this.libraryCacheManager.getTracks().filter(track => trackIds.has(track.fileId));
     }
 
+    private async synchronizeBindingsForSource(sourceId: string): Promise<void> {
+        const bindings = await this.librarySourceManager.synchronizeSourceBindings(sourceId);
+        const playlistIds = Array.from(new Set(bindings.map(binding => binding.playlistId)));
+        for (const playlistId of playlistIds) this.recomputePlaylistMembership(playlistId);
+        if (playlistIds.length > 0) {
+            await this.libraryCacheManager.saveCache();
+            this.emitPlaylistsUpdated();
+        }
+    }
+
+    private recomputePlaylistMembership(playlistId: string): void {
+        const bindings = this.librarySourceManager.getPlaylistBindings()
+            .filter(binding => binding.playlistId === playlistId);
+        const bindingTrackIds = bindings.flatMap(binding => {
+            const excludedPaths = new Set(binding.excludedPaths);
+            return binding.managedFiles.flatMap(file => (
+                file.trackId && !excludedPaths.has(file.canonicalPath) ? [file.trackId] : []
+            ));
+        });
+        this.libraryCacheManager.setPlaylistMaterializedTracks(playlistId, bindingTrackIds);
+    }
+
+    private getActiveBindingTrackIds(binding: PlaylistSourceBinding): string[] {
+        const excludedPaths = new Set(binding.excludedPaths);
+        return binding.managedFiles.flatMap(file => (
+            file.trackId && !excludedPaths.has(file.canonicalPath) ? [file.trackId] : []
+        ));
+    }
+
+    private emitPlaylistsUpdated(): void {
+        this.windowManager.sendToMainWindow(
+            'library:playlistsUpdated',
+            this.libraryCacheManager.getAllPlaylists()
+        );
+    }
+
+    private emitSourcesUpdated(): void {
+        this.windowManager.sendToMainWindow(
+            'library:sourcesUpdated',
+            this.librarySourceManager.getSources()
+        );
+    }
+
+    @IpcHandle('library:getLibrarySources')
+    async getLibrarySources(): Promise<any[]> {
+        await this.ensureLibrarySourcesLoaded();
+        return this.librarySourceManager.getSources();
+    }
+
+    @IpcHandle('library:getPlaylistBindings')
+    async getPlaylistBindings(playlistId: string): Promise<any[]> {
+        await this.ensureLibrarySourcesLoaded();
+        return this.librarySourceManager.getPlaylistBindings()
+            .filter(binding => binding.playlistId === playlistId)
+            .map(binding => {
+                const source = this.librarySourceManager.getSource(binding.sourceId);
+                const excludedPaths = new Set(binding.excludedPaths);
+                return {
+                    ...binding,
+                    source,
+                    availableTrackCount: binding.managedFiles.filter(file => (
+                        file.trackId && !excludedPaths.has(file.canonicalPath)
+                    )).length,
+                    excludedTrackCount: binding.excludedPaths.length
+                };
+            });
+    }
+
+    @IpcHandle('library:bindDirectoryToPlaylist')
+    async bindDirectoryToPlaylist(
+        playlistId: string,
+        directoryPath: string
+    ): Promise<{success: boolean; binding?: any; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const playlist = this.libraryCacheManager.getPlaylistById(playlistId);
+            if (!playlist) throw new Error('歌单不存在');
+            if (playlist.systemType === 'favorites') throw new Error('收藏歌单不支持绑定文件夹');
+
+            const {source} = await this.librarySourceManager.ensureSource(
+                'directory',
+                directoryPath,
+                'playlist_binding'
+            );
+            const {binding} = await this.librarySourceManager.createPlaylistBinding(playlistId, source.id);
+            const scanned = await this.scanDirectorySource(directoryPath, source.id);
+            this.emitSourcesUpdated();
+            return {
+                success: scanned,
+                binding: this.librarySourceManager.getPlaylistBinding(binding.id),
+                error: scanned ? undefined : '文件夹已绑定，但首次扫描失败'
+            };
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('library:rescanPlaylistBinding')
+    async rescanPlaylistBinding(bindingId: string): Promise<{success: boolean; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const binding = this.librarySourceManager.getPlaylistBinding(bindingId);
+            if (!binding) throw new Error('歌单文件夹绑定不存在');
+            const source = this.librarySourceManager.getSource(binding.sourceId);
+            if (!source) throw new Error('音乐库来源不存在');
+            const success = await this.scanDirectorySource(source.path, source.id);
+            return {success, error: success ? undefined : '重新扫描文件夹失败'};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('library:restorePlaylistBindingExclusions')
+    async restorePlaylistBindingExclusions(
+        bindingId: string
+    ): Promise<{success: boolean; restoredCount?: number; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const binding = this.librarySourceManager.getPlaylistBinding(bindingId);
+            if (!binding) throw new Error('歌单文件夹绑定不存在');
+            const restoredCount = await this.librarySourceManager.restorePlaylistBindingExclusions(bindingId);
+            this.recomputePlaylistMembership(binding.playlistId);
+            await this.libraryCacheManager.saveCache();
+            this.emitPlaylistsUpdated();
+            return {success: true, restoredCount};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('library:unbindDirectoryFromPlaylist')
+    async unbindDirectoryFromPlaylist(
+        bindingId: string,
+        mode: 'keep' | 'remove'
+    ): Promise<{success: boolean; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            if (mode !== 'keep' && mode !== 'remove') throw new Error('无效的解绑模式');
+            const binding = this.librarySourceManager.getPlaylistBinding(bindingId);
+            if (!binding) throw new Error('歌单文件夹绑定不存在');
+            if (mode === 'keep') {
+                this.libraryCacheManager.addManualTracksToPlaylist(
+                    binding.playlistId,
+                    this.getActiveBindingTrackIds(binding)
+                );
+            }
+            await this.librarySourceManager.removePlaylistBinding(bindingId);
+            this.recomputePlaylistMembership(binding.playlistId);
+            await this.libraryCacheManager.saveCache();
+            this.emitPlaylistsUpdated();
+            return {success: true};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('library:removeLibrarySource')
+    async removeLibrarySource(
+        sourceId: string
+    ): Promise<{success: boolean; removedTrackCount?: number; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const source = this.librarySourceManager.getSource(sourceId);
+            if (!source) throw new Error('音乐库来源不存在');
+
+            const uniqueTrackIds = source.knownFiles.flatMap(file => {
+                if (this.librarySourceManager.isFileCoveredByOtherSource(file.path, sourceId)) return [];
+                const trackId = this.libraryCacheManager.getTrackByPath(file.path)?.fileId || file.trackId;
+                return trackId ? [trackId] : [];
+            });
+            const affectedPlaylistIds = this.librarySourceManager.getPlaylistBindings()
+                .filter(binding => binding.sourceId === sourceId)
+                .map(binding => binding.playlistId);
+
+            await this.librarySourceManager.removeSource(sourceId);
+            if (source.type === 'directory') {
+                await this.removeMusicFolder(source.path).catch(error => {
+                    console.warn('⚠️ 移除兼容音乐文件夹设置失败:', error);
+                });
+            }
+            const removedTrackCount = this.libraryCacheManager.removeTracksFromIndex(uniqueTrackIds);
+            for (const playlistId of Array.from(new Set(affectedPlaylistIds))) {
+                this.recomputePlaylistMembership(playlistId);
+            }
+            await this.libraryCacheManager.saveCache();
+            this.windowManager.sendToMainWindow('library:updated', this.libraryCacheManager.getTracks());
+            this.emitPlaylistsUpdated();
+            this.emitSourcesUpdated();
+            return {success: true, removedTrackCount};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
     @IpcHandle('library:importLibraryFiles')
     async importLibraryFiles(filePaths: string[]): Promise<LibraryImportResult> {
         const tracks: CachedTrack[] = [];
@@ -889,6 +1097,7 @@ export class LibraryController extends BaseController {
             }
 
             this.windowManager.sendToMainWindow('library:updated', this.libraryCacheManager.getTracks());
+            this.emitSourcesUpdated();
             return {
                 success: failedPaths.length === 0,
                 tracks,

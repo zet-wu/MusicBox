@@ -393,7 +393,9 @@ export class Application {
             libraryCacheManager, metadataHandler, networkDriveManager,
             networkFileAdapter, this.windowManager, embeddedCoverService,
             parseMetadata, () => settingsController.getMusicFolders(),
-            librarySourceManager, audioController.state
+            librarySourceManager,
+            (folderPath: string) => settingsController.removeMusicFolder(folderPath),
+            audioController.state
         );
         this.libraryScanner = libraryController;
         this.musicFolderSettingsProvider = settingsController;

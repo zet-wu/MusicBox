@@ -21,7 +21,7 @@ async function createManager() {
 
 afterEach(async () => {
     await Promise.all(temporaryDirectories.splice(0).map(directory => (
-        fs.promises.rm(directory, {recursive: true, force: true})
+        fs.promises.rm(directory, {recursive: true, force: true, maxRetries: 3, retryDelay: 50})
     )));
 });
 
@@ -109,5 +109,53 @@ describe('LibrarySourceManager 旧数据迁移', () => {
             canonicalPath: manager.canonicalize(secondFile),
             trackId: 'second'
         }]);
+    });
+
+    it('同步绑定成员、记录排除项并支持恢复', async () => {
+        const manager = await createManager();
+        await manager.loadAndMigrate({musicFolders: [], scannedDirectories: [], tracks: []});
+        const directory = path.resolve('test-files', 'bound');
+        const filePath = path.join(directory, 'bound.flac');
+        const {source} = await manager.ensureSource('directory', directory, 'playlist_binding');
+        const {binding} = await manager.createPlaylistBinding('playlist-1', source.id);
+        await manager.updateSourceScan(source.id, [{
+            path: filePath,
+            canonicalPath: manager.canonicalize(filePath),
+            trackId: 'bound-track'
+        }], true);
+
+        const [synchronized] = await manager.synchronizeSourceBindings(source.id);
+        const excludedCount = await manager.excludePlaylistFiles('playlist-1', [filePath]);
+        const excluded = manager.getPlaylistBinding(binding.id);
+        const restoredCount = await manager.restorePlaylistBindingExclusions(binding.id);
+
+        expect(synchronized.managedFiles[0].trackId).toBe('bound-track');
+        expect(excludedCount).toBe(1);
+        expect(excluded.excludedPaths).toEqual([manager.canonicalize(filePath)]);
+        expect(restoredCount).toBe(1);
+        expect(manager.getPlaylistBinding(binding.id).excludedPaths).toEqual([]);
+    });
+
+    it('移除来源时一并移除绑定，并能识别重叠来源', async () => {
+        const manager = await createManager();
+        await manager.loadAndMigrate({musicFolders: [], scannedDirectories: [], tracks: []});
+        const parentDirectory = path.resolve('test-files', 'overlap');
+        const childDirectory = path.join(parentDirectory, 'child');
+        const filePath = path.join(childDirectory, 'track.flac');
+        const {source: parentSource} = await manager.ensureSource('directory', parentDirectory, 'scan');
+        const {source: childSource} = await manager.ensureSource('directory', childDirectory, 'playlist_binding');
+        await manager.createPlaylistBinding('playlist-1', childSource.id);
+        await manager.updateSourceScan(childSource.id, [{
+            path: filePath,
+            canonicalPath: manager.canonicalize(filePath),
+            trackId: 'track'
+        }], true);
+
+        expect(manager.isFileCoveredByOtherSource(filePath, childSource.id)).toBe(true);
+        const removed = await manager.removeSource(childSource.id);
+
+        expect(removed.removedBindings).toHaveLength(1);
+        expect(manager.getSource(parentSource.id)).toBeDefined();
+        expect(manager.getPlaylistBindings()).toEqual([]);
     });
 });

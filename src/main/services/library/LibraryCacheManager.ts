@@ -395,6 +395,17 @@ export class LibraryCacheManager {
         return track;
     }
 
+    removeTracksFromIndex(trackFileIds: string[]): number {
+        const removedIds = new Set(trackFileIds);
+        const before = this.cache.tracks.length;
+        this.cache.tracks = this.cache.tracks.filter(track => !removedIds.has(track.fileId));
+        for (const playlist of this.cache.playlists || []) {
+            playlist.trackIds = (playlist.trackIds || []).filter(id => !removedIds.has(id));
+            playlist.manualTrackIds = (playlist.manualTrackIds || []).filter(id => !removedIds.has(id));
+        }
+        return before - this.cache.tracks.length;
+    }
+
     parseDriveId(filePath: string): string | null {
         if (!this.isNetworkPath(filePath)) return null;
         const match = filePath.match(/^network:\/\/([^/]+)/);
@@ -605,9 +616,9 @@ export class LibraryCacheManager {
         const track = this.cache.tracks.find(t => t.fileId === trackFileId);
         if (!track) throw new Error('歌曲不存在');
         if (!Array.isArray(playlist.trackIds)) playlist.trackIds = [];
-        if (playlist.trackIds.includes(trackFileId)) throw new Error('歌曲已在歌单中');
-        playlist.trackIds.push(trackFileId);
         if (!Array.isArray(playlist.manualTrackIds)) playlist.manualTrackIds = [];
+        if (playlist.manualTrackIds.includes(trackFileId)) throw new Error('歌曲已在歌单中');
+        if (!playlist.trackIds.includes(trackFileId)) playlist.trackIds.push(trackFileId);
         if (!playlist.manualTrackIds.includes(trackFileId)) playlist.manualTrackIds.push(trackFileId);
         playlist.updatedAt = Date.now();
         console.log(`➕ LibraryCacheManager: 添加歌曲到歌单 - ${track.title} -> ${playlist.name}`);
@@ -635,6 +646,27 @@ export class LibraryCacheManager {
         if (!playlist) throw new Error('歌单不存在');
         playlist.trackIds = trackIds;
         playlist.manualTrackIds = trackIds.filter(id => (playlist.manualTrackIds || []).includes(id));
+        playlist.updatedAt = Date.now();
+        return playlist;
+    }
+
+    addManualTracksToPlaylist(playlistId: string, trackIds: string[]): Playlist {
+        const playlist = this.getPlaylistById(playlistId);
+        if (!playlist) throw new Error('歌单不存在');
+        if (!Array.isArray(playlist.manualTrackIds)) playlist.manualTrackIds = [];
+        playlist.manualTrackIds = Array.from(new Set([...playlist.manualTrackIds, ...trackIds]));
+        playlist.trackIds = Array.from(new Set([...playlist.trackIds, ...trackIds]));
+        playlist.updatedAt = Date.now();
+        return playlist;
+    }
+
+    setPlaylistMaterializedTracks(playlistId: string, bindingTrackIds: string[]): Playlist {
+        const playlist = this.getPlaylistById(playlistId);
+        if (!playlist) throw new Error('歌单不存在');
+        playlist.trackIds = Array.from(new Set([
+            ...(playlist.manualTrackIds || []),
+            ...bindingTrackIds
+        ]));
         playlist.updatedAt = Date.now();
         return playlist;
     }

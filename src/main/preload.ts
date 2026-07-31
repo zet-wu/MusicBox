@@ -232,6 +232,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         scanDirectory: (path: string) => ipcRenderer.invoke('library:scanDirectory', path),
         importLibraryDirectory: (path: string) => ipcRenderer.invoke('library:importLibraryDirectory', path),
         importLibraryFiles: (paths: string[]) => ipcRenderer.invoke('library:importLibraryFiles', paths),
+        getLibrarySources: () => ipcRenderer.invoke('library:getLibrarySources'),
+        removeLibrarySource: (sourceId: string) => ipcRenderer.invoke('library:removeLibrarySource', sourceId),
+        getPlaylistBindings: (playlistId: string) => ipcRenderer.invoke('library:getPlaylistBindings', playlistId),
+        bindDirectoryToPlaylist: (playlistId: string, path: string) =>
+            ipcRenderer.invoke('library:bindDirectoryToPlaylist', playlistId, path),
+        unbindDirectoryFromPlaylist: (bindingId: string, mode: 'keep' | 'remove') =>
+            ipcRenderer.invoke('library:unbindDirectoryFromPlaylist', bindingId, mode),
+        rescanPlaylistBinding: (bindingId: string) =>
+            ipcRenderer.invoke('library:rescanPlaylistBinding', bindingId),
+        restorePlaylistBindingExclusions: (bindingId: string) =>
+            ipcRenderer.invoke('library:restorePlaylistBindingExclusions', bindingId),
         scanNetworkDrive: (driveId: string, relativePath: string) => ipcRenderer.invoke('library:scanNetworkDrive', driveId, relativePath),
         scanSingleFile: (networkPath: string) => ipcRenderer.invoke('library:scanSingleFile', networkPath),
         scanDirectoryForFiles: (path: string) => ipcRenderer.invoke('library:scanDirectoryForFiles', path),
@@ -279,6 +290,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         onLibraryUpdated: (callback: (...args: any[]) => void) => {
             ipcRenderer.on('library:updated', callback);
             return () => ipcRenderer.removeListener('library:updated', callback);
+        },
+        onPlaylistsUpdated: (callback: (...args: any[]) => void) => {
+            ipcRenderer.on('library:playlistsUpdated', callback);
+            return () => ipcRenderer.removeListener('library:playlistsUpdated', callback);
+        },
+        onSourcesUpdated: (callback: (...args: any[]) => void) => {
+            ipcRenderer.on('library:sourcesUpdated', callback);
+            return () => ipcRenderer.removeListener('library:sourcesUpdated', callback);
         },
         onFavoritesChanged: (callback: (...args: any[]) => void) => {
             ipcRenderer.on('library:favoritesChanged', callback);
