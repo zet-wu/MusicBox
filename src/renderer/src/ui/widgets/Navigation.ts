@@ -31,7 +31,7 @@ class Navigation extends Component {
     sidebarCollapsed: boolean;
     userPlaylists: SidebarPlaylist[];
     networkDrives: NetworkDrive[];
-    removeLibraryUpdatedListener: Unsubscribe | null = null;
+    removePlaylistsUpdatedListener: Unsubscribe | null = null;
     removeWindowMaximizedListener: Unsubscribe | null = null;
     removeNetworkDriveConnectedListener: Unsubscribe | null = null;
     removeNetworkDriveDisconnectedListener: Unsubscribe | null = null;
@@ -72,7 +72,7 @@ class Navigation extends Component {
         this.setupEventListeners();
         this.restoreSidebarState();
         this.loadUserPlaylists();
-        this.setupLibraryUpdateListener();
+        this.setupPlaylistsUpdateListener();
         this.loadNetworkDrives();
         this.initializeSidebarButtonsState();
         this.initializeWindowState().then(r => {
@@ -80,8 +80,8 @@ class Navigation extends Component {
         });
     }
 
-    setupLibraryUpdateListener(): void {
-        this.removeLibraryUpdatedListener = navigationDataService.onLibraryUpdated(async () => {
+    setupPlaylistsUpdateListener(): void {
+        this.removePlaylistsUpdatedListener = navigationDataService.onPlaylistsUpdated(async () => {
             await this.refreshPlaylists();
         });
     }
@@ -690,9 +690,9 @@ class Navigation extends Component {
     }
 
     destroy(): void {
-        if (this.removeLibraryUpdatedListener) {
-            this.removeLibraryUpdatedListener();
-            this.removeLibraryUpdatedListener = null;
+        if (this.removePlaylistsUpdatedListener) {
+            this.removePlaylistsUpdatedListener();
+            this.removePlaylistsUpdatedListener = null;
         }
         if (this.removeWindowMaximizedListener) {
             this.removeWindowMaximizedListener();

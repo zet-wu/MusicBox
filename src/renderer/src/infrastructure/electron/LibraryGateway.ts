@@ -202,6 +202,10 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.on('onLibraryUpdated', (_event: unknown, tracks: Track[]) => handler(tracks));
     }
 
+    onPlaylistsUpdated(handler: (playlists: Playlist[]) => void): Unsubscribe {
+        return this.on('onPlaylistsUpdated', (_event: unknown, playlists: Playlist[]) => handler(playlists));
+    }
+
     onSourcesUpdated(handler: () => void): Unsubscribe {
         return this.on('onSourcesUpdated', () => handler());
     }

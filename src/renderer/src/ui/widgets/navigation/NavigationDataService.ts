@@ -4,11 +4,11 @@ import {libraryGateway} from "@/infrastructure/electron";
 import {libraryDataService} from "@/features/library/service/LibraryDataService";
 import type {Result, Unsubscribe} from "@api/types/common";
 import type {MountedNetworkDrive} from "@api/types/electron";
-import type {Playlist, Track} from "@api/types/library";
+import type {Playlist} from "@api/types/library";
 
 class NavigationDataService {
-    onLibraryUpdated(handler: (tracks: Track[]) => void | Promise<void>): Unsubscribe {
-        return libraryGateway.onLibraryUpdated(handler);
+    onPlaylistsUpdated(handler: (playlists: Playlist[]) => void | Promise<void>): Unsubscribe {
+        return libraryGateway.onPlaylistsUpdated(handler);
     }
 
     onWindowMaximizedChanged(handler: (isMaximized: boolean) => void): Unsubscribe {

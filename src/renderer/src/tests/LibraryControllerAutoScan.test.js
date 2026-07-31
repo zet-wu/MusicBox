@@ -18,9 +18,9 @@ vi.mock('electron', () => ({
 import {LibraryController} from '../../../main/controllers/LibraryController';
 import {LibrarySourceManager} from '../../../main/services/library/LibrarySourceManager';
 
-const temporaryDirectories: string[] = [];
+const temporaryDirectories = [];
 
-async function createTemporaryDirectory(name: string): Promise<string> {
+async function createTemporaryDirectory(name) {
     const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'musicbox-auto-scan-test-'));
     temporaryDirectories.push(root);
     const directory = path.join(root, name);
@@ -67,13 +67,13 @@ describe('LibraryController 批量扫描通知', () => {
             sendToMainWindow
         };
         const controller = new LibraryController(
-            libraryCacheManager as any,
-            {} as any,
-            {} as any,
-            {isNetworkPath: () => false} as any,
-            windowManager as any,
-            {} as any,
-            {} as any,
+            libraryCacheManager,
+            {},
+            {},
+            {isNetworkPath: () => false},
+            windowManager,
+            {},
+            {},
             vi.fn(),
             async () => [],
             sourceManager,
