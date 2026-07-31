@@ -55,7 +55,11 @@ export class NetworkRequestClient {
                 const timeoutId = setTimeout(() => controller.abort(), timeout);
                 const callerSignal = fetchOptions.signal;
                 const abortFromCaller = () => controller.abort(callerSignal?.reason);
-                callerSignal?.addEventListener('abort', abortFromCaller, {once: true});
+                if (callerSignal?.aborted) {
+                    abortFromCaller();
+                } else {
+                    callerSignal?.addEventListener('abort', abortFromCaller, {once: true});
+                }
 
                 let response: Response;
                 try {

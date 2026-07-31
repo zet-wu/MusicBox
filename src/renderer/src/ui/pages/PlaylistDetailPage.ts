@@ -75,6 +75,7 @@ class PlaylistDetailPage extends Component {
     private networkCoverPreferenceUnsubscribe: Unsubscribe | null = null;
     private trackVirtualizer: ElementVirtualizer | null = null;
     private readonly coverLoadQueue = new CoverLoadQueue(4);
+    private viewGeneration = 0;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -114,6 +115,7 @@ class PlaylistDetailPage extends Component {
     }
 
     async show(playlist: PlaylistDetail): Promise<void> {
+        const viewGeneration = ++this.viewGeneration;
         this.isVisible = true;
         this.currentPlaylist = playlist;
         this.searchTrackIds = null;
@@ -127,8 +129,14 @@ class PlaylistDetailPage extends Component {
         }
 
         // 每次显示新歌单时刷新数据和视图，事件由容器级委托保持稳定
-        await this.loadPlaylistCover();
-        await this.loadPlaylistTracks(false);
+        await this.loadPlaylistCover(viewGeneration);
+        if (!this.isCurrentView(viewGeneration, playlist)) {
+            return;
+        }
+        await this.loadPlaylistTracks(false, viewGeneration);
+        if (!this.isCurrentView(viewGeneration, playlist)) {
+            return;
+        }
         this.render();
 
         // 平滑显示页面
@@ -160,6 +168,7 @@ class PlaylistDetailPage extends Component {
     }
 
     hide(): void {
+        this.viewGeneration += 1;
         this.isVisible = false;
         this.coverLoadQueue.beginBatch();
         this.destroyTrackVirtualizer();
@@ -176,6 +185,7 @@ class PlaylistDetailPage extends Component {
     }
 
     destroy(): void {
+        this.viewGeneration += 1;
         this.coverLoadQueue.destroy();
         this.destroyTrackVirtualizer();
         if (this.coverDisplayPreferenceUnsubscribe) {
@@ -629,41 +639,57 @@ class PlaylistDetailPage extends Component {
         return Number.isInteger(index) && index >= 0 ? index : null;
     }
 
-    async loadPlaylistCover(): Promise<void> {
-        if (!this.currentPlaylist) return;
+    async loadPlaylistCover(viewGeneration = this.viewGeneration): Promise<void> {
+        const playlist = this.currentPlaylist;
+        if (!playlist) return;
         if (!getCollectionCapabilities(this.getCollectionType()).canEditCover) {
-            this.currentPlaylist.coverImage = null;
+            playlist.coverImage = null;
             return;
         }
 
         try {
-            const result = await playlistDataService.getPlaylistCover(this.currentPlaylist.id);
+            const result = await playlistDataService.getPlaylistCover(playlist.id);
+            if (!this.isCurrentView(viewGeneration, playlist)) {
+                return;
+            }
             if (result.success && result.coverPath) {
-                this.currentPlaylist.coverImage = result.coverPath;
+                playlist.coverImage = result.coverPath;
             } else {
-                this.currentPlaylist.coverImage = null;
+                playlist.coverImage = null;
             }
         } catch (error) {
+            if (!this.isCurrentView(viewGeneration, playlist)) {
+                return;
+            }
             console.error('❌ PlaylistDetailPage: 加载歌单封面失败', error);
-            this.currentPlaylist.coverImage = null;
+            playlist.coverImage = null;
         }
     }
 
-    async loadPlaylistTracks(renderPage = true): Promise<void> {
-        if (!this.currentPlaylist) return;
+    async loadPlaylistTracks(renderPage = true, viewGeneration = this.viewGeneration): Promise<void> {
+        const playlist = this.currentPlaylist;
+        if (!playlist) return;
+        const collectionType = this.getCollectionType();
         try {
-            if (this.getCollectionType() === 'all-tracks') {
-                this.sourceTracks = await libraryDataService.getTracks();
+            if (collectionType === 'all-tracks') {
+                const tracks = await libraryDataService.getTracks();
+                if (!this.isCurrentView(viewGeneration, playlist)) {
+                    return;
+                }
+                this.sourceTracks = tracks;
                 this.applySourceTracks();
-                this.currentPlaylist.trackIds = this.sourceTracks
+                playlist.trackIds = this.sourceTracks
                     .map((track) => track.fileId)
                     .filter((fileId): fileId is string => Boolean(fileId));
-                this.currentPlaylist.trackCount = this.tracks.length;
+                playlist.trackCount = this.tracks.length;
                 if (renderPage) this.render();
                 return;
             }
 
-            const result = await playlistDataService.getPlaylistDetail(this.currentPlaylist.id);
+            const result = await playlistDataService.getPlaylistDetail(playlist.id);
+            if (!this.isCurrentView(viewGeneration, playlist)) {
+                return;
+            }
             if (result.success) {
                 this.sourceTracks = (result.tracks || result.playlist?.tracks || []) as PlaylistDetailTrack[];
                 this.applySourceTracks();
@@ -671,12 +697,12 @@ class PlaylistDetailPage extends Component {
                 // 同步更新currentPlaylist对象，确保UI状态正确
                 if (result.playlist) {
                     const playlistDetail = result.playlist as PlaylistDetail;
-                    this.currentPlaylist.trackIds = playlistDetail.trackIds || [];
-                    this.currentPlaylist.trackCount = this.tracks.length;
+                    playlist.trackIds = playlistDetail.trackIds || [];
+                    playlist.trackCount = this.tracks.length;
                     // 如果有其他需要同步的属性，也在这里更新
-                    if (this.getCollectionType() === 'playlist') {
-                        if (playlistDetail.name) this.currentPlaylist.name = playlistDetail.name;
-                        if (playlistDetail.description !== undefined) this.currentPlaylist.description = playlistDetail.description;
+                    if (collectionType === 'playlist') {
+                        if (playlistDetail.name) playlist.name = playlistDetail.name;
+                        if (playlistDetail.description !== undefined) playlist.description = playlistDetail.description;
                     }
                 }
 
@@ -686,19 +712,28 @@ class PlaylistDetailPage extends Component {
                 this.sourceTracks = [];
                 this.tracks = [];
                 // 同步更新空状态
-                this.currentPlaylist.trackIds = [];
-                this.currentPlaylist.trackCount = 0;
+                playlist.trackIds = [];
+                playlist.trackCount = 0;
                 if (renderPage) this.render();
             }
         } catch (error) {
+            if (!this.isCurrentView(viewGeneration, playlist)) {
+                return;
+            }
             console.error('❌ PlaylistDetailPage: 加载歌单歌曲失败', error);
             this.sourceTracks = [];
             this.tracks = [];
             // 同步更新空状态
-            this.currentPlaylist.trackIds = [];
-            this.currentPlaylist.trackCount = 0;
+            playlist.trackIds = [];
+            playlist.trackCount = 0;
             if (renderPage) this.render();
         }
+    }
+
+    private isCurrentView(viewGeneration: number, playlist: PlaylistDetail): boolean {
+        return this.isVisible
+            && this.viewGeneration === viewGeneration
+            && this.currentPlaylist === playlist;
     }
 
     private renderTracksSection(): string {
