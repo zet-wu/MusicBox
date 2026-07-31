@@ -19,6 +19,7 @@ export interface NavigationComponentBindingHost {
 
 export interface PageComponentBindingHost {
     handleDriveRemoved(drive?: unknown): Promise<void>;
+    handlePlaylistSelected(playlist: Playlist): Promise<void>;
     handleTrackPlayed(track: Track, index: number): Promise<void>;
     handlePlayAllTracks(tracks: Track[]): Promise<void>;
     handleShuffleAllTracks(tracks: Track[]): Promise<void>;
@@ -36,6 +37,7 @@ export type ComponentEventName =
     | 'recentPage'
     | 'artistsPage'
     | 'albumsPage'
+    | 'playlistsPage'
     | 'statisticsPage'
     | 'networkDiskModal'
     | 'networkDriveDetailPage';

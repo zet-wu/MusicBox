@@ -563,6 +563,7 @@ class Navigation extends Component {
     // 刷新歌单列表
     async refreshPlaylists(): Promise<void> {
         await this.loadUserPlaylists();
+        this.emit('playlistsChanged');
     }
 
 

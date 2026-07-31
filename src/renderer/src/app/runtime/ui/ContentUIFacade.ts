@@ -123,6 +123,14 @@ export class ContentUIFacade {
         await this.app.components.albumsPage?.show();
     }
 
+    async showPlaylistsPage(): Promise<void> {
+        await this.app.components.playlistsPage?.show();
+    }
+
+    async refreshPlaylistsPage(): Promise<void> {
+        await this.app.components.playlistsPage?.refresh();
+    }
+
     async showStatisticsPage(): Promise<void> {
         await this.app.components.statisticsPage?.show();
     }
@@ -132,6 +140,7 @@ export class ContentUIFacade {
         this.app.components.recentPage?.hide();
         this.app.components.artistsPage?.hide();
         this.app.components.albumsPage?.hide();
+        this.app.components.playlistsPage?.hide();
         this.app.components.statisticsPage?.hide();
         this.app.components.playlistDetailPage?.hide();
         this.app.components.networkDriveDetailPage?.hide();

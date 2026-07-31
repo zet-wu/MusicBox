@@ -1,4 +1,5 @@
 import type {Track} from "@api/types/track";
+import type {Playlist} from "@api/types/playlist";
 import type {AppView} from "@/shared/types/AppContracts";
 
 import type {
@@ -40,6 +41,10 @@ export class PageComponentBindings {
 
         if (components.albumsPage) {
             this.setupSingleComponentEvents('albumsPage');
+        }
+
+        if (components.playlistsPage) {
+            this.setupSingleComponentEvents('playlistsPage');
         }
 
         if (components.statisticsPage) {
@@ -145,6 +150,12 @@ export class PageComponentBindings {
                         content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
                     });
                 }
+                break;
+
+            case 'playlistsPage':
+                components.playlistsPage?.on('playlistSelected', async (playlist: Playlist) => {
+                    await app.handlePlaylistSelected(playlist);
+                });
                 break;
 
             case 'statisticsPage':

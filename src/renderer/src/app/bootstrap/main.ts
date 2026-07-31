@@ -23,6 +23,7 @@ import '@extensions/api/index.js';
 
 import '@ui/pages/ArtistsPage';
 import '@ui/pages/AlbumsPage';
+import '@ui/pages/PlaylistsPage';
 import '@ui/pages/HomePage';
 import '@ui/pages/NetworkDriveDetailPage';
 import '@ui/pages/PlaylistDetailPage';

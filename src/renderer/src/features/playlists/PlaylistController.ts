@@ -141,6 +141,7 @@ export class PlaylistController {
 
     async handlePlaylistCoverUpdated(playlist: Playlist): Promise<void> {
         this.ui.updateNavigationPlaylistInfo(playlist);
+        await this.refreshNavigationPlaylists();
     }
 
     async refreshNavigationPlaylists(): Promise<void> {

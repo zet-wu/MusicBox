@@ -3,6 +3,7 @@ import {ArtistsPage} from "@ui/pages/ArtistsPage";
 import {HomePage} from "@ui/pages/HomePage";
 import {NetworkDriveDetailPage} from "@ui/pages/NetworkDriveDetailPage";
 import {PlaylistDetailPage} from "@ui/pages/PlaylistDetailPage";
+import {PlaylistsPage} from "@ui/pages/PlaylistsPage";
 import {RecentPage} from "@ui/pages/RecentPage";
 import {Settings} from "@ui/pages/Settings";
 import {StatisticsPage} from "@ui/pages/StatisticsPage";
@@ -70,6 +71,7 @@ export class ComponentRegistry {
         this.components.editTrackInfoDialog = new EditTrackInfoDialog();
 
         this.components.playlistDetailPage = new PlaylistDetailPage('#content-area');
+        this.components.playlistsPage = new PlaylistsPage('#content-area');
         this.components.networkDriveDetailPage = new NetworkDriveDetailPage('#content-area');
 
         this.components.updateModal = new UpdateModal();

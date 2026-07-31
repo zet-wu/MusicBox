@@ -268,6 +268,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
         },
         pageBindings: {
             handleDriveRemoved: (drive) => app.handleDriveRemoved(drive),
+            handlePlaylistSelected: (playlist) => app.handlePlaylistSelected(playlist),
             handleTrackPlayed: (track, index) => app.handleTrackPlayed(track, index),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
             handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),

@@ -7,6 +7,7 @@ export type AppView =
     | 'recent'
     | 'artists'
     | 'albums'
+    | 'playlists'
     | 'statistics'
     | 'playlist-detail'
     | 'network-drive-detail'

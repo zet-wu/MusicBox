@@ -47,6 +47,9 @@ export class ViewRouter {
             case 'albums':
                 await this.content.showAlbumsPage();
                 break;
+            case 'playlists':
+                await this.content.showPlaylistsPage();
+                break;
             case 'statistics':
                 await this.content.showStatisticsPage();
                 break;

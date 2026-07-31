@@ -5,6 +5,7 @@ import type {ArtistsPage} from '@ui/pages/ArtistsPage';
 import type {HomePage} from '@ui/pages/HomePage';
 import type {NetworkDriveDetailPage} from '@ui/pages/NetworkDriveDetailPage';
 import type {PlaylistDetailPage} from '@ui/pages/PlaylistDetailPage';
+import type {PlaylistsPage} from '@ui/pages/PlaylistsPage';
 import type {RecentPage} from '@ui/pages/RecentPage';
 import type {Settings} from '@ui/pages/Settings';
 import type {StatisticsPage} from '@ui/pages/StatisticsPage';
@@ -45,6 +46,7 @@ export interface ComponentRegistryMap {
     playlistBindingDialog: PlaylistBindingDialog;
     editTrackInfoDialog: EditTrackInfoDialog;
     playlistDetailPage: PlaylistDetailPage;
+    playlistsPage: PlaylistsPage;
     networkDriveDetailPage: NetworkDriveDetailPage;
     updateModal: UpdateModal;
     pluginManagerModal: PluginManagerModal;
