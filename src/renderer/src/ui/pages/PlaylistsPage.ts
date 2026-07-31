@@ -23,6 +23,7 @@ export class PlaylistsPage extends Component {
     private sortDirection: SortDirection;
     private searchQuery: string;
     private contextMenuRequestId: number;
+    private refreshGeneration = 0;
     public isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -46,6 +47,7 @@ export class PlaylistsPage extends Component {
     }
 
     hide(): void {
+        this.refreshGeneration++;
         this.contextMenuRequestId++;
         this.isVisible = false;
         if (this.container) {
@@ -54,7 +56,10 @@ export class PlaylistsPage extends Component {
     }
 
     async refresh(): Promise<void> {
-        this.playlists = await libraryDataService.getPlaylists();
+        const refreshGeneration = ++this.refreshGeneration;
+        const playlists = await libraryDataService.getPlaylists();
+        if (!this.isVisible || refreshGeneration !== this.refreshGeneration) return;
+        this.playlists = playlists;
         this.sortPlaylists();
         if (this.isVisible) {
             this.render();

@@ -206,12 +206,15 @@ class Navigation extends Component {
     }
 
     navigateToView(view: SidebarView): void {
-        this.updateSidebarSelection(view);
-        this.currentView = view;
         this.emit('viewChanged', view);
     }
 
     updateSidebarSelection(type: string, id: string | null = null): void {
+        this.currentView = type === 'playlist'
+            ? 'playlist-detail'
+            : type === 'network-drive'
+                ? 'network-drive-detail'
+                : type;
         document.querySelectorAll<HTMLElement>('.sidebar-link, .playlist-sidebar-item, .network-drive-sidebar-item').forEach(item => {
             item.classList.remove('active');
         });

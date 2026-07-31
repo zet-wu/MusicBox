@@ -93,7 +93,16 @@ class ArtistsPage extends Component {
                 this.emit('appendAllTracks', tracks);
             },
             onTrackRightClick: (track, index, x, y, selectedTracks, selectedTrackItems) => {
-                this.emit('trackRightClick', track, index, x, y, selectedTracks, selectedTrackItems);
+                this.emit(
+                    'trackRightClick',
+                    track,
+                    index,
+                    x,
+                    y,
+                    selectedTracks,
+                    selectedTrackItems,
+                    this.selectedArtist?.tracks || []
+                );
             }
         });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
@@ -117,6 +126,7 @@ class ArtistsPage extends Component {
     }
 
     async show(): Promise<void> {
+        const viewGeneration = ++this.coverGeneration;
         if (!this.listenersSetup) {
             this.setupElements();
             this.setupAPIListeners();
@@ -130,6 +140,7 @@ class ArtistsPage extends Component {
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
             const pageData = await libraryPageDataService.getArtists();
+            if (!this.isVisible || viewGeneration !== this.coverGeneration) return;
             this.tracks = pageData.tracks as Track[];
             this.artists = pageData.artists as ArtistInfo[];
             this.filteredArtists = [...this.artists];
@@ -187,8 +198,13 @@ class ArtistsPage extends Component {
     setupAPIListeners(): void {
         // 监听音乐库更新
         this.addAPIEventListenerManaged('libraryUpdated', (tracks: Track[]) => {
+            const selectedArtistName = this.selectedArtist?.name;
             this.tracks = tracks;
             this.processArtists();
+            this.selectedArtist = selectedArtistName
+                ? this.artists.find((artist) => artist.name === selectedArtistName) || null
+                : null;
+            if (this.isVisible) this.render();
         });
     }
 

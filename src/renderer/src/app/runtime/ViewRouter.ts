@@ -19,6 +19,11 @@ export class ViewRouter {
     async handleViewChange(view: AppView): Promise<void> {
         const app = this.app;
 
+        if (!this.isNavigableCoreView(view)) {
+            console.warn('🎵 App: 未注册的视图，保持当前页面:', view);
+            return;
+        }
+
         this.hideAllPages();
         app.currentView = view;
 
@@ -56,14 +61,7 @@ export class ViewRouter {
             case 'statistics':
                 await this.content.showStatisticsPage();
                 break;
-            case 'playlist-detail':
-                break;
             default:
-                console.warn('Unknown view:', view);
-                if (app.currentView !== 'playlist-detail') {
-                    this.content.showTrackList();
-                    app.updateTrackList('default-fallback');
-                }
                 break;
         }
     }
@@ -74,5 +72,19 @@ export class ViewRouter {
 
     updateSidebarSelection(type: string, id: string | null = null): void {
         this.content.updateSidebarSelection(type, id);
+    }
+
+    private isNavigableCoreView(view: AppView): boolean {
+        return [
+            'home-page',
+            'library',
+            'favorites',
+            'recent',
+            'artists',
+            'albums',
+            'folders',
+            'playlists',
+            'statistics'
+        ].includes(view);
     }
 }

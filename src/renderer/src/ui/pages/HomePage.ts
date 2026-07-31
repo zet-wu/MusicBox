@@ -16,6 +16,8 @@ class HomePage extends Component {
     _lastTracksHash: string | null;
     private visualizationAnimation: number | null;
     private breathingInterval: ReturnType<typeof setInterval> | null;
+    private isVisible = false;
+    private viewGeneration = 0;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -26,16 +28,24 @@ class HomePage extends Component {
         this.visualizationAnimation = null;
         this.breathingInterval = null;
         this.setupElements();
+        this.addAPIEventListenerManaged('libraryUpdated', (tracks: Track[]) => {
+            this.tracks = tracks || [];
+            if (this.isVisible) this.render();
+        });
     }
 
     async show(): Promise<void> {
+        const viewGeneration = ++this.viewGeneration;
+        this.isVisible = true;
         if (this.element) {
             (this.element as HTMLElement).style.display = 'block';
         }
 
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
-            this.tracks = await homeLibraryActionService.loadTracks();
+            const tracks = await homeLibraryActionService.loadTracks();
+            if (!this.isVisible || viewGeneration !== this.viewGeneration) return;
+            this.tracks = tracks;
             this._lastTracksHash = this._generateTracksHash(this.tracks);
         }
 
@@ -50,6 +60,8 @@ class HomePage extends Component {
     }
 
     hide(): void {
+        this.viewGeneration++;
+        this.isVisible = false;
         this.stopAudioVisualization();
         this.stopBreathingGuide();
         if (this.container) {

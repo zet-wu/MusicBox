@@ -38,6 +38,8 @@ class NetworkDriveDetailPage extends Component {
     container: HTMLElement | null = null;
     private listenersSetup = false;
     private coverDisplayPreferenceUnsubscribe: Unsubscribe | null = null;
+    private viewGeneration = 0;
+    private directoryGeneration = 0;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -58,6 +60,7 @@ class NetworkDriveDetailPage extends Component {
     }
 
     async show(drive: NetworkDrive): Promise<void> {
+        const viewGeneration = ++this.viewGeneration;
         this.isVisible = true;
         this.currentDrive = drive;
         this.currentPath = '/';  // 重置到根目录
@@ -69,14 +72,18 @@ class NetworkDriveDetailPage extends Component {
             element.style.transform = 'translateY(10px)';
         }
 
-        await this.loadDriveStatus();
-        await this.loadDriveTracks();
-        await this.loadDirectoryStructure(this.currentPath);
+        await this.loadDriveStatus(viewGeneration);
+        if (!this.isCurrentView(drive, viewGeneration)) return;
+        await this.loadDriveTracks(viewGeneration);
+        if (!this.isCurrentView(drive, viewGeneration)) return;
+        await this.loadDirectoryStructure(this.currentPath, viewGeneration);
+        if (!this.isCurrentView(drive, viewGeneration)) return;
         this.render();
 
         if (this.element) {
             const element = this.element as HTMLElement;
-            requestAnimationFrame(() => {
+            this.requestAnimationFrameManaged(() => {
+                if (!this.isCurrentView(drive, viewGeneration)) return;
                 element.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
                 element.style.opacity = '1';
                 element.style.transform = 'translateY(0)';
@@ -85,6 +92,8 @@ class NetworkDriveDetailPage extends Component {
     }
 
     hide(): void {
+        this.viewGeneration++;
+        this.directoryGeneration++;
         this.isVisible = false;
         this.currentDrive = null;
         this.tracks = [];
@@ -122,40 +131,54 @@ class NetworkDriveDetailPage extends Component {
         });
     }
 
-    async loadDriveStatus(): Promise<void> {
-        if (!this.currentDrive) {
+    async loadDriveStatus(viewGeneration = this.viewGeneration): Promise<void> {
+        const drive = this.currentDrive;
+        if (!drive) {
             return;
         }
 
         try {
-            this.driveStatus = await networkDriveDetailService.getStatus(this.currentDrive.id);
+            const driveStatus = await networkDriveDetailService.getStatus(drive.id);
+            if (!this.isCurrentView(drive, viewGeneration)) return;
+            this.driveStatus = driveStatus;
         } catch (error) {
+            if (!this.isCurrentView(drive, viewGeneration)) return;
             console.error('❌ NetworkDriveDetailPage: 加载磁盘状态失败', error);
             this.driveStatus = null;
         }
     }
 
-    async loadDriveTracks(): Promise<void> {
-        if (!this.currentDrive) {
+    async loadDriveTracks(viewGeneration = this.viewGeneration): Promise<void> {
+        const drive = this.currentDrive;
+        if (!drive) {
             return;
         }
 
         try {
-            this.tracks = await networkDriveDetailService.getTracksByDrive(this.currentDrive.id);
+            const tracks = await networkDriveDetailService.getTracksByDrive(drive.id);
+            if (!this.isCurrentView(drive, viewGeneration)) return;
+            this.tracks = tracks;
             console.log(`📀 NetworkDriveDetailPage: 加载了 ${this.tracks.length} 首歌曲`);
         } catch (error) {
+            if (!this.isCurrentView(drive, viewGeneration)) return;
             console.error('❌ NetworkDriveDetailPage: 加载歌曲失败', error);
             this.tracks = [];
         }
     }
 
-    async loadDirectoryStructure(path = '/'): Promise<void> {
-        if (!this.currentDrive) {
+    async loadDirectoryStructure(path = '/', viewGeneration = this.viewGeneration): Promise<void> {
+        const drive = this.currentDrive;
+        const directoryGeneration = ++this.directoryGeneration;
+        if (!drive) {
             return;
         }
 
         try {
-            const result = await networkDriveDetailService.getDirectoryStructure(this.currentDrive.id, path);
+            const result = await networkDriveDetailService.getDirectoryStructure(drive.id, path);
+            if (
+                !this.isCurrentView(drive, viewGeneration)
+                || directoryGeneration !== this.directoryGeneration
+            ) return;
             if (result.success) {
                 this.directoryStructure = result.structure || [];
                 console.log(`📁 NetworkDriveDetailPage: 加载了 ${this.directoryStructure.length} 个项目`);
@@ -164,6 +187,10 @@ class NetworkDriveDetailPage extends Component {
                 this.directoryStructure = [];
             }
         } catch (error) {
+            if (
+                !this.isCurrentView(drive, viewGeneration)
+                || directoryGeneration !== this.directoryGeneration
+            ) return;
             console.error('❌ NetworkDriveDetailPage: 加载目录结构失败', error);
             this.directoryStructure = [];
         }
@@ -236,6 +263,12 @@ class NetworkDriveDetailPage extends Component {
             </div>
         `;
 
+    }
+
+    private isCurrentView(drive: NetworkDrive, viewGeneration: number): boolean {
+        return this.isVisible
+            && this.viewGeneration === viewGeneration
+            && this.currentDrive?.id === drive.id;
     }
 
     setupEventListeners(): void {
@@ -438,7 +471,8 @@ class NetworkDriveDetailPage extends Component {
             this.tracks.push(result.addedTrack);
         }
         if (result.track) {
-            this.emit('playTrack', result.track, 0);
+            const index = this.tracks.findIndex((track) => track.filePath === result.track?.filePath);
+            this.emit('playTrack', result.track, index >= 0 ? index : 0);
         }
     }
 
@@ -454,7 +488,8 @@ class NetworkDriveDetailPage extends Component {
             fileName,
             this.tracks
         );
-        this.emit('trackRightClick', track, 0, x, y);
+        const index = this.tracks.findIndex((item) => item.filePath === track.filePath);
+        this.emit('trackRightClick', track, index >= 0 ? index : 0, x, y, undefined, [track], this.tracks);
     }
 
     calculateTotalDuration(): number {

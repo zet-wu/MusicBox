@@ -27,6 +27,7 @@ export class FolderSourcesPage extends Component {
     private activeSource: LibraryDirectoryOverview | null = null;
     private removeSourcesUpdatedListener: Unsubscribe;
     private loading = false;
+    private refreshGeneration = 0;
     public isVisible = false;
 
     constructor(container: string | Element | null) {
@@ -52,6 +53,8 @@ export class FolderSourcesPage extends Component {
     }
 
     hide(): void {
+        this.refreshGeneration++;
+        this.loading = false;
         this.isVisible = false;
         this.hideContextMenu();
         if (this.container) this.container.innerHTML = '';
@@ -65,13 +68,16 @@ export class FolderSourcesPage extends Component {
     }
 
     async refresh(): Promise<void> {
+        const refreshGeneration = ++this.refreshGeneration;
         this.loading = true;
         try {
-            this.directories = await librarySourceManagementService.getDirectories();
+            const directories = await librarySourceManagementService.getDirectories();
+            if (!this.isVisible || refreshGeneration !== this.refreshGeneration) return;
+            this.directories = directories;
             this.sortDirectories();
-            if (this.isVisible) this.render();
+            this.render();
         } finally {
-            this.loading = false;
+            if (refreshGeneration === this.refreshGeneration) this.loading = false;
         }
     }
 

@@ -47,6 +47,7 @@ class StatisticsPage extends Component {
     private listenersSetup: boolean;
     private historyUnsubscribe: (() => void) | null;
     private isVisible: boolean;
+    private viewGeneration = 0;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -62,6 +63,7 @@ class StatisticsPage extends Component {
     }
 
     async show(): Promise<void> {
+        const viewGeneration = ++this.viewGeneration;
         if (!this.listenersSetup) {
             this.setupElements();
             this.setupAPIListeners();
@@ -72,6 +74,7 @@ class StatisticsPage extends Component {
         }
         this.isVisible = true;
         const pageData = await libraryPageDataService.getStatisticsPageData();
+        if (!this.isVisible || viewGeneration !== this.viewGeneration) return;
         this.tracks = pageData.tracks;
         this.loadPlayHistory();
         this.moodHistory = pageData.moodHistory;
@@ -81,6 +84,7 @@ class StatisticsPage extends Component {
     }
 
     hide(): void {
+        this.viewGeneration++;
         this.isVisible = false;
         if (this.container) {
             this.container.innerHTML = '';
@@ -106,6 +110,8 @@ class StatisticsPage extends Component {
         // 监听音乐库更新
         this.addAPIEventListenerManaged('libraryUpdated', (tracks: Track[]) => {
             this.tracks = tracks || [];
+            this.calculatePlayStats();
+            if (this.isVisible) this.render();
         });
 
         this.historyUnsubscribe = recentPlaybackHistoryService.subscribe(() => {

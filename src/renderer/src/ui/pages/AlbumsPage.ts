@@ -48,7 +48,6 @@ class AlbumsPage extends Component {
     private _coverQueue: string[];
     private _coverConcurrency: number;
     private _coverMaxConcurrency: number;
-    private _lastTracksHash: string | null;
     private listenersSetup: boolean;
     private albumGroupingUnsubscribe: Unsubscribe | null;
     private coverPreferenceUnsubscribe: Unsubscribe | null;
@@ -78,8 +77,6 @@ class AlbumsPage extends Component {
         this._coverQueue = [];            // 待处理队列（存储专辑key）
         this._coverConcurrency = 0;
         this._coverMaxConcurrency = 5;
-        // 防重复机制
-        this._lastTracksHash = null;      // 上次tracks的哈希值
         this.listenersSetup = false; // 事件监听器是否已设置
         this.albumGroupingUnsubscribe = albumGroupingPreferenceService.onChanged(() => {
             this.selectedAlbum = null;
@@ -107,7 +104,16 @@ class AlbumsPage extends Component {
                 this.emit('appendAllTracks', tracks);
             },
             onTrackRightClick: (track, index, x, y, selectedTracks, selectedTrackItems) => {
-                this.emit('trackRightClick', track, index, x, y, selectedTracks, selectedTrackItems);
+                this.emit(
+                    'trackRightClick',
+                    track,
+                    index,
+                    x,
+                    y,
+                    selectedTracks,
+                    selectedTrackItems,
+                    this.selectedAlbum?.tracks || []
+                );
             }
         });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
@@ -132,6 +138,7 @@ class AlbumsPage extends Component {
     }
 
     async show(): Promise<void> {
+        const viewGeneration = ++this.coverGeneration;
         if (!this.listenersSetup) {
             this._bindLibraryEvents();
             this.listenersSetup = true;
@@ -144,8 +151,8 @@ class AlbumsPage extends Component {
             const pageData = await libraryPageDataService.getAlbums(this.sortBy, this.sortDirection, {
                 splitByArtist: albumGroupingPreferenceService.shouldSplitByArtist()
             });
+            if (!this.isVisible || viewGeneration !== this.coverGeneration) return;
             this.tracks = pageData.tracks;
-            this._lastTracksHash = this._generateTracksHash(this.tracks);
             this.albums = pageData.albums;
             this.scheduleCoversForMissing();
         }
@@ -177,7 +184,6 @@ class AlbumsPage extends Component {
         this._coverQueue.length = 0;
         this._lastSourceRect = null;
         this._lastSourceKey = null;
-        this._lastTracksHash = null;
         this.listenersSetup = false;
         this.albumGroupingUnsubscribe?.();
         this.albumGroupingUnsubscribe = null;
@@ -191,16 +197,12 @@ class AlbumsPage extends Component {
 
     _bindLibraryEvents(): void {
         this.addAPIEventListenerManaged('libraryUpdated', (tracks) => {
-            const newTracksHash = this._generateTracksHash(tracks || []);
-
-            // 检查tracks是否真正发生了变化
-            if (this._lastTracksHash === newTracksHash) {
-                return;
-            }
-
-            this._lastTracksHash = newTracksHash;
+            const selectedAlbumKey = this.selectedAlbum?.key;
             this.tracks = (tracks || []) as Track[];
             this.processAlbums();
+            this.selectedAlbum = selectedAlbumKey
+                ? this.albums.find((album) => album.key === selectedAlbumKey) || null
+                : null;
             if (this.isVisible) this.render();
         });
     }
