@@ -16,7 +16,7 @@ describe('系统歌曲页面', () => {
             showCreatedDate: true
         });
         expect(getCollectionCapabilities('favorites')).toEqual({
-            canAddSongs: true,
+            canAddSongs: false,
             canClear: true,
             canEditCover: false,
             canRemoveTracks: false,
