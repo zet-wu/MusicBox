@@ -16,7 +16,7 @@ class SettingsSystemGateway {
 
     readonly settings = {
         get: <T = unknown>(key: string): Promise<T | null> => getElectronAPI().settings.get<T>(key),
-        set: <T = unknown>(key: string, value: T): Promise<void> => getElectronAPI().settings.set(key, value),
+        set: <T = unknown>(key: string, value: T): Promise<boolean> => getElectronAPI().settings.set(key, value),
         getMusicFolders: (): Promise<string[]> => getElectronAPI().settings.getMusicFolders(),
         getAutoScanSettings: (): Promise<unknown> => getElectronAPI().settings.getAutoScanSettings(),
         addMusicFolder: (folderPath: string): Promise<unknown> => getElectronAPI().settings.addMusicFolder(folderPath),

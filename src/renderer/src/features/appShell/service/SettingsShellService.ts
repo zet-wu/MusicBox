@@ -39,8 +39,8 @@ export class SettingsShellService {
         return await settingsSystemGateway.settings.get<T>(key);
     }
 
-    async setSetting<T = unknown>(key: string, value: T): Promise<void> {
-        await settingsSystemGateway.settings.set(key, value);
+    async setSetting<T = unknown>(key: string, value: T): Promise<boolean> {
+        return await settingsSystemGateway.settings.set(key, value);
     }
 
     async selectFolder(): Promise<FolderSelectionResult> {

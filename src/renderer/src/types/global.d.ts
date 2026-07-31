@@ -25,7 +25,7 @@ import type {AppReadyEventDetail} from '@extensions/core/types';
 
 interface ElectronSettingsAPI {
     get<T = unknown>(key: string): Promise<T | null>;
-    set<T = unknown>(key: string, value: T): Promise<void>;
+    set<T = unknown>(key: string, value: T): Promise<boolean>;
     getAll(): Promise<Record<string, unknown>>;
     reset(): Promise<unknown>;
     getMusicFolders(): Promise<string[]>;

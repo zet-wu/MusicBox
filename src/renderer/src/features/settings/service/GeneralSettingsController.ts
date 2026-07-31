@@ -5,6 +5,7 @@ import {settingsPanelVisibilityService} from "./SettingsPanelVisibilityService";
 import type {SettingValue} from "./SettingsStore";
 import type {SettingsListenerScope} from "./SettingsListenerScope";
 import type {PlaylistInfoAlignment} from "@api/types/settings";
+import {playlistAutoCoverPreferenceService} from './PlaylistAutoCoverPreferenceService';
 
 export interface GeneralSettingsElements {
     navButtons: Iterable<HTMLElement>;
@@ -22,6 +23,7 @@ export interface GeneralSettingsElements {
     splitAlbumsByArtistToggle: HTMLInputElement | null;
     showTrackCoversToggle: HTMLInputElement | null;
     autoFetchMissingTrackCoversToggle: HTMLInputElement | null;
+    autoPlaylistCoverToggle: HTMLInputElement | null;
     gaplessPlaybackToggle: HTMLInputElement | null;
     networkDriveToggle: HTMLInputElement | null;
     networkDriveConfig: HTMLElement | null;
@@ -102,6 +104,25 @@ class GeneralSettingsController {
             scope,
             'autoFetchMissingTrackCoversChanged'
         );
+        scope.listen(elements.autoPlaylistCoverToggle, 'change', async () => {
+            const toggle = elements.autoPlaylistCoverToggle;
+            if (!toggle) return;
+            const requestedValue = toggle.checked;
+            toggle.disabled = true;
+            try {
+                const saved = await playlistAutoCoverPreferenceService.save(requestedValue);
+                if (!saved) {
+                    toggle.checked = !requestedValue;
+                    showToast('保存自动歌单封面设置失败', 'error');
+                }
+            } catch (error) {
+                console.error('❌ GeneralSettingsController: 保存自动歌单封面设置失败', error);
+                toggle.checked = !requestedValue;
+                showToast('保存自动歌单封面设置失败', 'error');
+            } finally {
+                toggle.disabled = false;
+            }
+        });
         this.bindCheckedSetting(elements.gaplessPlaybackToggle, 'gaplessPlayback', callbacks, scope, 'gaplessPlaybackEnabled');
         this.bindNetworkDriveToggle(elements, callbacks, scope);
         this.bindNetworkDriveModal(elements, scope);

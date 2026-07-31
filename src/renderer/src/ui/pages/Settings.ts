@@ -28,6 +28,7 @@ import {settingsPanelVisibilityService} from "@/features/settings/service";
 import {settingsPageVisibilityService} from "@/features/settings/service";
 import {settingsSectionNavigationService} from "@/features/settings/service";
 import {settingsStore, type SettingValue} from "@/features/settings/service";
+import {playlistAutoCoverPreferenceService} from "@/features/settings/service";
 import {
     settingsToolsController,
     type SettingsToolsElements
@@ -118,6 +119,7 @@ class Settings extends Component {
         this.splitAlbumsByArtistToggle = this.element.querySelector('#split-albums-by-artist-toggle');
         this.showTrackCoversToggle = this.element.querySelector('#show-track-covers-toggle');
         this.autoFetchMissingTrackCoversToggle = this.element.querySelector('#auto-fetch-missing-track-covers-toggle');
+        this.autoPlaylistCoverToggle = this.element.querySelector('#auto-playlist-cover-toggle');
         this.gaplessPlaybackToggle = this.element.querySelector('#gapless-playback-toggle');
         this.exclusiveModeToggle = this.element.querySelector('#exclusive-mode-toggle');
         this.exclusiveModeItem = this.element.querySelector('#exclusive-mode-item');
@@ -401,6 +403,9 @@ class Settings extends Component {
         this.splitAlbumsByArtistToggle.checked = initialValues.splitAlbumsByArtist;
         this.showTrackCoversToggle.checked = initialValues.showTrackCovers;
         this.autoFetchMissingTrackCoversToggle.checked = initialValues.autoFetchMissingTrackCovers;
+        this.autoPlaylistCoverToggle.checked = false;
+        this.autoPlaylistCoverToggle.disabled = true;
+        void this.initializeAutoPlaylistCoverSetting();
         this.gaplessPlaybackToggle.checked = initialValues.gaplessPlayback;
 
         // 初始化音乐文件夹和自动扫描设置
@@ -468,6 +473,17 @@ class Settings extends Component {
     // 加载设置
     loadSettings(): MusicBoxSettings {
         return settingsStore.load();
+    }
+
+    private async initializeAutoPlaylistCoverSetting(): Promise<void> {
+        try {
+            this.autoPlaylistCoverToggle.checked = await playlistAutoCoverPreferenceService.load();
+        } catch (error) {
+            console.error('❌ Settings: 加载自动歌单封面设置失败', error);
+            this.autoPlaylistCoverToggle.checked = false;
+        } finally {
+            this.autoPlaylistCoverToggle.disabled = false;
+        }
     }
 
     // 更新设置
@@ -693,6 +709,7 @@ class Settings extends Component {
             splitAlbumsByArtistToggle: this.splitAlbumsByArtistToggle,
             showTrackCoversToggle: this.showTrackCoversToggle,
             autoFetchMissingTrackCoversToggle: this.autoFetchMissingTrackCoversToggle,
+            autoPlaylistCoverToggle: this.autoPlaylistCoverToggle,
             gaplessPlaybackToggle: this.gaplessPlaybackToggle,
             networkDriveToggle: this.networkDriveToggle,
             networkDriveConfig: this.networkDriveConfig,
