@@ -25,6 +25,7 @@ import '@ui/pages/ArtistsPage';
 import '@ui/pages/AlbumsPage';
 import '@ui/pages/PlaylistsPage';
 import '@ui/pages/HomePage';
+import '@ui/pages/FolderSourcesPage';
 import '@ui/pages/NetworkDriveDetailPage';
 import '@ui/pages/PlaylistDetailPage';
 import '@ui/pages/RecentPage';
@@ -45,6 +46,7 @@ import '@ui/modals/UpdateModal';
 import '@ui/dialogs/AddToPlaylistDialog';
 import '@ui/dialogs/CreatePlaylistDialog';
 import '@ui/dialogs/EditTrackInfoDialog';
+import '@ui/dialogs/FolderPlaylistBindingDialog';
 import '@ui/dialogs/PlaylistBindingDialog';
 import '@ui/dialogs/RenamePlaylistDialog';
 

@@ -1,5 +1,6 @@
 import type {Track} from "@api/types/track";
 import type {Playlist} from "@api/types/playlist";
+import type {LibraryDirectoryOverview} from "@api/types/electron";
 import type {AppView} from "@/shared/types/AppContracts";
 
 import type {
@@ -46,6 +47,14 @@ export class PageComponentBindings {
         if (components.playlistsPage) {
             this.setupSingleComponentEvents('playlistsPage');
         }
+
+        if (components.folderSourcesPage) {
+            this.setupSingleComponentEvents('folderSourcesPage');
+        }
+
+        components.folderPlaylistBindingDialog?.on('bindingsChanged', async () => {
+            await components.folderSourcesPage?.refresh();
+        });
 
         if (components.statisticsPage) {
             this.setupSingleComponentEvents('statisticsPage');
@@ -168,6 +177,12 @@ export class PageComponentBindings {
                         content.showCollectionContextMenu(x, y, tracks, playlist);
                     }
                 );
+                break;
+
+            case 'folderSourcesPage':
+                components.folderSourcesPage?.on('manageBindings', async (source: LibraryDirectoryOverview) => {
+                    await this.context.dialogs.showFolderPlaylistBindingDialog(source);
+                });
                 break;
 
             case 'statisticsPage':

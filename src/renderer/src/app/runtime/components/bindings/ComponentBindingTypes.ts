@@ -38,6 +38,7 @@ export type ComponentEventName =
     | 'artistsPage'
     | 'albumsPage'
     | 'playlistsPage'
+    | 'folderSourcesPage'
     | 'statisticsPage'
     | 'networkDiskModal'
     | 'networkDriveDetailPage';

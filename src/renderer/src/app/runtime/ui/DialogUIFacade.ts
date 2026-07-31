@@ -1,5 +1,6 @@
 import type {Playlist} from '@api/types/playlist';
 import type {Track} from '@api/types/track';
+import type {LibraryDirectoryOverview} from '@api/types/electron';
 import type {ConfirmOptions} from '@/shared/types/AppContracts';
 import type {AppComponentPort} from '../AppRuntimePorts';
 
@@ -28,6 +29,10 @@ export class DialogUIFacade {
 
     async showPlaylistBindingDialog(playlist: Playlist): Promise<void> {
         await this.app.components.playlistBindingDialog?.show(playlist);
+    }
+
+    async showFolderPlaylistBindingDialog(source: LibraryDirectoryOverview): Promise<void> {
+        await this.app.components.folderPlaylistBindingDialog?.show(source);
     }
 
     async showEditTrackInfoDialog(track: Track): Promise<void> {

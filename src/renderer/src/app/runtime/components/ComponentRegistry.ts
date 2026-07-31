@@ -1,6 +1,7 @@
 import {AlbumsPage} from "@ui/pages/AlbumsPage";
 import {ArtistsPage} from "@ui/pages/ArtistsPage";
 import {HomePage} from "@ui/pages/HomePage";
+import {FolderSourcesPage} from "@ui/pages/FolderSourcesPage";
 import {NetworkDriveDetailPage} from "@ui/pages/NetworkDriveDetailPage";
 import {PlaylistDetailPage} from "@ui/pages/PlaylistDetailPage";
 import {PlaylistsPage} from "@ui/pages/PlaylistsPage";
@@ -24,6 +25,7 @@ import {AddToPlaylistDialog} from "@ui/dialogs/AddToPlaylistDialog";
 import {ConfirmDialog} from "@ui/dialogs/ConfirmDialog";
 import {CreatePlaylistDialog} from "@ui/dialogs/CreatePlaylistDialog";
 import {EditTrackInfoDialog} from "@ui/dialogs/EditTrackInfoDialog";
+import {FolderPlaylistBindingDialog} from "@ui/dialogs/FolderPlaylistBindingDialog";
 import {PlaylistBindingDialog} from "@ui/dialogs/PlaylistBindingDialog";
 import {RenamePlaylistDialog} from "@ui/dialogs/RenamePlaylistDialog";
 
@@ -69,6 +71,7 @@ export class ComponentRegistry {
         this.components.renamePlaylistDialog = new RenamePlaylistDialog();
         this.components.playlistBindingDialog = new PlaylistBindingDialog();
         this.components.editTrackInfoDialog = new EditTrackInfoDialog();
+        this.components.folderPlaylistBindingDialog = new FolderPlaylistBindingDialog();
 
         this.components.playlistDetailPage = new PlaylistDetailPage('#content-area');
         this.components.playlistsPage = new PlaylistsPage('#content-area');
@@ -79,6 +82,7 @@ export class ComponentRegistry {
         this.components.networkDiskModal = null;
         this.components.pluginManagerModal = new PluginManagerModal();
         this.components.homePage = new HomePage('#content-area');
+        this.components.folderSourcesPage = new FolderSourcesPage('#content-area');
 
         this.initializePageComponentsOnDemand();
     }
