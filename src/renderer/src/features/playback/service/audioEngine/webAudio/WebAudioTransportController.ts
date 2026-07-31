@@ -44,6 +44,12 @@ class WebAudioTransportController {
         }
 
         mediaElement.onended = () => this.handleSourceEnded();
+        mediaElement.onplay = () => {
+            void this.transitionToPlaying();
+        };
+        mediaElement.onpause = () => {
+            void this.transitionToPaused();
+        };
     }
 
     isPlaying(): boolean {
@@ -80,11 +86,8 @@ class WebAudioTransportController {
             }
 
             await mediaElement.play();
-            this.playing = true;
-            this.paused = false;
             this.pauseTime = mediaElement.currentTime || 0;
-            this.startProgressUpdates();
-            await this.notifyPlaybackStateChanged(true);
+            await this.transitionToPlaying();
 
             return true;
         } catch (error) {
@@ -107,12 +110,8 @@ class WebAudioTransportController {
 
             mediaElement.pause();
             this.pauseTime = this.clampPosition(mediaElement.currentTime || 0, this.getMaxPosition());
-            this.playing = false;
-            this.paused = true;
-            this.stopProgressUpdates();
-
             console.log(`⏸️ 暂停播放，位置: ${this.pauseTime.toFixed(2)}s`);
-            await this.notifyPlaybackStateChanged(false);
+            await this.transitionToPaused();
 
             return true;
         } catch (error) {
@@ -201,9 +200,21 @@ class WebAudioTransportController {
     }
 
     destroy(): void {
+        this.releaseMediaElementHandlers();
         this.clearMediaSource();
         this.releaseSourceNode();
         this.stopProgressUpdates();
+    }
+
+    private releaseMediaElementHandlers(): void {
+        const mediaElement = this.options.getMediaElement();
+        if (!mediaElement) {
+            return;
+        }
+
+        mediaElement.onended = null;
+        mediaElement.onplay = null;
+        mediaElement.onpause = null;
     }
 
     private releaseSourceNode(): void {
@@ -231,6 +242,32 @@ class WebAudioTransportController {
         this.stopProgressUpdates();
         void this.notifyPlaybackStateChanged(false);
         void this.options.onTrackEnded();
+    }
+
+    private async transitionToPlaying(): Promise<void> {
+        if (this.playing && !this.paused) {
+            return;
+        }
+
+        this.playing = true;
+        this.paused = false;
+        this.startProgressUpdates();
+        await this.notifyPlaybackStateChanged(true);
+    }
+
+    private async transitionToPaused(): Promise<void> {
+        if (!this.playing) {
+            return;
+        }
+
+        const mediaElement = this.options.getMediaElement();
+        if (mediaElement) {
+            this.pauseTime = this.clampPosition(mediaElement.currentTime || 0, this.getMaxPosition());
+        }
+        this.playing = false;
+        this.paused = true;
+        this.stopProgressUpdates();
+        await this.notifyPlaybackStateChanged(false);
     }
 
     private startProgressUpdates(): void {
