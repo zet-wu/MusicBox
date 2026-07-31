@@ -10,6 +10,7 @@ import {
     GetTracksOptions
 } from '../services/library/LibraryCacheManager';
 import {MetadataHandler} from '../services/library/MetadataHandler';
+import {EmbeddedCoverService, type EmbeddedCoverResult} from '../services/library/EmbeddedCoverService';
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
 import {NetworkDriveManager} from '../services/network/NetworkDriveManager';
 import {WindowManager} from '../core/WindowManager';
@@ -29,6 +30,7 @@ export class LibraryController extends BaseController {
         private networkDriveManager: NetworkDriveManager,
         private networkFileAdapter: NetworkFileAdapter,
         private windowManager: WindowManager,
+        private embeddedCoverService: EmbeddedCoverService,
         private parseMetadata: (filePath: string, adapter?: any, opts?: any) => Promise<TrackMetadata>,
         audioEngineState: any
     ) {
@@ -446,6 +448,20 @@ export class LibraryController extends BaseController {
     }
 
     // ── 元数据 ──────────────────────────────────────────────
+
+    @IpcHandle('library:getTrackCover')
+    async getTrackCover(filePath: string): Promise<EmbeddedCoverResult | null> {
+        try {
+            if (!filePath) {
+                console.warn('⚠️ getTrackCover: 未提供文件路径');
+                return null;
+            }
+            return await this.embeddedCoverService.getCover(filePath, this.networkFileAdapter);
+        } catch (error) {
+            console.error('❌ 获取内嵌封面失败:', error);
+            return null;
+        }
+    }
 
     @IpcHandle('library:getTrackMetadata')
     async getTrackMetadata(filePath: string): Promise<any> {

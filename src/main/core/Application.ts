@@ -49,6 +49,7 @@ export class Application {
     private windowManager: WindowManager;
     private configManager: ConfigManager;
     private controllers: BaseController[] = [];
+    private embeddedCoverService: {destroy(): Promise<void>} | null = null;
     private isInitialized = false;
     private isConfigured = false;
     private perfTimer = new PerformanceTimer();
@@ -310,6 +311,7 @@ export class Application {
             {LyricsController},
             {TrayController},
             {HttpServerController},
+            {EmbeddedCoverService},
             {parseMetadata}
         ] = await Promise.all([
             import('../controllers/WindowController'),
@@ -334,6 +336,7 @@ export class Application {
             import('../controllers/LyricsController'),
             import('../controllers/TrayController'),
             import('../controllers/HttpServerController'),
+            import('../services/library/EmbeddedCoverService'),
             import('../utils/metadata')
         ]);
 
@@ -357,6 +360,8 @@ export class Application {
         }
 
         const audioController = new AudioController(boundParseMetadata);
+        const embeddedCoverService = new EmbeddedCoverService();
+        this.embeddedCoverService = embeddedCoverService;
         const trayController = new TrayController(this.windowManager);
         this.windowManager.setTraySettingsGetter(() => trayController.getSettings());
 
@@ -372,7 +377,8 @@ export class Application {
             new NetworkController(networkDriveManager, networkFileAdapter, this.windowManager),
             new LibraryController(
                 libraryCacheManager, metadataHandler, networkDriveManager,
-                networkFileAdapter, this.windowManager, parseMetadata, audioController.state
+                networkFileAdapter, this.windowManager, embeddedCoverService,
+                parseMetadata, audioController.state
             ),
             new SystemController(),
             new SettingsController(),
@@ -423,6 +429,11 @@ export class Application {
             // 注销所有控制器
             for (const controller of this.controllers) {
                 controller.unregister();
+            }
+
+            if (this.embeddedCoverService) {
+                await this.embeddedCoverService.destroy();
+                this.embeddedCoverService = null;
             }
 
             // 关闭所有窗口

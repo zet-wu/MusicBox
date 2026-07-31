@@ -84,6 +84,11 @@ export interface FavoritesChangedData {
     favorite?: boolean;
 }
 
+export interface EmbeddedTrackCover {
+    format: string;
+    data: Uint8Array | number[];
+}
+
 export interface ElectronLibraryAPI {
     scanDirectory(path: string): Promise<boolean>;
     scanNetworkDrive(driveId: string | number, relativePath: string): Promise<boolean>;
@@ -94,6 +99,7 @@ export interface ElectronLibraryAPI {
     getPlaylists(): Promise<Playlist[]>;
     search(query: string): Promise<Track[]>;
     getTrackMetadata(filePath: string): Promise<Track | null>;
+    getTrackCover(filePath: string): Promise<EmbeddedTrackCover | null>;
     getTrackPlaybackMetadata(filePath: string): Promise<Track | null>;
     updateTrackMetadata(trackId: string, metadata: Partial<Track>): Promise<unknown>;
     createPlaylist(name: string, description?: string): Promise<unknown>;

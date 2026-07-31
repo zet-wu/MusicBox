@@ -1,5 +1,6 @@
 import {libraryGateway} from '@/infrastructure/electron';
 import type {Result} from '@api/types/common';
+import type {EmbeddedTrackCover} from '@api/types/electron';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 
 export type PlaylistMutationResult = {
@@ -74,6 +75,16 @@ export class LibraryDataService {
         return await this.callGateway(
             () => libraryGateway.getTrackMetadata(filePath),
             'library.getTrackMetadata',
+            null
+        );
+    }
+
+    async getTrackCover(filePath: string): Promise<EmbeddedTrackCover | null> {
+        this.assertFilePath(filePath, 'filePath');
+
+        return await this.callGateway(
+            () => libraryGateway.getTrackCover(filePath),
+            'library.getTrackCover',
             null
         );
     }

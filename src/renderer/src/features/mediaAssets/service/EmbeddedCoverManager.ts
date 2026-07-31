@@ -22,10 +22,6 @@ interface EmbeddedCoverData {
     format?: string;
 }
 
-interface TrackMetadataWithCover {
-    cover?: EmbeddedCoverData;
-}
-
 interface BufferLike {
     length: number;
     constructor?: {
@@ -114,16 +110,9 @@ class EmbeddedCoverManager {
 
             this.processingFiles.add(filePath);
 
-            // 从主进程获取元数据（包括封面）
-            const metadata = await libraryDataService.getTrackMetadata(filePath) as TrackMetadataWithCover | null;
-            if (!metadata || typeof metadata !== 'object') {
-                const errorResult: EmbeddedCoverResult = {success: false, error: '主进程返回无效响应'};
-                this.setCache(cacheKey, errorResult);
-                this.processingFiles.delete(filePath);
-                return errorResult;
-            }
-
-            if (!metadata.cover) {
+            // 从工作线程获取内嵌封面，不解析列表不需要的完整元数据
+            const cover = await libraryDataService.getTrackCover(filePath);
+            if (!cover) {
                 const errorResult: EmbeddedCoverResult = {success: false, error: '音频文件中未找到内嵌封面'};
                 this.setCache(cacheKey, errorResult);
                 this.processingFiles.delete(filePath);
@@ -131,7 +120,7 @@ class EmbeddedCoverManager {
             }
 
             // 验证封面数据
-            if (!metadata.cover.data || !metadata.cover.format) {
+            if (!cover.data || !cover.format) {
                 const errorResult: EmbeddedCoverResult = {success: false, error: '内嵌封面数据格式无效'};
                 this.setCache(cacheKey, errorResult);
                 this.processingFiles.delete(filePath);
@@ -139,7 +128,7 @@ class EmbeddedCoverManager {
             }
 
             // 转换封面数据为可用的URL
-            const convertedCover = this.convertCoverToUrl(metadata.cover);
+            const convertedCover = this.convertCoverToUrl(cover);
             if (!convertedCover.success) {
                 const errorResult: EmbeddedCoverResult = {success: false, error: `封面格式转换失败: ${convertedCover.error}`};
                 this.setCache(cacheKey, errorResult);
@@ -159,7 +148,7 @@ class EmbeddedCoverManager {
                 success: true,
                 url: convertedCover.url,
                 mimeType: convertedCover.mimeType,
-                format: metadata.cover.format,
+                format: cover.format,
                 size: convertedCover.size,
                 source: 'embedded',
             };

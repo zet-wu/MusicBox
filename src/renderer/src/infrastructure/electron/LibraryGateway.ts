@@ -2,7 +2,7 @@ import {ElectronNamespaceAdapter} from './ElectronBridge';
 import type {Result, Unsubscribe} from '@api/types/common';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 import type {CacheValidationResult, ScanProgress} from '@api/types/events';
-import type {FavoritesChangedData} from '@api/types/electron';
+import type {EmbeddedTrackCover, FavoritesChangedData} from '@api/types/electron';
 
 export interface PlaylistResult {
     success: boolean;
@@ -37,6 +37,10 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
 
     getTrackMetadata(filePath: string): Promise<Track | null> {
         return this.call('getTrackMetadata', filePath);
+    }
+
+    getTrackCover(filePath: string): Promise<EmbeddedTrackCover | null> {
+        return this.call('getTrackCover', filePath);
     }
 
     getTrackPlaybackMetadata(filePath: string): Promise<Track | null> {
