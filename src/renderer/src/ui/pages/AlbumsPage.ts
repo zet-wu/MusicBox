@@ -2,8 +2,6 @@
  * 专辑页组件
  * 营造“收藏实体专辑”的沉浸式浏览体验
  */
-
-import {formatTime} from "@utils/index.js";
 import {Component} from "@ui/base/Component";
 import {TrackCollectionDetail} from "@ui/components/TrackCollectionDetail";
 import {
@@ -45,12 +43,12 @@ class AlbumsPage extends Component {
     private _coverConcurrency: number;
     private _coverMaxConcurrency: number;
     private _lastTracksHash: string | null;
-    private _coversScheduled: boolean;
     private listenersSetup: boolean;
     private albumGroupingUnsubscribe: Unsubscribe | null;
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private coverGeneration: number;
     private readonly trackCollectionDetail: TrackCollectionDetail;
+    private coverObserver: IntersectionObserver | null;
     isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -73,11 +71,9 @@ class AlbumsPage extends Component {
         this._coverMaxConcurrency = 5;
         // 防重复机制
         this._lastTracksHash = null;      // 上次tracks的哈希值
-        this._coversScheduled = false;    // 是否已经调度过封面获取
         this.listenersSetup = false; // 事件监听器是否已设置
         this.albumGroupingUnsubscribe = albumGroupingPreferenceService.onChanged(() => {
             this.selectedAlbum = null;
-            this._coversScheduled = false;
             this._coverQueue.length = 0;
             this._coverFailures.clear();
             this.processAlbums();
@@ -86,6 +82,7 @@ class AlbumsPage extends Component {
             }
         });
         this.coverGeneration = 0;
+        this.coverObserver = null;
         this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
             onBack: () => {
                 this.selectedAlbum = null;
@@ -108,7 +105,6 @@ class AlbumsPage extends Component {
             this.coverGeneration++;
             this._coverQueue.length = 0;
             this._coverRequests.clear();
-            this._coversScheduled = false;
             if (!enabled) {
                 const selectedAlbumKey = this.selectedAlbum?.key;
                 this.processAlbums();
@@ -154,6 +150,8 @@ class AlbumsPage extends Component {
 
     hide(): void {
         this.coverGeneration++;
+        this.coverObserver?.disconnect();
+        this.coverObserver = null;
         this.isVisible = false;
         this.selectedAlbum = null;
         this.trackCollectionDetail.hide();
@@ -175,6 +173,8 @@ class AlbumsPage extends Component {
         this.albumGroupingUnsubscribe = null;
         this.coverPreferenceUnsubscribe?.();
         this.coverPreferenceUnsubscribe = null;
+        this.coverObserver?.disconnect();
+        this.coverObserver = null;
         this.trackCollectionDetail.destroy();
         super.destroy();
     }
@@ -190,7 +190,6 @@ class AlbumsPage extends Component {
 
             this._lastTracksHash = newTracksHash;
             this.tracks = (tracks || []) as Track[];
-            this._coversScheduled = false; // 重置封面调度状态
             this.processAlbums();
             if (this.isVisible) this.render();
         });
@@ -218,27 +217,31 @@ class AlbumsPage extends Component {
     scheduleCoversForMissing(): void {
         if (!trackCoverNetworkPreferenceService.isEnabled()) return;
         if (!this.albums || this.albums.length === 0) return;
+        const container = this.container as HTMLElement | null;
+        const tiles = container?.querySelectorAll<HTMLElement>('.albumsx-tile');
+        if (!tiles?.length) return;
 
-        // 防重复机制：检查是否已经调度过封面获取
-        if (this._coversScheduled) {
-            return;
-        }
-
-        let scheduledCount = 0;
-
-        for (const album of this.albums) {
-            if (!album.cover) {
-                const key = album.key;
-                if (this._coverRequests.has(key) || this._coverFailures.has(key)) continue;
-                this._coverQueue.push(key);
-                scheduledCount++;
-            }
-        }
-
-        if (scheduledCount > 0) {
-            this._coversScheduled = true;
-            this._drainCoverQueue();
-        }
+        this.coverObserver?.disconnect();
+        this.coverObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const tile = entry.target as HTMLElement;
+                const key = tile.dataset.albumKey;
+                const album = key ? this.albums.find(item => item.key === key) : null;
+                if (
+                    album
+                    && !album.cover
+                    && !this._coverRequests.has(album.key)
+                    && !this._coverFailures.has(album.key)
+                    && !this._coverQueue.includes(album.key)
+                ) {
+                    this._coverQueue.push(album.key);
+                    void this._drainCoverQueue();
+                }
+                observer.unobserve(tile);
+            });
+        }, {root: document.querySelector('.main-content'), rootMargin: '240px'});
+        tiles.forEach((tile: HTMLElement) => this.coverObserver?.observe(tile));
     }
 
     async _drainCoverQueue(): Promise<void> {
@@ -385,6 +388,7 @@ class AlbumsPage extends Component {
             </div>`;
 
         this.setupListEventListeners();
+        this.scheduleCoversForMissing();
     }
 
     renderEmptyState(): string {
@@ -432,68 +436,6 @@ class AlbumsPage extends Component {
             tracks
         });
         return;
-
-        const duration = this.formatDuration(album.totalDuration);
-        const cover = album.cover || 'assets/images/default-cover.svg';
-        this.container.innerHTML = `
-            <div class="albumsx detail">
-                <div class="detail-topbar">
-                    <button class="ghost" id="back-to-albums" title="返回">
-                        <svg viewBox="0 0 24 24"><path d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z"/></svg>
-                        返回
-                    </button>
-                </div>
-                <div class="detail-hero">
-                    <div class="cover">
-                        <img src="${cover}" alt="${this.escapeHtml(album.name)}"/>
-                    </div>
-                    <div class="info">
-                        <h1 class="name">${this.escapeHtml(album.name)}</h1>
-                        <div class="stats">
-                            <span>${this.escapeHtml(album.artist)}</span>
-                            <span>·</span>
-                            <span>${album.year || '年份未知'}</span>
-                            <span>·</span>
-                            <span>${tracks.length} 首</span>
-                            <span>·</span>
-                            <span>${duration}</span>
-                        </div>
-                        <div class="actions">
-                            <button class="primary" id="play-album">
-                                <svg viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg>
-                                播放专辑
-                            </button>
-                            <button class="outline" id="shuffle-album">
-                                <svg viewBox="0 0 24 24"><path d="M14.83,13.41L13.42,14.82L16.55,17.95L14.5,20H20V14.5L17.96,16.54L14.83,13.41M14.5,4L16.54,6.04L4,18.59L5.41,20L17.96,7.46L20,9.5V4M10.59,9.17L5.41,4L4,5.41L9.17,10.58L10.59,9.17Z"/></svg>
-                                随机播放
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="detail-tracks">
-                    ${tracks.map((t, i) => this.renderTrackRow(t, i)).join('')}
-                </div>
-            </div>`;
-        this.setupDetailEventListeners();
-    }
-
-    renderTrackRow(track: Track, index: number): string {
-        return `
-            <div class="trackx" data-track-path="${this.escapeHtml(track.filePath)}" data-index="${index}">
-                <div class="idx">${(track as any).track || index + 1}</div>
-                <div class="t-main">
-                    <div class="t-title clamp-1">${this.escapeHtml(track.title || '未知标题')}</div>
-                </div>
-                <div class="t-tail">
-                    <span class="t-time">${formatTime(track.duration || 0)}</span>
-                    <button class="i-btn" title="播放">
-                        <svg viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg>
-                    </button>
-                    <button class="i-btn" title="添加到播放列表">
-                        <svg viewBox="0 0 24 24"><path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/></svg>
-                    </button>
-                </div>
-            </div>`;
     }
 
     setupListEventListeners(): void {
@@ -543,48 +485,6 @@ class AlbumsPage extends Component {
 
             // 方向性高光，指针事件
             if (art) this.attachGlossHandlers(art);
-        });
-    }
-
-    setupDetailEventListeners(): void {
-        if (!this.selectedAlbum) return;
-
-        // 返回
-        // 反向共享元素转场
-        const backBtn = this.container.querySelector('#back-to-albums');
-        if (backBtn) backBtn.addEventListener('click', () => {
-            this.animateBackToGrid();
-        });
-
-        // 播放 / 随机
-        const playBtn = this.container.querySelector('#play-album');
-        if (playBtn) playBtn.addEventListener('click', () => this.emit('playAll', this.selectedAlbum?.tracks.sort((a, b) => ((a as any).track || 0) - ((b as any).track || 0))));
-        const shuffleBtn = this.container.querySelector('#shuffle-album');
-        if (shuffleBtn) {
-            shuffleBtn.addEventListener('click', () => {
-                this.emit('shuffleAll', this.selectedAlbum?.tracks || []);
-            });
-        }
-
-        // 歌曲行
-        this.container.querySelectorAll('.trackx').forEach((row: any) => {
-            const trackPath = row.dataset.trackPath;
-            const track = this.selectedAlbum?.tracks.find(t => t.filePath === trackPath);
-            if (!track) return;
-
-            const play = row.querySelector('.i-btn:first-of-type');
-            if (play) play.addEventListener('click', (e: Event) => {
-                e.stopPropagation();
-                this.emit('trackPlayed', track, 0);
-            });
-
-            const add = row.querySelector('.i-btn:last-of-type');
-            if (add) add.addEventListener('click', (e: Event) => {
-                e.stopPropagation();
-                this.emit('addToPlaylist', track);
-            });
-
-            row.addEventListener('dblclick', () => this.emit('trackPlayed', track, 0));
         });
     }
 
