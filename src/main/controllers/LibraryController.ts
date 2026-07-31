@@ -12,6 +12,7 @@ import {
 } from '../services/library/LibraryCacheManager';
 import {MetadataHandler} from '../services/library/MetadataHandler';
 import {EmbeddedCoverService, type EmbeddedCoverResult} from '../services/library/EmbeddedCoverService';
+import {PlaylistCoverStorage} from '../services/library/PlaylistCoverStorage';
 import {
     LibrarySourceManager,
     type LibrarySourceKnownFile,
@@ -59,6 +60,7 @@ export class LibraryController extends BaseController {
         private networkFileAdapter: NetworkFileAdapter,
         private windowManager: WindowManager,
         private embeddedCoverService: EmbeddedCoverService,
+        private playlistCoverStorage: PlaylistCoverStorage,
         private parseMetadata: (filePath: string, adapter?: any, opts?: any) => Promise<TrackMetadata>,
         private loadMusicFolders: () => Promise<string[]>,
         private librarySourceManager: LibrarySourceManager,
@@ -202,6 +204,7 @@ export class LibraryController extends BaseController {
                 success: true,
                 playlist: {
                     ...playlist,
+                    coverImage: this.libraryCacheManager.getPlaylistCover(playlistId),
                     trackIds: [...playlist.trackIds],
                     resolvedTrackCount: tracks.length
                 },
@@ -216,9 +219,13 @@ export class LibraryController extends BaseController {
     async deletePlaylist(playlistId: string): Promise<{ success: boolean; error?: string }> {
         try {
             await this.ensureLibrarySourcesLoaded();
+            const coverFileName = this.libraryCacheManager.getPlaylistCoverFileName(playlistId);
             await this.librarySourceManager.removePlaylistBindings(playlistId);
             this.libraryCacheManager.deletePlaylist(playlistId);
             await this.libraryCacheManager.saveCache();
+            await this.playlistCoverStorage.remove(coverFileName).catch(error => {
+                console.warn('⚠️ 删除歌单封面快照失败:', error);
+            });
             return {success: true};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -880,15 +887,39 @@ export class LibraryController extends BaseController {
     }
 
     @IpcHandle('library:updatePlaylistCover')
-    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<{ success: boolean; error?: string }> {
+    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<{
+        success: boolean;
+        coverPath?: string;
+        error?: string
+    }> {
+        let snapshotFileName: string | null = null;
+        let previousFileName: string | null = null;
         try {
-            const success = this.libraryCacheManager.updatePlaylistCover(playlistId, imagePath);
+            const playlist = this.libraryCacheManager.getPlaylistById(playlistId);
+            if (!playlist) throw new Error('歌单不存在');
+            if (playlist.systemType === 'favorites') throw new Error('系统收藏歌单不支持此操作');
+            previousFileName = this.libraryCacheManager.getPlaylistCoverFileName(playlistId);
+            const snapshot = await this.playlistCoverStorage.importFile(playlistId, imagePath);
+            snapshotFileName = snapshot.fileName;
+            const success = this.libraryCacheManager.updatePlaylistCover(playlistId, snapshot.fileName);
             if (success) {
                 await this.libraryCacheManager.saveCache();
-                return {success: true};
+                await this.playlistCoverStorage.remove(previousFileName).catch(error => {
+                    console.warn('⚠️ 清理旧歌单封面快照失败:', error);
+                });
+                return {success: true, coverPath: snapshot.filePath};
             }
+            await this.playlistCoverStorage.remove(snapshot.fileName);
             return {success: false, error: '更新歌单封面失败'};
         } catch (error: any) {
+            if (snapshotFileName) {
+                if (previousFileName) {
+                    this.libraryCacheManager.updatePlaylistCover(playlistId, previousFileName);
+                } else {
+                    this.libraryCacheManager.removePlaylistCover(playlistId);
+                }
+            }
+            await this.playlistCoverStorage.remove(snapshotFileName).catch(() => undefined);
             return {success: false, error: error.message};
         }
     }
@@ -905,16 +936,52 @@ export class LibraryController extends BaseController {
 
     @IpcHandle('library:removePlaylistCover')
     async removePlaylistCover(playlistId: string): Promise<{ success: boolean; error?: string }> {
+        let coverFileName: string | null = null;
         try {
+            coverFileName = this.libraryCacheManager.getPlaylistCoverFileName(playlistId);
             const success = this.libraryCacheManager.removePlaylistCover(playlistId);
             if (success) {
                 await this.libraryCacheManager.saveCache();
+                await this.playlistCoverStorage.remove(coverFileName).catch(error => {
+                    console.warn('⚠️ 删除歌单封面快照失败:', error);
+                });
                 return {success: true};
             }
             return {success: false, error: '移除歌单封面失败'};
         } catch (error: any) {
+            if (coverFileName) {
+                this.libraryCacheManager.updatePlaylistCover(playlistId, coverFileName);
+            }
             return {success: false, error: error.message};
         }
+    }
+
+    async migratePlaylistCovers(): Promise<void> {
+        let changed = false;
+        for (const playlist of this.libraryCacheManager.getUserPlaylistsForCoverMigration()) {
+            const legacyPath = playlist.coverImage || playlist.coverImagePath;
+            if (playlist.coverFileName || !legacyPath) {
+                if (playlist.coverImage !== undefined || playlist.coverImagePath !== undefined) {
+                    delete playlist.coverImage;
+                    delete playlist.coverImagePath;
+                    changed = true;
+                }
+                continue;
+            }
+
+            try {
+                const snapshot = await this.playlistCoverStorage.importFile(playlist.id, legacyPath);
+                playlist.coverFileName = snapshot.fileName;
+                console.log(`✅ 已迁移歌单封面快照: ${playlist.name}`);
+            } catch (error) {
+                console.warn(`⚠️ 歌单封面迁移失败，已清空: ${playlist.name}`, error);
+            }
+            delete playlist.coverImage;
+            delete playlist.coverImagePath;
+            playlist.updatedAt = Date.now();
+            changed = true;
+        }
+        if (changed) await this.libraryCacheManager.saveCache();
     }
 
     private emitFavoritesChanged(trackIds: string[], favorite?: boolean): void {

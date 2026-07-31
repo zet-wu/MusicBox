@@ -12,6 +12,7 @@ import {BaseController} from '../decorators/IpcHandler';
 import {registerAudioStreamProtocol} from '../services/audio/AudioStreamProtocol';
 
 interface LibraryScanner {
+    migratePlaylistCovers(): Promise<void>;
     scanDirectories(directoryPaths: string[]): Promise<{scannedFolderCount: number; failedFolders: string[]}>;
     scanAllLibrarySources(): Promise<{failedSources: string[]}>;
 }
@@ -295,6 +296,7 @@ export class Application {
             // 加载音乐库缓存（可能很慢）
             const libraryCacheManager = await this.container.get<any>('libraryCacheManager');
             await libraryCacheManager.loadCache();
+            await this.libraryScanner?.migratePlaylistCovers();
             const librarySourceManager = await this.container.get<any>('librarySourceManager');
             const musicFolders = await this.musicFolderSettingsProvider?.getMusicFolders() || [];
             const sourceLoadResult = await librarySourceManager.loadAndMigrate({
@@ -344,6 +346,7 @@ export class Application {
             {TrayController},
             {HttpServerController},
             {EmbeddedCoverService},
+            {PlaylistCoverStorage},
             {parseMetadata}
         ] = await Promise.all([
             import('../controllers/WindowController'),
@@ -369,6 +372,7 @@ export class Application {
             import('../controllers/TrayController'),
             import('../controllers/HttpServerController'),
             import('../services/library/EmbeddedCoverService'),
+            import('../services/library/PlaylistCoverStorage'),
             import('../utils/metadata')
         ]);
 
@@ -394,6 +398,7 @@ export class Application {
 
         const audioController = new AudioController(boundParseMetadata);
         const embeddedCoverService = new EmbeddedCoverService();
+        const playlistCoverStorage = new PlaylistCoverStorage();
         this.embeddedCoverService = embeddedCoverService;
         const trayController = new TrayController(this.windowManager);
         this.windowManager.setTraySettingsGetter(() => trayController.getSettings());
@@ -401,6 +406,7 @@ export class Application {
         const libraryController = new LibraryController(
             libraryCacheManager, metadataHandler, networkDriveManager,
             networkFileAdapter, this.windowManager, embeddedCoverService,
+            playlistCoverStorage,
             parseMetadata, () => settingsController.getMusicFolders(),
             librarySourceManager,
             (folderPath: string) => settingsController.removeMusicFolder(folderPath),

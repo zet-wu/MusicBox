@@ -43,8 +43,9 @@ export interface Playlist {
     manualTrackIds: string[];
     createdAt: number;
     updatedAt: number;
+    coverFileName?: string;
     coverImagePath?: string;
-    coverImage?: string;
+    coverImage?: string | null;
     systemType?: 'favorites';
 }
 
@@ -677,6 +678,10 @@ export class LibraryCacheManager {
         return this.cache.playlists?.find(p => p.id === playlistId);
     }
 
+    getUserPlaylistsForCoverMigration(): Playlist[] {
+        return this.getUserPlaylists();
+    }
+
     getAllPlaylists(): ResolvedPlaylist[] {
         const availableTracks = new Map(this.cache.tracks.map(track => [track.fileId, track]));
         return this.getUserPlaylists().map((playlist) => {
@@ -685,6 +690,7 @@ export class LibraryCacheManager {
                 .filter((track): track is CachedTrack => Boolean(track));
             return {
                 ...playlist,
+                coverImage: this.getPlaylistCover(playlist.id),
                 trackIds: [...playlist.trackIds],
                 resolvedTrackCount: resolvedTracks.length,
                 duration: resolvedTracks.reduce((total, track) => {
@@ -695,11 +701,13 @@ export class LibraryCacheManager {
         });
     }
 
-    updatePlaylistCover(playlistId: string, coverImagePath: string): boolean {
+    updatePlaylistCover(playlistId: string, coverFileName: string): boolean {
         this.assertUserManagedPlaylist(playlistId);
         const playlist = this.cache.playlists?.find(p => p.id === playlistId);
         if (!playlist) return false;
-        (playlist as any).coverImage = coverImagePath;
+        playlist.coverFileName = coverFileName;
+        delete playlist.coverImage;
+        delete playlist.coverImagePath;
         playlist.updatedAt = Date.now();
         return true;
     }
@@ -707,14 +715,24 @@ export class LibraryCacheManager {
     getPlaylistCover(playlistId: string): string | null {
         const playlist = this.cache.playlists?.find(p => p.id === playlistId);
         if (playlist?.systemType === 'favorites') return null;
-        return playlist ? ((playlist as any).coverImage ?? null) : null;
+        if (!playlist?.coverFileName) return null;
+        if (path.basename(playlist.coverFileName) !== playlist.coverFileName) return null;
+        return path.join(app.getPath('userData'), 'PlaylistCovers', playlist.coverFileName);
+    }
+
+    getPlaylistCoverFileName(playlistId: string): string | null {
+        const playlist = this.cache.playlists?.find(p => p.id === playlistId);
+        if (playlist?.systemType === 'favorites') return null;
+        return playlist?.coverFileName ?? null;
     }
 
     removePlaylistCover(playlistId: string): boolean {
         this.assertUserManagedPlaylist(playlistId);
         const playlist = this.cache.playlists?.find(p => p.id === playlistId);
         if (!playlist) return false;
-        (playlist as any).coverImage = null;
+        delete playlist.coverFileName;
+        delete playlist.coverImage;
+        delete playlist.coverImagePath;
         playlist.updatedAt = Date.now();
         return true;
     }
@@ -823,6 +841,8 @@ export class LibraryCacheManager {
             existing.systemType = 'favorites';
             existing.trackIds = Array.from(new Set(existing.trackIds || []));
             existing.manualTrackIds = Array.from(new Set(existing.manualTrackIds || existing.trackIds));
+            delete existing.coverFileName;
+            delete existing.coverImage;
             delete existing.coverImagePath;
             return existing;
         }
