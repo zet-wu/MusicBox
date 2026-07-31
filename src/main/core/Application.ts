@@ -251,6 +251,9 @@ export class Application {
             return manager;
         });
 
+        const {LibrarySourceManager} = await import('../services/library/LibrarySourceManager');
+        this.container.register('librarySourceManager', () => new LibrarySourceManager());
+
         // 注册元数据处理器（按需初始化）
         const {MetadataHandler} = await import('../services/library/MetadataHandler');
         this.container.register('metadataHandler', async () => {
@@ -283,6 +286,16 @@ export class Application {
             // 加载音乐库缓存（可能很慢）
             const libraryCacheManager = await this.container.get<any>('libraryCacheManager');
             await libraryCacheManager.loadCache();
+            const librarySourceManager = await this.container.get<any>('librarySourceManager');
+            const musicFolders = await this.musicFolderSettingsProvider?.getMusicFolders() || [];
+            const sourceLoadResult = await librarySourceManager.loadAndMigrate({
+                musicFolders,
+                scannedDirectories: libraryCacheManager.getScannedDirectories(),
+                tracks: libraryCacheManager.getAllTracks()
+            });
+            if (sourceLoadResult.migrated || libraryCacheManager.needsPlaylistMembershipMigration()) {
+                await libraryCacheManager.saveCache();
+            }
             console.log('✅ 音乐库缓存加载完成');
 
             this.windowManager.sendToMainWindow('library:updated', libraryCacheManager.getAllTracks());

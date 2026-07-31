@@ -40,6 +40,7 @@ export interface Playlist {
     name: string;
     description: string;
     trackIds: string[];
+    manualTrackIds: string[];
     createdAt: number;
     updatedAt: number;
     coverImagePath?: string;
@@ -126,6 +127,7 @@ export class LibraryCacheManager {
     private cache: CacheData;
     private _saveTimer: NodeJS.Timeout | null = null;
     private _pendingSave = false;
+    private playlistMembershipMigrationPending = false;
 
     constructor(networkFileAdapter: NetworkFileAdapter | null = null) {
         this.networkFileAdapter = networkFileAdapter;
@@ -186,10 +188,21 @@ export class LibraryCacheManager {
             playlists: Array.isArray(cacheData.playlists)
                 ? cacheData.playlists.filter((p: any) =>
                     p && typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.trackIds)
-                ).map((playlist: any) => ({
-                    ...playlist,
-                    systemType: playlist.id === FAVORITES_PLAYLIST_ID ? 'favorites' : undefined
-                }))
+                ).map((playlist: any) => {
+                    if (!Array.isArray(playlist.manualTrackIds)) {
+                        this.playlistMembershipMigrationPending = true;
+                    }
+                    return {
+                        ...playlist,
+                        trackIds: Array.from(new Set(playlist.trackIds)),
+                        manualTrackIds: Array.from(new Set(
+                            Array.isArray(playlist.manualTrackIds)
+                                ? playlist.manualTrackIds
+                                : playlist.trackIds
+                        )),
+                        systemType: playlist.id === FAVORITES_PLAYLIST_ID ? 'favorites' : undefined
+                    };
+                })
                 : [],
             ignoredFiles: Array.isArray(cacheData.ignoredFiles) ? cacheData.ignoredFiles : [],
             statistics: {
@@ -213,6 +226,7 @@ export class LibraryCacheManager {
 
         try {
             await fs.promises.writeFile(this.cacheFilePath, JSON.stringify(this.cache), 'utf8');
+            this.playlistMembershipMigrationPending = false;
         } catch (error) {
             console.error('❌ LibraryCacheManager: 保存缓存失败:', error);
             throw error;
@@ -371,6 +385,8 @@ export class LibraryCacheManager {
                     const i = playlist.trackIds.indexOf(trackFileId);
                     if (i !== -1) {
                         playlist.trackIds.splice(i, 1);
+                        playlist.manualTrackIds = (playlist.manualTrackIds || [])
+                            .filter(id => id !== trackFileId);
                         playlist.updatedAt = Date.now();
                     }
                 }
@@ -408,6 +424,8 @@ export class LibraryCacheManager {
                 if (Array.isArray(playlist.trackIds)) {
                     const lenBefore = playlist.trackIds.length;
                     playlist.trackIds = playlist.trackIds.filter(id => !removedIds.has(id));
+                    playlist.manualTrackIds = (playlist.manualTrackIds || [])
+                        .filter(id => !removedIds.has(id));
                     if (playlist.trackIds.length !== lenBefore) playlist.updatedAt = Date.now();
                 }
             }
@@ -458,6 +476,10 @@ export class LibraryCacheManager {
         };
         await this.saveCache();
         return summary;
+    }
+
+    needsPlaylistMembershipMigration(): boolean {
+        return this.playlistMembershipMigrationPending;
     }
 
     getAllTracks(): CachedTrack[] {
@@ -536,6 +558,7 @@ export class LibraryCacheManager {
             name: name.trim(),
             description: description.trim(),
             trackIds: [],
+            manualTrackIds: [],
             createdAt: Date.now(),
             updatedAt: Date.now()
         };
@@ -584,6 +607,8 @@ export class LibraryCacheManager {
         if (!Array.isArray(playlist.trackIds)) playlist.trackIds = [];
         if (playlist.trackIds.includes(trackFileId)) throw new Error('歌曲已在歌单中');
         playlist.trackIds.push(trackFileId);
+        if (!Array.isArray(playlist.manualTrackIds)) playlist.manualTrackIds = [];
+        if (!playlist.manualTrackIds.includes(trackFileId)) playlist.manualTrackIds.push(trackFileId);
         playlist.updatedAt = Date.now();
         console.log(`➕ LibraryCacheManager: 添加歌曲到歌单 - ${track.title} -> ${playlist.name}`);
         return playlist;
@@ -600,6 +625,7 @@ export class LibraryCacheManager {
         const idx = playlist.trackIds.indexOf(trackFileId);
         if (idx === -1) throw new Error('歌曲不在歌单中');
         playlist.trackIds.splice(idx, 1);
+        playlist.manualTrackIds = (playlist.manualTrackIds || []).filter(id => id !== trackFileId);
         playlist.updatedAt = Date.now();
         return playlist;
     }
@@ -608,6 +634,7 @@ export class LibraryCacheManager {
         const playlist = this.getPlaylistById(playlistId);
         if (!playlist) throw new Error('歌单不存在');
         playlist.trackIds = trackIds;
+        playlist.manualTrackIds = trackIds.filter(id => (playlist.manualTrackIds || []).includes(id));
         playlist.updatedAt = Date.now();
         return playlist;
     }
@@ -681,6 +708,7 @@ export class LibraryCacheManager {
             }
             const before = playlist.trackIds.length;
             playlist.trackIds = playlist.trackIds.filter(id => validIds.has(id));
+            playlist.manualTrackIds = (playlist.manualTrackIds || []).filter(id => validIds.has(id));
             const delta = before - playlist.trackIds.length;
             if (delta > 0) {
                 cleaned += delta;
@@ -754,6 +782,7 @@ export class LibraryCacheManager {
             existing.description = '';
             existing.systemType = 'favorites';
             existing.trackIds = Array.from(new Set(existing.trackIds || []));
+            existing.manualTrackIds = Array.from(new Set(existing.manualTrackIds || existing.trackIds));
             delete existing.coverImagePath;
             return existing;
         }
@@ -764,6 +793,7 @@ export class LibraryCacheManager {
             name: '收藏',
             description: '',
             trackIds: [],
+            manualTrackIds: [],
             createdAt: now,
             updatedAt: now,
             systemType: 'favorites'

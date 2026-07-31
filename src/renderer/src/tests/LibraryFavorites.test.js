@@ -43,7 +43,8 @@ describe('LibraryCacheManager 系统收藏', () => {
             id: FAVORITES_PLAYLIST_ID,
             name: '收藏',
             systemType: 'favorites',
-            trackIds: []
+            trackIds: [],
+            manualTrackIds: []
         });
         expect(manager.getAllPlaylists()).toEqual([]);
         expect(manager.getCacheStatistics().totalPlaylists).toBe(0);
@@ -92,8 +93,25 @@ describe('LibraryCacheManager 系统收藏', () => {
         expect(manager.getAllPlaylists()).toEqual([{
             ...userPlaylist,
             trackIds: [],
+            manualTrackIds: [],
             resolvedTrackCount: 0
         }]);
         expect(manager.getCacheStatistics().totalPlaylists).toBe(1);
+    });
+
+    it('将旧歌单成员迁移为手动成员', () => {
+        const cache = manager.validateCacheData({
+            playlists: [{
+                id: 'legacy-playlist',
+                name: '旧歌单',
+                description: '',
+                trackIds: ['legacy-favorite'],
+                createdAt: 1,
+                updatedAt: 1
+            }]
+        });
+
+        expect(cache.playlists[0].manualTrackIds).toEqual(['legacy-favorite']);
+        expect(manager.needsPlaylistMembershipMigration()).toBe(true);
     });
 });
