@@ -131,8 +131,10 @@ export class LibraryCacheManager {
     private _saveTimer: NodeJS.Timeout | null = null;
     private _pendingSave = false;
     private playlistMembershipMigrationPending = false;
+    private cacheLoaded = false;
+    private saveQueue: Promise<void> = Promise.resolve();
 
-    constructor(networkFileAdapter: NetworkFileAdapter | null = null) {
+    constructor(networkFileAdapter: NetworkFileAdapter | null = null, cacheFilePath?: string) {
         this.networkFileAdapter = networkFileAdapter;
         this.cache = {
             ...defaultCache,
@@ -144,7 +146,9 @@ export class LibraryCacheManager {
         };
         this.ensureFavoritesPlaylist();
 
-        try {
+        if (cacheFilePath) {
+            this.cacheFilePath = cacheFilePath;
+        } else try {
             const userDataPath = app.getPath('userData');
             this.cacheFilePath = path.join(userDataPath, this.cacheFileName);
         } catch {
@@ -168,8 +172,10 @@ export class LibraryCacheManager {
         try {
             try {
                 await fs.promises.access(this.cacheFilePath);
-            } catch {
+            } catch (error: any) {
+                if (error?.code !== 'ENOENT') throw error;
                 console.log('🔄 LibraryCacheManager: 缓存文件不存在，使用默认缓存');
+                this.cacheLoaded = true;
                 return;
             }
 
@@ -177,36 +183,44 @@ export class LibraryCacheManager {
             const cacheData = JSON.parse(data);
             this.cache = this.validateCacheData(cacheData);
             this.ensureFavoritesPlaylist();
+            this.cacheLoaded = true;
             console.log(`✅ LibraryCacheManager: 加载缓存成功，共 ${this.cache.tracks.length} 首歌曲`);
         } catch (error) {
             console.error('❌ LibraryCacheManager: 加载缓存失败:', error);
+            throw new Error(`音乐库缓存加载失败，已阻止空缓存覆盖原文件: ${(error as Error).message}`);
         }
     }
 
     private validateCacheData(cacheData: any): CacheData {
+        const tracks = Array.isArray(cacheData.tracks) ? cacheData.tracks : [];
+        const playlists = this.normalizePlaylists(cacheData.playlists, tracks);
+        const favoritesPlaylist = playlists.find((playlist) => (
+            playlist.id === FAVORITES_PLAYLIST_ID || playlist.systemType === 'favorites'
+        ));
+        const legacyFavoriteIds = tracks
+            .filter((track: any) => track?.favorite === true && typeof track.fileId === 'string')
+            .map((track: any) => track.fileId as string);
+
+        if (!favoritesPlaylist && legacyFavoriteIds.length > 0) {
+            const now = Date.now();
+            playlists.push({
+                id: FAVORITES_PLAYLIST_ID,
+                name: '收藏',
+                description: '',
+                trackIds: Array.from(new Set(legacyFavoriteIds)),
+                manualTrackIds: Array.from(new Set(legacyFavoriteIds)),
+                createdAt: now,
+                updatedAt: now,
+                systemType: 'favorites'
+            });
+            this.playlistMembershipMigrationPending = true;
+        }
+
         return {
             lastUpdated: cacheData.lastUpdated || defaultCache.lastUpdated,
             scannedDirectories: Array.isArray(cacheData.scannedDirectories) ? cacheData.scannedDirectories : [],
-            tracks: Array.isArray(cacheData.tracks) ? cacheData.tracks : [],
-            playlists: Array.isArray(cacheData.playlists)
-                ? cacheData.playlists.filter((p: any) =>
-                    p && typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.trackIds)
-                ).map((playlist: any) => {
-                    if (!Array.isArray(playlist.manualTrackIds)) {
-                        this.playlistMembershipMigrationPending = true;
-                    }
-                    return {
-                        ...playlist,
-                        trackIds: Array.from(new Set(playlist.trackIds)),
-                        manualTrackIds: Array.from(new Set(
-                            Array.isArray(playlist.manualTrackIds)
-                                ? playlist.manualTrackIds
-                                : playlist.trackIds
-                        )),
-                        systemType: playlist.id === FAVORITES_PLAYLIST_ID ? 'favorites' : undefined
-                    };
-                })
-                : [],
+            tracks,
+            playlists,
             ignoredFiles: Array.isArray(cacheData.ignoredFiles) ? cacheData.ignoredFiles : [],
             statistics: {
                 totalTracks: cacheData.statistics?.totalTracks ?? 0,
@@ -219,6 +233,17 @@ export class LibraryCacheManager {
     }
 
     async saveCache(): Promise<void> {
+        if (!this.cacheLoaded) {
+            throw new Error('音乐库缓存尚未加载，拒绝覆盖磁盘数据');
+        }
+
+        const saveOperation = this.saveQueue.then(() => this.persistCache());
+        this.saveQueue = saveOperation.catch(() => undefined);
+        return saveOperation;
+    }
+
+    private async persistCache(): Promise<void> {
+
         if (!Array.isArray(this.cache.tracks)) this.cache.tracks = [];
         if (!Array.isArray(this.cache.playlists)) this.cache.playlists = [];
         if (!Array.isArray(this.cache.ignoredFiles)) this.cache.ignoredFiles = [];
@@ -227,13 +252,72 @@ export class LibraryCacheManager {
         this.cache.statistics.totalPlaylists = this.getUserPlaylists().length;
         this.cache.lastUpdated = Date.now();
 
+        const temporaryPath = `${this.cacheFilePath}.tmp`;
+        const backupPath = `${this.cacheFilePath}.bak`;
         try {
-            await fs.promises.writeFile(this.cacheFilePath, JSON.stringify(this.cache), 'utf8');
+            await fs.promises.writeFile(temporaryPath, JSON.stringify(this.cache), 'utf8');
+            try {
+                await fs.promises.copyFile(this.cacheFilePath, backupPath);
+            } catch (error: any) {
+                if (error?.code !== 'ENOENT') throw error;
+            }
+            await fs.promises.rename(temporaryPath, this.cacheFilePath);
             this.playlistMembershipMigrationPending = false;
         } catch (error) {
+            await fs.promises.rm(temporaryPath, {force: true}).catch(() => undefined);
             console.error('❌ LibraryCacheManager: 保存缓存失败:', error);
             throw error;
         }
+    }
+
+    private normalizePlaylists(rawPlaylists: unknown, tracks: CachedTrack[]): Playlist[] {
+        if (!Array.isArray(rawPlaylists)) return [];
+
+        const trackIdByPath = new Map(
+            tracks
+                .filter((track) => typeof track.filePath === 'string' && typeof track.fileId === 'string')
+                .map((track) => [track.filePath, track.fileId])
+        );
+
+        return rawPlaylists
+            .filter((playlist: any) => (
+                playlist && typeof playlist.id === 'string' && typeof playlist.name === 'string'
+            ))
+            .map((playlist: any) => {
+                const rawTrackItems = Array.isArray(playlist.trackIds)
+                    ? playlist.trackIds
+                    : Array.isArray(playlist.tracks)
+                        ? playlist.tracks
+                        : [];
+                const trackIds = rawTrackItems
+                    .map((item: any) => {
+                        if (typeof item === 'string') return item;
+                        if (typeof item?.fileId === 'string') return item.fileId;
+                        if (typeof item?.id === 'string') return item.id;
+                        if (typeof item?.filePath === 'string') return trackIdByPath.get(item.filePath);
+                        return undefined;
+                    })
+                    .filter((fileId: unknown): fileId is string => typeof fileId === 'string');
+                const manualTrackIds = Array.isArray(playlist.manualTrackIds)
+                    ? playlist.manualTrackIds.filter((fileId: unknown): fileId is string => typeof fileId === 'string')
+                    : trackIds;
+
+                if (!Array.isArray(playlist.trackIds) || !Array.isArray(playlist.manualTrackIds)) {
+                    this.playlistMembershipMigrationPending = true;
+                }
+
+                return {
+                    ...playlist,
+                    description: typeof playlist.description === 'string' ? playlist.description : '',
+                    trackIds: Array.from(new Set(trackIds)),
+                    manualTrackIds: Array.from(new Set(manualTrackIds)),
+                    createdAt: typeof playlist.createdAt === 'number' ? playlist.createdAt : Date.now(),
+                    updatedAt: typeof playlist.updatedAt === 'number' ? playlist.updatedAt : Date.now(),
+                    systemType: playlist.id === FAVORITES_PLAYLIST_ID || playlist.systemType === 'favorites'
+                        ? 'favorites'
+                        : undefined
+                };
+            });
     }
 
     scheduleSave(delay = 2000): void {

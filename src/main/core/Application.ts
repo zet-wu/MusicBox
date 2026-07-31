@@ -254,10 +254,8 @@ export class Application {
         this.container.register('libraryCacheManager', async () => {
             const adapter = await this.container.get<InstanceType<typeof NetworkFileAdapter>>('networkFileAdapter');
             const manager = new LibraryCacheManager(adapter);
-
-            // 不在这里加载缓存，延迟到后台，因此注释
-            // await manager.loadCache();
-
+            // 持久化状态必须先于窗口和 IPC 可用，避免空内存缓存覆盖已有歌单。
+            await manager.loadCache();
             return manager;
         });
 
@@ -293,9 +291,8 @@ export class Application {
     private async initializeHeavyServices(): Promise<void> {
         console.log('🔄 加载音乐库缓存...');
         try {
-            // 加载音乐库缓存（可能很慢）
+            // 缓存已在启动控制器注册前加载，这里只初始化其余重服务。
             const libraryCacheManager = await this.container.get<any>('libraryCacheManager');
-            await libraryCacheManager.loadCache();
             await this.libraryScanner?.migratePlaylistCovers();
             const librarySourceManager = await this.container.get<any>('librarySourceManager');
             const musicFolders = await this.musicFolderSettingsProvider?.getMusicFolders() || [];
