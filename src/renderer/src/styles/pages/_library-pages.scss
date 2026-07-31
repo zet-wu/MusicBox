@@ -1184,33 +1184,6 @@
   }
 }
 
-// 播放波纹效果
-.play-ripple {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(var(--color-primary-rgb), 0.3);
-  animation: playRipple 1s ease-out forwards;
-  pointer-events: none;
-}
-
-@keyframes playRipple {
-  0% {
-    width: 0;
-    height: 0;
-    opacity: 1;
-  }
-  100% {
-    width: 200px;
-    height: 200px;
-    opacity: 0;
-  }
-}
-
 // 现代化艺术家页面响应式设计
 @media (max-width: 1024px) {
   .artists-page.modern-artists {
@@ -2159,11 +2132,6 @@
       margin-bottom: 14px;
     }
 
-    .artist-card-play {
-      position: absolute;
-      right: 18px;
-      bottom: 18px;
-    }
   }
 
   .list-row {
@@ -2184,9 +2152,6 @@
       text-align: left;
     }
 
-    .artist-card-play {
-      margin-left: auto;
-    }
   }
 
   .artist-library-item {
@@ -2225,6 +2190,8 @@
 
   .artist-library-info {
     min-width: 0;
+    width: 100%;
+    max-width: 100%;
   }
 
   .artist-library-name {
@@ -2243,25 +2210,6 @@
     font-size: 13px;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .artist-card-play {
-    display: grid;
-    width: 38px;
-    height: 38px;
-    flex: 0 0 auto;
-    place-items: center;
-    border: 0;
-    border-radius: 50%;
-    background: var(--color-primary);
-    color: #fff;
-    cursor: pointer;
-
-    svg {
-      width: 20px;
-      height: 20px;
-      fill: currentColor;
-    }
   }
 
   .artists-no-results {

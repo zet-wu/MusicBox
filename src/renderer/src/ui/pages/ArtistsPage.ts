@@ -380,24 +380,6 @@ class ArtistsPage extends Component {
         animate();
     }
 
-    // 播放艺术家音乐并显示动画
-    playArtistWithAnimation(star: HTMLElement, artist: ArtistInfo): void {
-        // 创建波纹效果
-        const ripple = document.createElement('div');
-        ripple.className = 'play-ripple';
-        star.appendChild(ripple);
-
-        // 播放音乐
-        this.emit('playAll', artist.tracks);
-
-        // 移除波纹效果
-        this.setTimeoutManaged(() => {
-            if (ripple.parentNode) {
-                ripple.parentNode.removeChild(ripple);
-            }
-        }, 1000);
-    }
-
     // 艺术家详情显示
     showArtistDetailWithTransition(artist: ArtistInfo, element: HTMLElement): void {
         // 获取点击的封面元素
@@ -809,11 +791,6 @@ class ArtistsPage extends Component {
                 return;
             }
 
-            if (target?.closest('.artist-card-play')) {
-                event.stopPropagation();
-                this.playArtistWithAnimation(item, artist);
-                return;
-            }
             this.showArtistDetailWithTransition(artist, item);
         });
 
@@ -868,15 +845,12 @@ class ArtistsPage extends Component {
                     <img src="${cover}" alt="${this.escapeHtml(artist.name)}" loading="lazy">
                 </div>
                 <div class="artist-library-info">
-                    <div class="artist-library-name">${this.escapeHtml(artist.name)}</div>
+                    <div class="artist-library-name" title="${this.escapeHtml(artist.name)}">${this.escapeHtml(artist.name)}</div>
                     <div class="artist-library-stats">
                         ${artist.tracks.length} 首歌曲 · ${artist.albums.size} 张专辑
                         ${this.viewMode === 'list' ? ` · ${this.formatDuration(artist.totalDuration)}` : ''}
                     </div>
                 </div>
-                <button class="artist-card-play" type="button" title="播放该艺术家的歌曲">
-                    <svg viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg>
-                </button>
             </div>
         `;
     }
