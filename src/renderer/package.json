@@ -15,8 +15,11 @@
     "build:css": "sass src/styles/main.scss public/styles/main.css --style=compressed"
   },
   "dependencies": {
+    "@tanstack/virtual-core": "3.17.7",
     "dayjs": "^1.11.7",
-    "fuse.js": "^6.6.2"
+    "fuse.js": "^6.6.2",
+    "lru-cache": "11.5.2",
+    "p-queue": "9.3.3"
   },
   "devDependencies": {
     "@vitejs/plugin-legacy": "^8.0.1",
