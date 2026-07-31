@@ -145,6 +145,9 @@ export class ComponentEventBinder {
                 },
                 updateAlbumsPageButtonVisibility: (enabled) => {
                     this.ui.content.updateAlbumsPageButtonVisibility(enabled);
+                },
+                navigateToFolders: () => {
+                    this.ui.content.navigateToView('folders');
                 }
             }
         });

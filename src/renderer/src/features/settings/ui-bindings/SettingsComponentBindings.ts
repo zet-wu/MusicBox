@@ -16,6 +16,7 @@ interface SettingsBindingUI {
     updateRecentPlayButtonVisibility(enabled: boolean): void;
     updateArtistsPageButtonVisibility(enabled: boolean): void;
     updateAlbumsPageButtonVisibility(enabled: boolean): void;
+    navigateToFolders(): void;
 }
 
 export interface SettingsComponentBindingHost {
@@ -54,6 +55,10 @@ export function bindSettingsComponentEvents({
 
     components.settings.on('checkUpdates', () => {
         ui.showUpdateModal();
+    });
+
+    components.settings.on('manageMusicFolders', () => {
+        ui.navigateToFolders();
     });
 
     integrations.onShowUpdateDetails(() => {

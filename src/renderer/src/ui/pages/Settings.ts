@@ -19,7 +19,6 @@ import {
     type GeneralSettingsElements
 } from "@/features/settings/service";
 import {hardwareAccelerationSettingsController} from "@/features/settings/service";
-import {musicFolderListRenderer} from "@/features/settings/service";
 import {musicFolderSettingsController} from "@/features/settings/service";
 import {musicFolderSettingsService} from "@/features/settings/service";
 import {appModalService} from "@/features/appShell/service";
@@ -133,9 +132,7 @@ class Settings extends Component {
         this.trayCloseBehaviorItem = this.element.querySelector('#tray-close-behavior-item');
         this.trayStartMinimizedItem = this.element.querySelector('#tray-start-minimized-item');
         this.autoScanToggle = this.element.querySelector('#auto-scan-toggle');
-        this.selectFolderBtn = this.element.querySelector('#select-folder-btn');
-        this.musicFoldersContainer = this.element.querySelector('#music-folders-container');
-        this.musicFoldersList = this.element.querySelector('#music-folders-list');
+        this.manageMusicFoldersBtn = this.element.querySelector('#manage-music-folders-btn');
         this.scanFrequencyContainer = this.element.querySelector('#scan-frequency-container');
         this.scanFrequencySelect = this.element.querySelector('#scan-frequency-select');
         this.selectLyricsFolderBtn = this.element.querySelector('#select-lyrics-folder-btn');
@@ -231,20 +228,14 @@ class Settings extends Component {
         });
 
         // 按钮事件
-        this.addEventListenerManaged(this.selectFolderBtn, 'click', async () => {
-            await this.handleAddMusicFolder();
+        this.addEventListenerManaged(this.manageMusicFoldersBtn, 'click', () => {
+            this.hide();
+            this.emit('manageMusicFolders');
         });
 
         // 扫描频率更改
         this.addEventListenerManaged(this.scanFrequencySelect, 'change', async (e: Event) => {
             await this.handleScanFrequencyChange(getSelectTarget(e).value);
-        });
-
-        this.addEventListenerManaged(this.musicFoldersList, 'click', async (e: Event) => {
-            const folderPath = musicFolderListRenderer.resolveRemoveFolder(e.target);
-            if (folderPath) {
-                await this.handleRemoveMusicFolder(folderPath);
-            }
         });
 
         traySettingsController.initialize(this.getTraySettingsElements(), {
@@ -563,10 +554,6 @@ class Settings extends Component {
     // 音乐文件夹和自动扫描相关方法
     async initializeMusicFoldersAndAutoScan(): Promise<void> {
         try {
-            // 加载音乐文件夹列表
-            const folders = await musicFolderSettingsService.getMusicFolders();
-            this.renderMusicFolders(folders);
-
             // 加载自动扫描设置
             const autoScanSettings = await musicFolderSettingsService.getAutoScanSettings();
             this.autoScanToggle.checked = autoScanSettings.enabled || false;
@@ -577,28 +564,6 @@ class Settings extends Component {
         } catch (error) {
             console.error('❌ Settings: 初始化音乐文件夹和自动扫描设置失败:', error);
         }
-    }
-
-    async handleAddMusicFolder(): Promise<void> {
-        const folders = await musicFolderSettingsController.addMusicFolder();
-        if (folders) {
-            this.renderMusicFolders(folders);
-        }
-    }
-
-    async handleRemoveMusicFolder(folderPath: string): Promise<void> {
-        const folders = await musicFolderSettingsController.removeMusicFolder(folderPath);
-        if (folders) {
-            this.renderMusicFolders(folders);
-        }
-    }
-
-    renderMusicFolders(folders: string[] | null | undefined): void {
-        musicFolderListRenderer.render({
-            container: this.musicFoldersContainer,
-            list: this.musicFoldersList,
-            folders
-        });
     }
 
     async handleAutoScanToggle(enabled: boolean): Promise<void> {
