@@ -258,117 +258,6 @@
 
 // 现代化艺术家页面样式
 .artists-page.modern-artists {
-  // 沉浸式英雄区域
-  .artists-hero-section {
-    position: relative;
-    height: 300px;
-    margin-bottom: var(--spacing-xl);
-    border-radius: var(--border-radius-xl);
-    overflow: hidden;
-    background: var(--gradient-primary);
-
-    .hero-background {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 1;
-
-      .artists-visualizer {
-        width: 100%;
-        height: 100%;
-        opacity: 0.3;
-      }
-
-      .hero-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(135deg,
-                rgba(var(--color-primary-rgb), 0.8) 0%,
-                rgba(var(--color-primary-rgb), 0.6) 100%);
-      }
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 2;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: var(--spacing-xl);
-      color: white;
-
-      .hero-title-container {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-lg);
-
-        .hero-icon {
-          width: 60px;
-          height: 60px;
-          background: rgba(255, 255, 255, 0.2);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          backdrop-filter: blur(10px);
-
-          svg {
-            width: 32px;
-            height: 32px;
-            fill: currentColor;
-          }
-        }
-
-        .hero-text {
-          .hero-title {
-            font-size: 48px;
-            font-weight: 700;
-            margin: 0 0 var(--spacing-xs) 0;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-          }
-
-          .hero-subtitle {
-            font-size: 18px;
-            opacity: 0.9;
-            margin: 0;
-          }
-        }
-      }
-
-      .hero-stats {
-        display: flex;
-        gap: var(--spacing-xl);
-
-        .stat-item {
-          text-align: center;
-          background: rgba(255, 255, 255, 0.15);
-          padding: var(--spacing-md);
-          border-radius: var(--border-radius-lg);
-          backdrop-filter: blur(10px);
-          min-width: 100px;
-
-          .stat-number {
-            display: block;
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: var(--spacing-xs);
-          }
-
-          .stat-label {
-            font-size: var(--font-size-sm);
-            opacity: 0.8;
-          }
-        }
-      }
-    }
-  }
-
   // 现代化控制栏
   .modern-controls {
     display: flex;
@@ -1187,31 +1076,6 @@
 // 现代化艺术家页面响应式设计
 @media (max-width: 1024px) {
   .artists-page.modern-artists {
-    .artists-hero-section {
-      height: 250px;
-
-      .hero-content {
-        .hero-title-container {
-          .hero-text .hero-title {
-            font-size: 36px;
-          }
-        }
-
-        .hero-stats {
-          gap: var(--spacing-md);
-
-          .stat-item {
-            min-width: 80px;
-            padding: var(--spacing-sm);
-
-            .stat-number {
-              font-size: 20px;
-            }
-          }
-        }
-      }
-    }
-
     .modern-controls {
       flex-direction: column;
       gap: var(--spacing-md);
@@ -1371,53 +1235,6 @@
 
 @media (max-width: 768px) {
   .artists-page.modern-artists {
-    .artists-hero-section {
-      height: 200px;
-
-      .hero-content {
-        padding: var(--spacing-md);
-
-        .hero-title-container {
-          flex-direction: column;
-          text-align: center;
-          gap: var(--spacing-md);
-
-          .hero-icon {
-            width: 50px;
-            height: 50px;
-
-            svg {
-              width: 24px;
-              height: 24px;
-            }
-          }
-
-          .hero-text .hero-title {
-            font-size: 28px;
-          }
-        }
-
-        .hero-stats {
-          flex-direction: row;
-          justify-content: center;
-          gap: var(--spacing-sm);
-
-          .stat-item {
-            min-width: 60px;
-            padding: var(--spacing-xs);
-
-            .stat-number {
-              font-size: 16px;
-            }
-
-            .stat-label {
-              font-size: 10px;
-            }
-          }
-        }
-      }
-    }
-
     .modern-controls {
       padding: var(--spacing-md);
 

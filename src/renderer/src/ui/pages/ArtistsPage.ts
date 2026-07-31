@@ -20,14 +20,6 @@ import type {Unsubscribe} from "@api/types/common";
 import type {ArtistViewMode} from "@api/types/settings";
 import type {Track} from "@api/types/track";
 
-interface StarParticle {
-    x: number;
-    y: number;
-    radius: number;
-    opacity: number;
-    speed: number;
-}
-
 interface SourceRectSnapshot {
     left: number;
     top: number;
@@ -45,7 +37,6 @@ class ArtistsPage extends Component {
     private selectedArtist: ArtistInfo | null;
     private viewMode: ArtistViewMode;
     private listenersSetup: boolean;
-    private heroAnimationId: number | null;
     private _coverFailures: Set<string>;
     private _coverLoading: Set<string>;
     private _coverFetchingInProgress: boolean;
@@ -63,7 +54,6 @@ class ArtistsPage extends Component {
         this.selectedArtist = null;
         this.viewMode = artistViewModePreferenceService.getMode();
         this.listenersSetup = false; // 事件监听器是否已设置
-        this.heroAnimationId = null;
         this._coverFailures = new Set(); // 记录封面获取失败的艺术家
         this._coverLoading = new Set(); // 记录正在加载封面的艺术家
         this._coverFetchingInProgress = false; // 防止重复启动封面获取
@@ -143,14 +133,12 @@ class ArtistsPage extends Component {
         this.destroyArtistVirtualizer();
         this.trackCollectionDetail.hide();
         this.selectedArtist = null;
-        this.stopHeroVisualization();
         if (this.container) {
             this.container.innerHTML = '';
         }
     }
 
     destroy(): void {
-        this.stopHeroVisualization();
         this.destroyArtistVirtualizer();
         this.trackCollectionDetail.destroy();
 
@@ -205,41 +193,6 @@ class ArtistsPage extends Component {
         this.trackCollectionDetail.hide();
         this.container.innerHTML = `
             <div class="page-content artists-page modern-artists">
-                <!-- hero区域 -->
-                <div class="artists-hero-section">
-                    <div class="hero-background">
-                        <canvas id="artists-visualizer" class="artists-visualizer"></canvas>
-                        <div class="hero-overlay"></div>
-                    </div>
-                    <div class="hero-content">
-                        <div class="hero-title-container">
-                            <div class="hero-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/>
-                                </svg>
-                            </div>
-                            <div class="hero-text">
-                                <h1 class="hero-title">音乐星河</h1>
-                                <p class="hero-subtitle">探索 ${this.artists.length} 位艺术家的音乐宇宙</p>
-                            </div>
-                        </div>
-                        <div class="hero-stats">
-                            <div class="stat-item">
-                                <span class="stat-number">${this.artists.length}</span>
-                                <span class="stat-label">艺术家</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-number">${this.getTotalTracks()}</span>
-                                <span class="stat-label">歌曲</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-number">${this.getTotalAlbums()}</span>
-                                <span class="stat-label">专辑</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 ${this.artists.length > 0 ? `
                     <!-- 现代化控制栏 -->
                     <div class="modern-controls">
@@ -287,7 +240,6 @@ class ArtistsPage extends Component {
         `;
 
         this.setupEventListeners();
-        this.initializeHeroVisualization();
         this.mountArtistVirtualizer();
     }
 
@@ -311,73 +263,6 @@ class ArtistsPage extends Component {
             });
         });
 
-    }
-
-    // 初始化hero区域可视化
-    initializeHeroVisualization(): void {
-        this.stopHeroVisualization();
-        const canvas = this.container.querySelector('#artists-visualizer');
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
-
-        // 创建星空背景动画
-        this.createStarfieldAnimation(ctx, canvas);
-    }
-
-    private stopHeroVisualization(): void {
-        if (!this.heroAnimationId) {
-            return;
-        }
-
-        this.cancelAnimationFrameManaged(this.heroAnimationId);
-        this.heroAnimationId = null;
-    }
-
-    // 创建星空背景动画
-    createStarfieldAnimation(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
-        const stars: StarParticle[] = [];
-        const numStars = 50;
-
-        // 初始化星星
-        for (let i = 0; i < numStars; i++) {
-            stars.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                radius: Math.random() * 2 + 0.5,
-                opacity: Math.random() * 0.8 + 0.2,
-                speed: Math.random() * 0.5 + 0.1
-            });
-        }
-
-        const animate = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 绘制星星
-            stars.forEach((star) => {
-                ctx.beginPath();
-                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
-                ctx.fill();
-
-                // 星星闪烁效果
-                star.opacity += (Math.random() - 0.5) * 0.02;
-                star.opacity = Math.max(0.1, Math.min(0.9, star.opacity));
-
-                // 缓慢移动
-                star.x += star.speed;
-                if (star.x > canvas.width) {
-                    star.x = -star.radius;
-                }
-            });
-
-            this.heroAnimationId = this.requestAnimationFrameManaged(animate);
-        };
-
-        animate();
     }
 
     // 艺术家详情显示
@@ -866,16 +751,6 @@ class ArtistsPage extends Component {
         this.artistVirtualizer = null;
     }
 
-    // 获取总歌曲数
-    getTotalTracks(): number {
-        return this.artists.reduce((total, artist) => total + artist.tracks.length, 0);
-    }
-
-    // 获取总专辑数
-    getTotalAlbums(): number {
-        return this.artists.reduce((total, artist) => total + artist.albums.size, 0);
-    }
-
     // 切换视图模式
     switchViewMode(newMode: ArtistViewMode): void {
         this.viewMode = newMode;
@@ -891,7 +766,6 @@ class ArtistsPage extends Component {
 
         const artist = this.selectedArtist;
         this.destroyArtistVirtualizer();
-        this.stopHeroVisualization();
         this.trackCollectionDetail.show({
             title: artist.name,
             description: '艺术家歌曲',
