@@ -141,7 +141,7 @@ src/renderer/src/
 
 `features/` 按业务域组织 renderer 逻辑，例如：
 
-- `playback`：播放状态、队列、播放服务、Web Audio / WASAPI engine adapter。
+- `playback`：播放状态、队列、播放历史、播放服务、Web Audio / WASAPI engine adapter。
 - `library`：音乐库数据、扫描入口、元数据编辑、UI 绑定。
 - `mediaAssets`：歌词、封面、本地/内嵌/在线资源解析。
 - `equalizer`：图形均衡器、参量均衡器、预设文件。
@@ -172,6 +172,8 @@ MusicBox 当前有两类播放实现：
 - WASAPI/native engine：renderer 通过 `WasapiEngine.ts` 和 `nativeAudioGateway` 调用主进程 `NativeAudioController`，再桥接 `dist/main/NativeAudio.node`。
 
 `PlaybackService` 统一暴露播放控制，`AudioEngineAdapter` 负责 Web Audio / WASAPI 切换。`PlaybackQueue` 是顺序、随机和单曲循环模式共享的显式队列模型，使用稳定的 `queueId` 支持排序和状态恢复；随机模式直接调整可见队列顺序，不维护隐藏播放序列。`native/` 中的 Rust crate 使用 N-API 暴露原生音频能力，并在 `npm run build:rs` 时复制到 `dist/main/NativeAudio.node`。
+
+成功开始新的播放会话时，播放运行时发布 `playbackStarted` 事件。组合根启动的 `PlaybackHistoryController` 常驻订阅该事件，并由播放历史服务统一更新最近播放与累计统计；页面只读取和订阅结果，不参与记录。
 
 ## 音乐库与元数据
 

@@ -156,16 +156,18 @@ npm run lint
 播放相关代码集中在 `features/playback/`：
 
 - `PlaybackController.ts`：应用层播放 controller。
+- `PlaybackHistoryController.ts`：常驻订阅新播放会话并触发历史记录。
 - `PlaybackStore.ts`：播放状态 store。
 - `domain/PlaybackQueue.ts`：显式队列、播放模式和队列变更规则。
 - `domain/TrackIdentity.ts`：歌曲去重和同一性判断。
 - `service/PlaybackService.ts`：播放服务 facade。
+- `service/RecentPlaybackHistoryService.ts`：统一持久化最近播放和累计统计。
 - `service/AudioEngineAdapter.ts`：Web Audio / WASAPI 切换适配。
 - `service/audioEngine/webAudio/`：Web Audio 实现。
 - `service/audioEngine/wasapi/WasapiEngine.ts`：WASAPI renderer adapter。
 - `ui-bindings/`：播放器、列表等 UI 事件绑定。
 
-`PlaybackQueue` 是队列顺序和当前队列项的权威来源。各播放模式共享同一组可见 `QueueEntry`，UI 通过 `queueId` 提交排序，队列快照随播放状态持久化。音频引擎返回的播放元数据由 `PlaybackStateSynchronizer` 与当前队列歌曲合并后写入 `PlaybackRuntimeState`，以保留 `fileId` 等音乐库身份；上层不直接把引擎对象作为当前歌曲。播放状态变化通过事件和 store 同步到播放器 UI、歌词、桌面歌词和插件 API。
+`PlaybackQueue` 是队列顺序和当前队列项的权威来源。各播放模式共享同一组可见 `QueueEntry`，UI 通过 `queueId` 提交排序，队列快照随播放状态持久化。音频引擎返回的播放元数据由 `PlaybackStateSynchronizer` 与当前队列歌曲合并后写入 `PlaybackRuntimeState`，以保留 `fileId` 等音乐库身份；上层不直接把引擎对象作为当前歌曲。播放状态变化通过事件和 store 同步到播放器 UI、歌词、桌面歌词和插件 API；新的有效播放会话另行发布 `playbackStarted`，由组合根中的历史 controller 统一记录，最近播放页和统计页只消费结果。
 
 ## 样式结构
 
