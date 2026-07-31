@@ -3,6 +3,7 @@ import type {MusicBoxSettings} from "@api/types/settings";
 import type {
     AlbumViewMode,
     ArtistViewMode,
+    FolderSourceViewMode,
     PlaylistDoubleClickMode,
     PlaylistInfoAlignment,
     PlaylistViewMode
@@ -24,6 +25,7 @@ export interface SettingsInitialValues {
     artistViewMode: ArtistViewMode;
     albumViewMode: AlbumViewMode;
     playlistViewMode: PlaylistViewMode;
+    folderSourceViewMode: FolderSourceViewMode;
     splitAlbumsByArtist: boolean;
     showTrackCovers: boolean;
     autoFetchMissingTrackCovers: boolean;
@@ -84,6 +86,7 @@ class SettingsStore {
             artistViewMode: settings.artistViewMode === 'list' ? 'list' : 'grid',
             albumViewMode: settings.albumViewMode === 'list' ? 'list' : 'grid',
             playlistViewMode: settings.playlistViewMode === 'list' ? 'list' : 'grid',
+            folderSourceViewMode: settings.folderSourceViewMode === 'list' ? 'list' : 'grid',
             splitAlbumsByArtist: this.getBoolean(settings, 'splitAlbumsByArtist', false),
             showTrackCovers: this.getBoolean(settings, 'showTrackCovers', true),
             autoFetchMissingTrackCovers: this.getBoolean(settings, 'autoFetchMissingTrackCovers', false),

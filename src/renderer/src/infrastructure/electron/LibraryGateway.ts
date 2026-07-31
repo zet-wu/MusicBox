@@ -5,6 +5,7 @@ import type {CacheValidationResult, ScanProgress} from '@api/types/events';
 import type {
     EmbeddedTrackCover,
     FavoritesChangedData,
+    LibraryDirectoryOverview,
     LibraryImportResult,
     LibraryIndexRebuildResult,
     LibrarySource,
@@ -35,6 +36,10 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.call('importLibraryFiles', paths, targetPlaylistId);
     }
 
+    getLibraryDirectoryOverviews(): Promise<LibraryDirectoryOverview[]> {
+        return this.call('getLibraryDirectoryOverviews');
+    }
+
     getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]> {
         return this.call('getPlaylistBindings', playlistId);
     }
@@ -47,11 +52,26 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.call('removeLibraryDirectory', directoryPath);
     }
 
+    removeLibrarySource(sourceId: string): Promise<Result & {removedTrackCount?: number}> {
+        return this.call('removeLibrarySource', sourceId);
+    }
+
+    rescanLibrarySource(sourceId: string): Promise<Result> {
+        return this.call('rescanLibrarySource', sourceId);
+    }
+
     bindDirectoryToPlaylist(
         playlistId: string,
         directoryPath: string
     ): Promise<Result & {binding?: PlaylistSourceBinding}> {
         return this.call('bindDirectoryToPlaylist', playlistId, directoryPath);
+    }
+
+    bindLibrarySourceToPlaylist(
+        playlistId: string,
+        sourceId: string
+    ): Promise<Result & {binding?: PlaylistSourceBinding}> {
+        return this.call('bindLibrarySourceToPlaylist', playlistId, sourceId);
     }
 
     unbindDirectoryFromPlaylist(bindingId: string, mode: 'keep' | 'remove'): Promise<Result> {
@@ -180,6 +200,10 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
 
     onLibraryUpdated(handler: (tracks: Track[]) => void): Unsubscribe {
         return this.on('onLibraryUpdated', (_event: unknown, tracks: Track[]) => handler(tracks));
+    }
+
+    onSourcesUpdated(handler: () => void): Unsubscribe {
+        return this.on('onSourcesUpdated', () => handler());
     }
 
     onFavoritesChanged(handler: (data: FavoritesChangedData) => void): Unsubscribe {

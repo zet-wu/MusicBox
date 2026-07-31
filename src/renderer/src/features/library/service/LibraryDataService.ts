@@ -1,7 +1,8 @@
 import {libraryGateway} from '@/infrastructure/electron';
-import type {Result} from '@api/types/common';
+import type {Result, Unsubscribe} from '@api/types/common';
 import type {
     EmbeddedTrackCover,
+    LibraryDirectoryOverview,
     LibraryImportResult,
     LibraryIndexRebuildResult,
     LibrarySource,
@@ -264,6 +265,14 @@ export class LibraryDataService {
         );
     }
 
+    async getLibraryDirectoryOverviews(): Promise<LibraryDirectoryOverview[]> {
+        return await this.callGateway(
+            () => libraryGateway.getLibraryDirectoryOverviews(),
+            'library.getLibraryDirectoryOverviews',
+            []
+        );
+    }
+
     async registerLibraryDirectory(
         directoryPath: string
     ): Promise<Result & {source?: LibrarySource}> {
@@ -286,6 +295,26 @@ export class LibraryDataService {
         );
     }
 
+    async removeLibrarySource(
+        sourceId: string
+    ): Promise<Result & {removedTrackCount?: number}> {
+        this.assertNonEmptyString(sourceId, 'sourceId');
+        return await this.callGateway(
+            () => libraryGateway.removeLibrarySource(sourceId),
+            'library.removeLibrarySource',
+            {success: false, error: '移除音乐库来源失败'}
+        );
+    }
+
+    async rescanLibrarySource(sourceId: string): Promise<Result> {
+        this.assertNonEmptyString(sourceId, 'sourceId');
+        return await this.callGateway(
+            () => libraryGateway.rescanLibrarySource(sourceId),
+            'library.rescanLibrarySource',
+            {success: false, error: '重新扫描音乐文件夹失败'}
+        );
+    }
+
     async bindDirectoryToPlaylist(
         playlistId: string,
         directoryPath: string
@@ -297,6 +326,23 @@ export class LibraryDataService {
             'library.bindDirectoryToPlaylist',
             {success: false, error: '绑定文件夹失败'}
         );
+    }
+
+    async bindLibrarySourceToPlaylist(
+        playlistId: string,
+        sourceId: string
+    ): Promise<Result & {binding?: PlaylistSourceBinding}> {
+        this.assertNonEmptyString(playlistId, 'playlistId');
+        this.assertNonEmptyString(sourceId, 'sourceId');
+        return await this.callGateway(
+            () => libraryGateway.bindLibrarySourceToPlaylist(playlistId, sourceId),
+            'library.bindLibrarySourceToPlaylist',
+            {success: false, error: '绑定音乐文件夹来源失败'}
+        );
+    }
+
+    onSourcesUpdated(handler: () => void): Unsubscribe {
+        return libraryGateway.onSourcesUpdated(handler);
     }
 
     async unbindDirectoryFromPlaylist(

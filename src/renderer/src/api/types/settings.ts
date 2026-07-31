@@ -4,6 +4,7 @@ export type PlaylistInfoAlignment = 'left' | 'center' | 'right';
 export type ArtistViewMode = 'grid' | 'list';
 export type AlbumViewMode = 'grid' | 'list';
 export type PlaylistViewMode = 'grid' | 'list';
+export type FolderSourceViewMode = 'grid' | 'list';
 
 export interface DesktopLyricsSettings {
     fontSize?: number;
@@ -27,6 +28,7 @@ export interface MusicBoxSettings {
     artistViewMode?: ArtistViewMode;
     albumViewMode?: AlbumViewMode;
     playlistViewMode?: PlaylistViewMode;
+    folderSourceViewMode?: FolderSourceViewMode;
     splitAlbumsByArtist?: boolean;
     showTrackCovers?: boolean;
     autoFetchMissingTrackCovers?: boolean;

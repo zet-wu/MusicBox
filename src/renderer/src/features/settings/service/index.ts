@@ -26,6 +26,7 @@ export * from './MusicFolderSettingsService';
 export * from './PlaylistInfoAlignmentPreferenceService';
 export * from './PlaylistAutoCoverPreferenceService';
 export * from './PlaylistViewModePreferenceService';
+export * from './FolderSourceViewModePreferenceService';
 export * from './SettingsExtensionNavigationService';
 export * from './SettingsListenerScope';
 export * from './SettingsPageVisibilityService';
