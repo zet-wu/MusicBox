@@ -60,6 +60,8 @@ function createLibraryController(currentView = 'library') {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
 });
 
 describe('旧歌曲列表移除后的集合行为', () => {
@@ -138,6 +140,41 @@ describe('旧歌曲列表移除后的集合行为', () => {
         expect(shouldClearInput).toBe(true);
         expect(app.filteredLibrary).toEqual(app.library);
         expect(ui.applySystemCollectionSearchResults).toHaveBeenLastCalledWith(null);
+    });
+
+    it('清除查询后丢弃仍在执行的旧搜索结果', async () => {
+        const {app, controller, ui} = createLibraryController();
+        const original = createTrack('original');
+        app.library = [original];
+        let resolveSearch!: (tracks: Track[]) => void;
+        vi.spyOn(libraryDataService, 'searchLibrary').mockReturnValue(new Promise(resolve => {
+            resolveSearch = resolve;
+        }));
+
+        const search = controller.handleSearchQuery('stale');
+        controller.clearSearchState();
+        resolveSearch([createTrack('stale')]);
+        await search;
+
+        expect(app.filteredLibrary).toEqual([original]);
+        expect(ui.applySystemCollectionSearchResults).toHaveBeenLastCalledWith(null);
+    });
+
+    it('取消防抖任务后不再执行旧回调', async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal('document', {
+            readyState: 'loading',
+            addEventListener: vi.fn()
+        });
+        const {debounce} = await import('../utils/index');
+        const callback = vi.fn();
+        const debounced = debounce(callback, 200);
+
+        debounced('stale');
+        debounced.cancel();
+        await vi.advanceTimersByTimeAsync(200);
+
+        expect(callback).not.toHaveBeenCalled();
     });
 
 });

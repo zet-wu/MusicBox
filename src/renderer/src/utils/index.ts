@@ -18,16 +18,26 @@ function formatTime(seconds: number): string {
 /**
  * Debounce function to limit the rate of function calls
  */
-function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
+type DebouncedFunction<T extends (...args: any[]) => void> = ((...args: Parameters<T>) => void) & {
+    cancel(): void;
+};
+
+function debounce<T extends (...args: any[]) => void>(func: T, wait: number): DebouncedFunction<T> {
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    return function executedFunction(...args: Parameters<T>): void {
+    const debounced = function executedFunction(...args: Parameters<T>): void {
         const later = () => {
-            clearTimeout(timeout);
+            timeout = undefined;
             func(...args);
         };
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+
+    debounced.cancel = () => {
+        clearTimeout(timeout);
+        timeout = undefined;
+    };
+    return debounced;
 }
 
 /**

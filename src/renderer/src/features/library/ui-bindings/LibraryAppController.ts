@@ -216,11 +216,15 @@ export class LibraryAppController {
             return false;
         }
 
+        this.clearSearchState();
+        return true;
+    }
+
+    clearSearchState(): void {
         this.searchGeneration++;
         this.activeSearchQuery = '';
         this.app.filteredLibrary = [...this.app.library];
         this.ui.applySystemCollectionSearchResults(null);
-        return true;
     }
 
     updateLibraryTrackDuration(filePath: string, duration: number): void {
