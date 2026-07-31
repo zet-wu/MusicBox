@@ -1941,7 +1941,7 @@
 .artists-browser {
   position: relative;
   min-height: 320px;
-  margin: 0 28px 32px;
+  margin: 0 0 32px;
 
   .artist-virtual-body {
     position: relative;
@@ -1963,15 +1963,31 @@
 
     .artist-library-item {
       min-width: 0;
-      padding: 18px;
+      padding: 0;
       flex-direction: column;
+      border-color: transparent;
+      background: transparent;
       text-align: center;
+      box-shadow: none;
     }
 
     .artist-avatar {
-      width: 132px;
-      height: 132px;
+      width: var(--cover);
+      height: var(--cover);
       margin-bottom: 14px;
+      box-shadow: var(--albumsx-shadow);
+      transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+    }
+
+    .artist-library-item:hover,
+    .artist-library-item:focus-visible {
+      border-color: transparent;
+      box-shadow: none;
+
+      .artist-avatar {
+        box-shadow: var(--albumsx-shadow-hover);
+        transform: translateY(-4px);
+      }
     }
 
   }
@@ -1982,6 +1998,9 @@
     .artist-library-item {
       min-height: 72px;
       padding: 10px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-secondary-bg);
     }
 
     .artist-avatar {

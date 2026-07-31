@@ -31,6 +31,14 @@ interface SourceRectSnapshot {
     scrollTop: number;
 }
 
+type ArtistViewSize = 's' | 'm' | 'l';
+
+const ARTIST_COVER_SIZES: Record<ArtistViewSize, number> = {
+    s: 110,
+    m: 150,
+    l: 200
+};
+
 class ArtistsPage extends Component {
     private container: any;
     private tracks: Track[];
@@ -38,6 +46,7 @@ class ArtistsPage extends Component {
     private filteredArtists: ArtistInfo[];
     private selectedArtist: ArtistInfo | null;
     private viewMode: ArtistViewMode;
+    private viewSize: ArtistViewSize;
     private sortBy: ArtistSortKey;
     private sortDirection: SortDirection;
     private searchQuery: string;
@@ -58,6 +67,7 @@ class ArtistsPage extends Component {
         this.filteredArtists = [];
         this.selectedArtist = null;
         this.viewMode = artistViewModePreferenceService.getMode();
+        this.viewSize = 'm';
         this.sortBy = 'name';
         this.sortDirection = 'asc';
         this.searchQuery = '';
@@ -200,61 +210,55 @@ class ArtistsPage extends Component {
 
     renderArtistsList(): void {
         this.trackCollectionDetail.hide();
+        const coverSize = ARTIST_COVER_SIZES[this.viewSize];
         this.container.innerHTML = `
-            <div class="page-content artists-page modern-artists">
-                ${this.artists.length > 0 ? `
-                    <!-- 现代化控制栏 -->
-                    <div class="modern-controls">
-                        <div class="search-container">
-                            <div class="search-wrapper">
-                                <svg class="search-icon" viewBox="0 0 24 24">
-                                    <path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L20.71,20L19.29,21.42L13.73,15.44C12.59,16.41 11.11,17 9.5,17A6.5,6.5 0 0,1 3,10.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/>
-                                </svg>
-                                <input type="text" id="artist-search" value="${this.escapeHtml(this.searchQuery)}"
-                                       placeholder="在星河中寻找艺术家..." class="modern-search-input">
-                            </div>
+            <div class="page-content artists-page modern-artists albumsx artistsx page">
+                <div class="albumsx-toolbar">
+                    <div class="left cluster">
+                        <div class="title">
+                            <span class="disc" aria-hidden>🎤</span>
+                            <span>星河</span>
+                            <em class="muted">${this.artists.length} 位</em>
                         </div>
-                        <div class="artist-sort-controls">
+                        <div class="segmented" role="tablist" aria-label="头像尺寸">
+                            <button class="seg-btn ${this.viewSize === 's' ? 'active' : ''}" data-size="s" ${this.viewMode === 'list' ? 'disabled' : ''}>小</button>
+                            <button class="seg-btn ${this.viewSize === 'm' ? 'active' : ''}" data-size="m" ${this.viewMode === 'list' ? 'disabled' : ''}>中</button>
+                            <button class="seg-btn ${this.viewSize === 'l' ? 'active' : ''}" data-size="l" ${this.viewMode === 'list' ? 'disabled' : ''}>大</button>
+                        </div>
+                    </div>
+                    <div class="right cluster">
+                        <div class="select">
                             <select id="artist-sort" aria-label="艺术家排序字段">
                                 <option value="name" ${this.sortBy === 'name' ? 'selected' : ''}>按艺术家名</option>
                                 <option value="tracks" ${this.sortBy === 'tracks' ? 'selected' : ''}>按歌曲数</option>
                             </select>
-                            <button class="sort-direction-btn" id="artist-sort-direction" type="button"
-                                    title="切换为${this.sortDirection === 'asc' ? '降序' : '升序'}"
-                                    aria-label="当前${this.sortDirection === 'asc' ? '升序' : '降序'}，点击切换">
-                                ${this.sortDirection === 'asc' ? '↑' : '↓'}
-                            </button>
                         </div>
-                        <div class="view-mode-toggle">
-                            <button class="mode-btn ${this.viewMode === 'grid' ? 'active' : ''}" data-view="grid" title="方格视图">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M3,3H10V10H3V3M14,3H21V10H14V3M3,14H10V21H3V14M14,14H21V21H14V14Z"/>
-                                </svg>
-                                <span>方格</span>
-                            </button>
-                            <button class="mode-btn ${this.viewMode === 'list' ? 'active' : ''}" data-view="list" title="列表视图">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M3,5H5V7H3V5M7,5H21V7H7V5M3,11H5V13H3V11M7,11H21V13H7V11M3,17H5V19H3V17M7,17H21V19H7V17Z"/>
-                                </svg>
-                                <span>列表</span>
-                            </button>
+                        <button class="sort-direction-btn" id="artist-sort-direction" type="button"
+                                title="切换为${this.sortDirection === 'asc' ? '降序' : '升序'}"
+                                aria-label="当前${this.sortDirection === 'asc' ? '升序' : '降序'}，点击切换">
+                            ${this.sortDirection === 'asc' ? '↑' : '↓'}
+                        </button>
+                        <div class="search-inline">
+                            <input type="text" id="artist-search" value="${this.escapeHtml(this.searchQuery)}" placeholder="搜索艺术家…">
+                        </div>
+                        <div class="segmented" role="tablist" aria-label="视图模式">
+                            <button class="seg-btn ${this.viewMode === 'grid' ? 'active' : ''}" data-view="grid">方格</button>
+                            <button class="seg-btn ${this.viewMode === 'list' ? 'active' : ''}" data-view="list">列表</button>
                         </div>
                     </div>
+                </div>
 
-                    <div class="artists-browser ${this.viewMode}-view">
+                ${this.artists.length > 0 ? `
+                    <div class="artists-browser ${this.viewMode}-view" style="--cover:${coverSize}px;">
                         <div class="artist-virtual-body"></div>
                     </div>
                 ` : `
-                    <div class="empty-state modern-empty">
-                        <div class="empty-animation">
-                            <div class="empty-stars">
-                                <div class="star"></div>
-                                <div class="star"></div>
-                                <div class="star"></div>
-                            </div>
+                    <div class="albumsx-empty">
+                        <div class="icon">
+                            <svg viewBox="0 0 24 24"><path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/></svg>
                         </div>
-                        <h3 class="empty-title">星河等待探索</h3>
-                        <p class="empty-description">添加音乐，让艺术家在这片星河中闪耀</p>
+                        <h3>暂无艺术家</h3>
+                        <p>添加音乐后，这里会展示音乐库中的艺术家</p>
                     </div>
                 `}
             </div>
@@ -285,8 +289,18 @@ class ArtistsPage extends Component {
             this.applyArtistSort();
         });
 
+        this.container.querySelectorAll('[data-size]').forEach((btn: HTMLElement) => {
+            btn.addEventListener('click', () => {
+                const size = btn.dataset.size;
+                if (isArtistViewSize(size) && size !== this.viewSize) {
+                    this.viewSize = size;
+                    this.renderArtistsList();
+                }
+            });
+        });
+
         // 视图模式切换
-        this.container.querySelectorAll('.mode-btn').forEach((btn: HTMLElement) => {
+        this.container.querySelectorAll('[data-view]').forEach((btn: HTMLElement) => {
             btn.addEventListener('click', () => {
                 const newMode = btn.dataset.view;
                 if (isArtistViewMode(newMode) && newMode !== this.viewMode) {
@@ -700,8 +714,10 @@ class ArtistsPage extends Component {
         }
 
         const availableWidth = body.clientWidth || this.container.clientWidth || 800;
+        const coverSize = ARTIST_COVER_SIZES[this.viewSize];
+        const gridCellWidth = coverSize + 60;
         const columns = this.viewMode === 'grid'
-            ? Math.max(1, Math.floor((availableWidth + 20) / 220))
+            ? Math.max(1, Math.floor((availableWidth + 20) / (gridCellWidth + 20)))
             : 1;
         const rowCount = Math.ceil(this.filteredArtists.length / columns);
         const scrollMargin = this.getArtistScrollMargin(body, scrollElement);
@@ -720,7 +736,7 @@ class ArtistsPage extends Component {
 
         this.artistVirtualizer = new ElementVirtualizer({
             count: rowCount,
-            estimateSize: () => this.viewMode === 'grid' ? 244 : 82,
+            estimateSize: () => this.viewMode === 'grid' ? coverSize + 94 : 82,
             getItemKey: (index) => `artist-row-${index}`,
             getScrollElement: () => scrollElement,
             scrollMargin,
@@ -794,10 +810,7 @@ class ArtistsPage extends Component {
     switchViewMode(newMode: ArtistViewMode): void {
         this.viewMode = newMode;
         artistViewModePreferenceService.setMode(newMode);
-        this.container.querySelectorAll('.mode-btn').forEach((btn: HTMLElement) => {
-            btn.classList.toggle('active', btn.dataset.view === newMode);
-        });
-        this.updateArtistsDisplay();
+        this.renderArtistsList();
     }
 
     renderArtistDetail(): void {
@@ -844,6 +857,10 @@ class ArtistsPage extends Component {
 
 function isArtistViewMode(value: unknown): value is ArtistViewMode {
     return value === 'grid' || value === 'list';
+}
+
+function isArtistViewSize(value: unknown): value is ArtistViewSize {
+    return value === 's' || value === 'm' || value === 'l';
 }
 
 function getErrorMessage(error: unknown): string {
