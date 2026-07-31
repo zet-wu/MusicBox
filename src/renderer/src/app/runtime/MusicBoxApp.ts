@@ -294,11 +294,11 @@ export class MusicBoxApp extends EventEmitter {
         await this.playbackController.handleShuffleAllTracks(tracks);
     }
 
-    async handleViewChange(view: AppView): Promise<void> {
-        await this.viewRouter.handleViewChange(view);
-        if (this.currentView === view) {
-            this.synchronizeSearchAfterNavigation();
+    async handleViewChange(view: AppView, options: {preserveSearch?: boolean} = {}): Promise<void> {
+        if (!options.preserveSearch && this.currentView !== view) {
+            this.clearSearchForNavigation();
         }
+        await this.viewRouter.handleViewChange(view);
     }
 
     hideAllPages(): void {
@@ -375,20 +375,19 @@ export class MusicBoxApp extends EventEmitter {
 
     // 处理歌单选择
     async handlePlaylistSelected(playlist: Playlist): Promise<void> {
+        this.clearSearchForNavigation();
         await this.playlistController.handlePlaylistSelected(playlist);
-        this.synchronizeSearchAfterNavigation();
     }
 
     // 处理网络磁盘选择
     async handleNetworkDriveSelected(drive: unknown): Promise<void> {
+        this.clearSearchForNavigation();
         await this.networkDriveRouteController.handleNetworkDriveSelected(drive);
-        this.synchronizeSearchAfterNavigation();
     }
 
-    private synchronizeSearchAfterNavigation(): void {
-        if (this.libraryController.handleNavigationSearchState()) {
-            this.components.search?.clearValue(false);
-        }
+    private clearSearchForNavigation(): void {
+        this.components.search?.clearValue(false);
+        this.libraryController.clearSearchState();
     }
 
     // 处理网络磁盘移除

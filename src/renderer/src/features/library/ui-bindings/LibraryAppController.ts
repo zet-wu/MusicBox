@@ -29,7 +29,7 @@ export interface LibraryAppHost {
     showCacheLoadingStatus(): void;
     hideCacheLoadingStatus(): void;
     showWelcomeScreen(): void;
-    handleViewChange(view: string): Promise<void>;
+    handleViewChange(view: string, options?: {preserveSearch?: boolean}): Promise<void>;
     syncDesktopLyricsButtonState(): Promise<void>;
 }
 
@@ -193,7 +193,7 @@ export class LibraryAppController {
         }
 
         if (!this.isTrackCollectionView()) {
-            await this.app.handleViewChange('library');
+            await this.app.handleViewChange('library', {preserveSearch: true});
             if (generation !== this.searchGeneration) return;
         }
 
@@ -208,16 +208,6 @@ export class LibraryAppController {
                 this.app.showError('搜索失败，请重试');
             }
         }
-    }
-
-    handleNavigationSearchState(): boolean {
-        if (this.isTrackCollectionView()) {
-            this.applySearchToActiveCollection();
-            return false;
-        }
-
-        this.clearSearchState();
-        return true;
     }
 
     clearSearchState(): void {

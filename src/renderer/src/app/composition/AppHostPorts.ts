@@ -78,7 +78,7 @@ export interface MusicBoxCompositionHost {
     handleTrackIndexChanged(index: number): void;
     handleTrackInfoUpdated(data: unknown): Promise<void>;
     handleTrackPlayed(track: Track, index: number, tracks?: Track[]): Promise<void>;
-    handleViewChange(view: AppView): Promise<void>;
+    handleViewChange(view: AppView, options?: {preserveSearch?: boolean}): Promise<void>;
     hideCacheLoadingStatus(): void;
     hideAllPages(): void;
     initGlobalShortcuts(): Promise<void>;
@@ -231,7 +231,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             showCacheLoadingStatus: () => app.showCacheLoadingStatus(),
             hideCacheLoadingStatus: () => app.hideCacheLoadingStatus(),
             showWelcomeScreen: () => app.showWelcomeScreen(),
-            handleViewChange: (view) => app.handleViewChange(view),
+            handleViewChange: (view, options) => app.handleViewChange(view, options),
             syncDesktopLyricsButtonState: () => app.syncDesktopLyricsButtonState()
         },
         lifecycle: {
