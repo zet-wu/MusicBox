@@ -9,7 +9,10 @@ import {
     libraryPageDataService,
     type LibraryAlbumItem as AlbumItem
 } from "@/features/library/service/LibraryPageDataService";
-import {albumGroupingPreferenceService} from "@/features/settings/service";
+import {
+    albumGroupingPreferenceService,
+    trackCoverNetworkPreferenceService
+} from "@/features/settings/service";
 import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/library";
 
@@ -44,6 +47,8 @@ class AlbumsPage extends Component {
     private _coversScheduled: boolean;
     private listenersSetup: boolean;
     private albumGroupingUnsubscribe: Unsubscribe | null;
+    private coverPreferenceUnsubscribe: Unsubscribe | null;
+    private coverGeneration: number;
     isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -78,6 +83,25 @@ class AlbumsPage extends Component {
                 this.render();
             }
         });
+        this.coverGeneration = 0;
+        this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
+            this.coverGeneration++;
+            this._coverQueue.length = 0;
+            this._coverRequests.clear();
+            this._coversScheduled = false;
+            if (!enabled) {
+                const selectedAlbumKey = this.selectedAlbum?.key;
+                this.processAlbums();
+                this.selectedAlbum = selectedAlbumKey
+                    ? this.albums.find(album => album.key === selectedAlbumKey) || null
+                    : null;
+                if (this.isVisible) {
+                    this.render();
+                }
+            } else if (this.isVisible && !this.selectedAlbum) {
+                this.scheduleCoversForMissing();
+            }
+        });
         this.isVisible = false;
     }
 
@@ -109,6 +133,7 @@ class AlbumsPage extends Component {
     }
 
     hide(): void {
+        this.coverGeneration++;
         this.isVisible = false;
         this.selectedAlbum = null;
         if (this.container) this.container.innerHTML = '';
@@ -127,6 +152,8 @@ class AlbumsPage extends Component {
         this.listenersSetup = false;
         this.albumGroupingUnsubscribe?.();
         this.albumGroupingUnsubscribe = null;
+        this.coverPreferenceUnsubscribe?.();
+        this.coverPreferenceUnsubscribe = null;
         super.destroy();
     }
 
@@ -167,6 +194,7 @@ class AlbumsPage extends Component {
 
     // 将缺失封面的专辑加入获取队列
     scheduleCoversForMissing(): void {
+        if (!trackCoverNetworkPreferenceService.isEnabled()) return;
         if (!this.albums || this.albums.length === 0) return;
 
         // 防重复机制：检查是否已经调度过封面获取
@@ -213,6 +241,10 @@ class AlbumsPage extends Component {
 
     // 获取专辑封面
     async _fetchAlbumCover(album: AlbumItem): Promise<void> {
+        if (!trackCoverNetworkPreferenceService.isEnabled()) {
+            return;
+        }
+        const generation = this.coverGeneration;
         try {
             const artist = this._sanitize(album.artist);
             const name = this._sanitize(album.name || album.album);
@@ -223,7 +255,13 @@ class AlbumsPage extends Component {
             // 显示加载态
             this._setAlbumCardLoading(album.key, true);
             const result = await libraryPageDataService.findAlbumCover(artist, name);
-            if (result && result.success && result.imageUrl) {
+            if (
+                generation === this.coverGeneration
+                && trackCoverNetworkPreferenceService.isEnabled()
+                && result
+                && result.success
+                && result.imageUrl
+            ) {
                 // 更新专辑数据
                 album.cover = result.imageUrl;
                 // 局部刷新：更新对应卡片的图片src

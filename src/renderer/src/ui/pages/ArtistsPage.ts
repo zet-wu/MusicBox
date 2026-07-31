@@ -9,6 +9,8 @@ import {
     type CoverLookupResult as CoverResult,
     type LibraryArtistInfo as ArtistInfo
 } from "@/features/library/service/LibraryPageDataService";
+import {trackCoverNetworkPreferenceService} from "@/features/settings/service";
+import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/track";
 
 type ArtistViewMode = 'constellation' | 'galaxy';
@@ -42,6 +44,9 @@ class ArtistsPage extends Component {
     private _coverFailures: Set<string>;
     private _coverLoading: Set<string>;
     private _coverFetchingInProgress: boolean;
+    private coverGeneration: number;
+    private coverPreferenceUnsubscribe: Unsubscribe | null;
+    private isVisible: boolean;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -55,6 +60,25 @@ class ArtistsPage extends Component {
         this._coverFailures = new Set(); // 记录封面获取失败的艺术家
         this._coverLoading = new Set(); // 记录正在加载封面的艺术家
         this._coverFetchingInProgress = false; // 防止重复启动封面获取
+        this.coverGeneration = 0;
+        this.isVisible = false;
+        this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
+            this.coverGeneration++;
+            this._coverFetchingInProgress = false;
+            this._coverLoading.clear();
+            if (!enabled) {
+                const selectedArtistName = this.selectedArtist?.name;
+                this.processArtists();
+                this.selectedArtist = selectedArtistName
+                    ? this.artists.find(artist => artist.name === selectedArtistName) || null
+                    : null;
+                if (this.isVisible) {
+                    this.render();
+                }
+            } else if (this.isVisible && !this.selectedArtist) {
+                this._startCoverFetching();
+            }
+        });
     }
 
     async show(): Promise<void> {
@@ -66,6 +90,7 @@ class ArtistsPage extends Component {
         if (this.element instanceof HTMLElement) {
             this.element.style.display = 'block';
         }
+        this.isVisible = true;
 
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
@@ -86,6 +111,8 @@ class ArtistsPage extends Component {
     }
 
     hide(): void {
+        this.coverGeneration++;
+        this.isVisible = false;
         this.selectedArtist = null;
         this.stopHeroVisualization();
         if (this.container) {
@@ -110,6 +137,8 @@ class ArtistsPage extends Component {
             this._coverLoading.clear();
         }
         this._coverFetchingInProgress = false;
+        this.coverPreferenceUnsubscribe?.();
+        this.coverPreferenceUnsubscribe = null;
 
         super.destroy();
     }
@@ -495,6 +524,10 @@ class ArtistsPage extends Component {
 
     // 获取艺术家封面
     async _fetchArtistCover(artist: ArtistInfo): Promise<void> {
+        if (!trackCoverNetworkPreferenceService.isEnabled()) {
+            return;
+        }
+        const generation = this.coverGeneration;
         try {
             const artistName = this._sanitize(artist.name);
             if (!artistName) {
@@ -514,7 +547,13 @@ class ArtistsPage extends Component {
             // 调用API获取艺术家封面
             // 只传艺术家名称，不传专辑名
             const result = await libraryPageDataService.findArtistCover(artistName) as CoverResult;
-            if (result && result.success && result.imageUrl) {
+            if (
+                generation === this.coverGeneration
+                && trackCoverNetworkPreferenceService.isEnabled()
+                && result
+                && result.success
+                && result.imageUrl
+            ) {
                 // 更新艺术家数据
                 artist.cover = result.imageUrl;
                 // 局部刷新：更新对应卡片的图片src
@@ -580,6 +619,9 @@ class ArtistsPage extends Component {
 
     // 启动封面获取流程
     _startCoverFetching(): void {
+        if (!trackCoverNetworkPreferenceService.isEnabled()) {
+            return;
+        }
         // 防止重复启动封面获取
         if (this._coverFetchingInProgress) {
             return;
@@ -1357,6 +1399,10 @@ class ArtistsPage extends Component {
 
     // 异步获取专辑封面
     async fetchAlbumCoverAsync(albumName: string, artistName: string, _tracks: Track[]): Promise<void> {
+        if (!trackCoverNetworkPreferenceService.isEnabled()) {
+            return;
+        }
+        const generation = this.coverGeneration;
         try {
             // 检查是否已经在获取中
             const albumKey = `${artistName}_${albumName}`;
@@ -1368,7 +1414,13 @@ class ArtistsPage extends Component {
 
             // 调用API获取专辑封面
             const result = await libraryPageDataService.findAlbumCover(artistName, albumName) as CoverResult;
-            if (result && result.success && result.imageUrl) {
+            if (
+                generation === this.coverGeneration
+                && trackCoverNetworkPreferenceService.isEnabled()
+                && result
+                && result.success
+                && result.imageUrl
+            ) {
                 // 更新专辑封面显示
                 this.updateAlbumCoverDisplay(albumName, result.imageUrl);
             } else {
