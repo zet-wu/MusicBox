@@ -64,7 +64,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe('旧歌曲列表移除后的集合行为', () => {
+describe('歌曲集合搜索与删除', () => {
     it('非歌曲集合页搜索时先导航到全部歌曲页', async () => {
         const {app, controller, ui} = createLibraryController('artists');
         const result = createTrack('result');
