@@ -45,7 +45,14 @@ export interface LibraryImportResult {
     success: boolean;
     tracks: CachedTrack[];
     failedPaths: string[];
+    coverUpdated?: boolean;
+    coverPath?: string;
     error?: string;
+}
+
+interface PlaylistCoverUpdateResult {
+    coverUpdated: boolean;
+    coverPath?: string;
 }
 
 @Controller('library')
@@ -65,6 +72,7 @@ export class LibraryController extends BaseController {
         private loadMusicFolders: () => Promise<string[]>,
         private librarySourceManager: LibrarySourceManager,
         private removeMusicFolder: (folderPath: string) => Promise<any>,
+        private loadAutoPlaylistCoverSetting: () => Promise<boolean>,
         audioEngineState: any
     ) {
         super();
@@ -251,6 +259,8 @@ export class LibraryController extends BaseController {
     async addTracksToPlaylist(playlistId: string, trackIds: string[]): Promise<{
         success: boolean;
         results?: any[];
+        coverUpdated?: boolean;
+        coverPath?: string;
         error?: string
     }> {
         try {
@@ -263,13 +273,15 @@ export class LibraryController extends BaseController {
                 }
             });
             await this.libraryCacheManager.saveCache();
+            const addedTrackIds = results
+                .filter(result => result.success)
+                .map(result => result.id);
+            const coverResult = await this.maybeSetAutomaticPlaylistCover(playlistId, addedTrackIds);
             if (playlistId === FAVORITES_PLAYLIST_ID) {
-                this.emitFavoritesChanged(
-                    results.filter(result => result.success).map(result => result.id),
-                    true
-                );
+                this.emitFavoritesChanged(addedTrackIds, true);
             }
-            return {success: true, results};
+            this.emitPlaylistsUpdated();
+            return {success: true, results, ...coverResult};
         } catch (error: any) {
             return {success: false, error: error.message};
         }
@@ -984,6 +996,44 @@ export class LibraryController extends BaseController {
         if (changed) await this.libraryCacheManager.saveCache();
     }
 
+    private async maybeSetAutomaticPlaylistCover(
+        playlistId: string,
+        addedTrackIds: string[]
+    ): Promise<PlaylistCoverUpdateResult> {
+        if (addedTrackIds.length === 0 || playlistId === FAVORITES_PLAYLIST_ID) {
+            return {coverUpdated: false};
+        }
+        if (this.libraryCacheManager.getPlaylistCoverFileName(playlistId)) {
+            return {coverUpdated: false};
+        }
+        if (!await this.loadAutoPlaylistCoverSetting()) {
+            return {coverUpdated: false};
+        }
+
+        for (const trackId of addedTrackIds) {
+            const track = this.libraryCacheManager.getTrackByFileId(trackId);
+            if (!track) continue;
+            let snapshotFileName: string | null = null;
+            try {
+                const cover = await this.embeddedCoverService.getCover(track.filePath, this.networkFileAdapter);
+                if (!cover) continue;
+                const snapshot = await this.playlistCoverStorage.saveSnapshot(playlistId, cover.data);
+                snapshotFileName = snapshot.fileName;
+                this.libraryCacheManager.updatePlaylistCover(playlistId, snapshot.fileName);
+                await this.libraryCacheManager.saveCache();
+                console.log(`✅ 已从歌曲内嵌图片生成歌单封面: ${track.title || track.fileName}`);
+                return {coverUpdated: true, coverPath: snapshot.filePath};
+            } catch (error) {
+                if (snapshotFileName) {
+                    this.libraryCacheManager.removePlaylistCover(playlistId);
+                    await this.playlistCoverStorage.remove(snapshotFileName).catch(() => undefined);
+                }
+                console.warn(`⚠️ 自动提取歌单封面失败: ${track.title || track.fileName}`, error);
+            }
+        }
+        return {coverUpdated: false};
+    }
+
     private emitFavoritesChanged(trackIds: string[], favorite?: boolean): void {
         if (trackIds.length === 0) return;
         const win = this.windowManager.getMainWindow();
@@ -1019,14 +1069,23 @@ export class LibraryController extends BaseController {
     private async synchronizeBindingsForSource(sourceId: string): Promise<void> {
         const bindings = await this.librarySourceManager.synchronizeSourceBindings(sourceId);
         const playlistIds = Array.from(new Set(bindings.map(binding => binding.playlistId)));
-        for (const playlistId of playlistIds) this.recomputePlaylistMembership(playlistId);
+        const additions = playlistIds.map(playlistId => ({
+            playlistId,
+            trackIds: this.recomputePlaylistMembership(playlistId)
+        }));
         if (playlistIds.length > 0) {
             await this.libraryCacheManager.saveCache();
+            for (const addition of additions) {
+                await this.maybeSetAutomaticPlaylistCover(addition.playlistId, addition.trackIds);
+            }
             this.emitPlaylistsUpdated();
         }
     }
 
-    private recomputePlaylistMembership(playlistId: string): void {
+    private recomputePlaylistMembership(playlistId: string): string[] {
+        const previousTrackIds = new Set(
+            this.libraryCacheManager.getPlaylistById(playlistId)?.trackIds || []
+        );
         const bindings = this.librarySourceManager.getPlaylistBindings()
             .filter(binding => binding.playlistId === playlistId);
         const bindingTrackIds = bindings.flatMap(binding => {
@@ -1035,7 +1094,8 @@ export class LibraryController extends BaseController {
                 file.trackId && !excludedPaths.has(file.canonicalPath) ? [file.trackId] : []
             ));
         });
-        this.libraryCacheManager.setPlaylistMaterializedTracks(playlistId, bindingTrackIds);
+        const playlist = this.libraryCacheManager.setPlaylistMaterializedTracks(playlistId, bindingTrackIds);
+        return playlist.trackIds.filter(trackId => !previousTrackIds.has(trackId));
     }
 
     private getActiveBindingTrackIds(binding: PlaylistSourceBinding): string[] {
@@ -1168,8 +1228,9 @@ export class LibraryController extends BaseController {
             const binding = this.librarySourceManager.getPlaylistBinding(bindingId);
             if (!binding) throw new Error('歌单文件夹绑定不存在');
             const restoredCount = await this.librarySourceManager.restorePlaylistBindingExclusions(bindingId);
-            this.recomputePlaylistMembership(binding.playlistId);
+            const addedTrackIds = this.recomputePlaylistMembership(binding.playlistId);
             await this.libraryCacheManager.saveCache();
+            await this.maybeSetAutomaticPlaylistCover(binding.playlistId, addedTrackIds);
             this.emitPlaylistsUpdated();
             return {success: true, restoredCount};
         } catch (error: any) {
@@ -1266,15 +1327,19 @@ export class LibraryController extends BaseController {
                 }
             }
 
+            let coverResult: PlaylistCoverUpdateResult = {coverUpdated: false};
             if (targetPlaylistId && tracks.length > 0) {
+                const addedTrackIds: string[] = [];
                 for (const track of tracks) {
                     try {
                         this.libraryCacheManager.addTrackToPlaylist(targetPlaylistId, track.fileId);
+                        addedTrackIds.push(track.fileId);
                     } catch (error: any) {
                         if (error.message !== '歌曲已在歌单中') throw error;
                     }
                 }
                 await this.libraryCacheManager.saveCache();
+                coverResult = await this.maybeSetAutomaticPlaylistCover(targetPlaylistId, addedTrackIds);
                 this.emitPlaylistsUpdated();
             }
             this.windowManager.sendToMainWindow('library:updated', this.libraryCacheManager.getTracks());
@@ -1283,6 +1348,7 @@ export class LibraryController extends BaseController {
                 success: failedPaths.length === 0,
                 tracks,
                 failedPaths,
+                ...coverResult,
                 error: failedPaths.length > 0 ? `${failedPaths.length} 个文件导入失败` : undefined
             };
         } catch (error: any) {

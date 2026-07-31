@@ -9,7 +9,8 @@ const DEFAULT_SETTINGS = {
     musicFolders: [] as string[],
     autoScanEnabled: false,
     scanFrequency: 'on_startup' as string,
-    lastScanTime: 0
+    lastScanTime: 0,
+    autoPlaylistCoverFromFirstTrack: false
 };
 
 type Settings = typeof DEFAULT_SETTINGS;
@@ -27,7 +28,7 @@ export class SettingsController extends BaseController {
     private async loadSettings(): Promise<Settings> {
         try {
             const data = await fs.promises.readFile(this.settingsFilePath, 'utf8');
-            return JSON.parse(data);
+            return {...DEFAULT_SETTINGS, ...JSON.parse(data)};
         } catch (error: any) {
             if (error.code !== 'ENOENT') console.error('⚠️ 加载音乐文件夹设置失败:', error);
             return {...DEFAULT_SETTINGS};
@@ -53,6 +54,11 @@ export class SettingsController extends BaseController {
     async getMusicFolders(): Promise<string[]> {
         const s = await this.ensureSettings();
         return s.musicFolders || [];
+    }
+
+    async isAutoPlaylistCoverEnabled(): Promise<boolean> {
+        const s = await this.ensureSettings();
+        return s.autoPlaylistCoverFromFirstTrack === true;
     }
 
     @IpcHandle('settings:addMusicFolder')

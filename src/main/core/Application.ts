@@ -410,6 +410,7 @@ export class Application {
             parseMetadata, () => settingsController.getMusicFolders(),
             librarySourceManager,
             (folderPath: string) => settingsController.removeMusicFolder(folderPath),
+            () => settingsController.isAutoPlaylistCoverEnabled(),
             audioController.state
         );
         this.libraryScanner = libraryController;
