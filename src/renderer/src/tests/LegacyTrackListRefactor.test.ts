@@ -110,6 +110,36 @@ describe('旧歌曲列表移除后的集合行为', () => {
         expect(app.library).toEqual([unrelated]);
         expect(app.filteredLibrary).toEqual([unrelated]);
     });
+
+    it('导航到其他歌曲集合时沿用当前搜索结果', async () => {
+        const {app, controller, ui} = createLibraryController();
+        const result = createTrack('result');
+        app.library = [result, createTrack('other')];
+        vi.spyOn(libraryDataService, 'searchLibrary').mockResolvedValue([result]);
+        await controller.handleSearchQuery('result');
+
+        app.currentView = 'favorites';
+        const shouldClearInput = controller.handleNavigationSearchState();
+
+        expect(shouldClearInput).toBe(false);
+        expect(ui.applySystemCollectionSearchResults).toHaveBeenLastCalledWith([result]);
+    });
+
+    it('导航到不支持顶部搜索的页面时清除查询状态', async () => {
+        const {app, controller, ui} = createLibraryController();
+        const result = createTrack('result');
+        app.library = [result, createTrack('other')];
+        vi.spyOn(libraryDataService, 'searchLibrary').mockResolvedValue([result]);
+        await controller.handleSearchQuery('result');
+
+        app.currentView = 'artists';
+        const shouldClearInput = controller.handleNavigationSearchState();
+
+        expect(shouldClearInput).toBe(true);
+        expect(app.filteredLibrary).toEqual(app.library);
+        expect(ui.applySystemCollectionSearchResults).toHaveBeenLastCalledWith(null);
+    });
+
 });
 
 describe('页面路由和最近播放索引', () => {

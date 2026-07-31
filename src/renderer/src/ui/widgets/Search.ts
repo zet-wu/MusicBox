@@ -51,11 +51,15 @@ class Search extends Component {
         this.emit('queryChanged', '');
     }
 
-    clearValue(): void {
+    clearValue(notifyChange = true): void {
         if (this.element) {
             this.element.value = '';
         }
-        this.clearSearch();
+        if (notifyChange) {
+            this.clearSearch();
+        } else {
+            this.debouncedSearch?.cancel?.();
+        }
     }
 
     focusInput(): void {

@@ -37,11 +37,9 @@ export class ViewRouter {
                 break;
             case 'library':
                 await this.content.showSystemCollection('all-tracks');
-                this.content.applySystemCollectionSearchResults(app.filteredLibrary);
                 break;
             case 'favorites':
                 await this.content.showSystemCollection('favorites');
-                this.content.applySystemCollectionSearchResults(app.filteredLibrary);
                 break;
             case 'recent':
                 await this.content.showRecentPage();

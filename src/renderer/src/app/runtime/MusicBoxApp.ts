@@ -296,6 +296,9 @@ export class MusicBoxApp extends EventEmitter {
 
     async handleViewChange(view: AppView): Promise<void> {
         await this.viewRouter.handleViewChange(view);
+        if (this.currentView === view) {
+            this.synchronizeSearchAfterNavigation();
+        }
     }
 
     hideAllPages(): void {
@@ -373,11 +376,19 @@ export class MusicBoxApp extends EventEmitter {
     // 处理歌单选择
     async handlePlaylistSelected(playlist: Playlist): Promise<void> {
         await this.playlistController.handlePlaylistSelected(playlist);
+        this.synchronizeSearchAfterNavigation();
     }
 
     // 处理网络磁盘选择
     async handleNetworkDriveSelected(drive: unknown): Promise<void> {
         await this.networkDriveRouteController.handleNetworkDriveSelected(drive);
+        this.synchronizeSearchAfterNavigation();
+    }
+
+    private synchronizeSearchAfterNavigation(): void {
+        if (this.libraryController.handleNavigationSearchState()) {
+            this.components.search?.clearValue(false);
+        }
     }
 
     // 处理网络磁盘移除

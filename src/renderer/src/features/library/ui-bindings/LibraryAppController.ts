@@ -210,6 +210,19 @@ export class LibraryAppController {
         }
     }
 
+    handleNavigationSearchState(): boolean {
+        if (this.isTrackCollectionView()) {
+            this.applySearchToActiveCollection();
+            return false;
+        }
+
+        this.searchGeneration++;
+        this.activeSearchQuery = '';
+        this.app.filteredLibrary = [...this.app.library];
+        this.ui.applySystemCollectionSearchResults(null);
+        return true;
+    }
+
     updateLibraryTrackDuration(filePath: string, duration: number): void {
         const app = this.app;
         const libraryTrack = app.library.find(track => track.filePath === filePath);
