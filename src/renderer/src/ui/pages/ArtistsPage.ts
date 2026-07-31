@@ -9,11 +9,15 @@ import {
     type CoverLookupResult as CoverResult,
     type LibraryArtistInfo as ArtistInfo
 } from "@/features/library/service/LibraryPageDataService";
-import {trackCoverNetworkPreferenceService} from "@/features/settings/service";
+import {
+    artistViewModePreferenceService,
+    trackCoverNetworkPreferenceService
+} from "@/features/settings/service";
+import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
+import type {VirtualItem} from "@tanstack/virtual-core";
 import type {Unsubscribe} from "@api/types/common";
+import type {ArtistViewMode} from "@api/types/settings";
 import type {Track} from "@api/types/track";
-
-type ArtistViewMode = 'constellation' | 'galaxy';
 
 interface StarParticle {
     x: number;
@@ -47,6 +51,7 @@ class ArtistsPage extends Component {
     private coverGeneration: number;
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private isVisible: boolean;
+    private artistVirtualizer: ElementVirtualizer | null;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -54,7 +59,7 @@ class ArtistsPage extends Component {
         this.artists = [];
         this.filteredArtists = [];
         this.selectedArtist = null;
-        this.viewMode = 'constellation'; // constellation or galaxy
+        this.viewMode = artistViewModePreferenceService.getMode();
         this.listenersSetup = false; // 事件监听器是否已设置
         this.heroAnimationId = null;
         this._coverFailures = new Set(); // 记录封面获取失败的艺术家
@@ -62,6 +67,7 @@ class ArtistsPage extends Component {
         this._coverFetchingInProgress = false; // 防止重复启动封面获取
         this.coverGeneration = 0;
         this.isVisible = false;
+        this.artistVirtualizer = null;
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverFetchingInProgress = false;
@@ -113,6 +119,7 @@ class ArtistsPage extends Component {
     hide(): void {
         this.coverGeneration++;
         this.isVisible = false;
+        this.destroyArtistVirtualizer();
         this.selectedArtist = null;
         this.stopHeroVisualization();
         if (this.container) {
@@ -122,6 +129,7 @@ class ArtistsPage extends Component {
 
     destroy(): void {
         this.stopHeroVisualization();
+        this.destroyArtistVirtualizer();
 
         this.tracks.length = 0;
         this.artists.length = 0;
@@ -220,24 +228,23 @@ class ArtistsPage extends Component {
                             </div>
                         </div>
                         <div class="view-mode-toggle">
-                            <button class="mode-btn ${this.viewMode === 'constellation' ? 'active' : ''}" data-view="constellation" title="星座视图">
+                            <button class="mode-btn ${this.viewMode === 'grid' ? 'active' : ''}" data-view="grid" title="方格视图">
                                 <svg viewBox="0 0 24 24">
-                                    <path d="M12,2L13.09,8.26L22,9L13.09,9.74L12,16L10.91,9.74L2,9L10.91,8.26L12,2M6.5,12.5L7.5,16.5L11.5,17.5L7.5,18.5L6.5,22.5L5.5,18.5L1.5,17.5L5.5,16.5L6.5,12.5M17.5,12.5L18.5,16.5L22.5,17.5L18.5,18.5L17.5,22.5L16.5,18.5L12.5,17.5L16.5,16.5L17.5,12.5Z"/>
+                                    <path d="M3,3H10V10H3V3M14,3H21V10H14V3M3,14H10V21H3V14M14,14H21V21H14V14Z"/>
                                 </svg>
-                                <span>星座</span>
+                                <span>方格</span>
                             </button>
-                            <button class="mode-btn ${this.viewMode === 'galaxy' ? 'active' : ''}" data-view="galaxy" title="星系视图">
+                            <button class="mode-btn ${this.viewMode === 'list' ? 'active' : ''}" data-view="list" title="列表视图">
                                 <svg viewBox="0 0 24 24">
-                                    <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z"/>
+                                    <path d="M3,5H5V7H3V5M7,5H21V7H7V5M3,11H5V13H3V11M7,11H21V13H7V11M3,17H5V19H3V17M7,17H21V19H7V17Z"/>
                                 </svg>
-                                <span>星系</span>
+                                <span>列表</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- 星河式艺术家展示 -->
-                    <div class="artists-galaxy ${this.viewMode === 'constellation' ? 'constellation-view' : 'galaxy-view'}">
-                        ${this.viewMode === 'constellation' ? this.renderConstellationView() : this.renderGalaxyView()}
+                    <div class="artists-browser ${this.viewMode}-view">
+                        <div class="artist-virtual-body"></div>
                     </div>
                 ` : `
                     <div class="empty-state modern-empty">
@@ -257,9 +264,7 @@ class ArtistsPage extends Component {
 
         this.setupEventListeners();
         this.initializeHeroVisualization();
-
-        // 渲染完成后启动封面获取
-        this._startCoverFetching();
+        this.mountArtistVirtualizer();
     }
 
     // 设置事件监听器
@@ -282,8 +287,6 @@ class ArtistsPage extends Component {
             });
         });
 
-        // 绑定不同视图的事件
-        this.bindViewSpecificEvents();
     }
 
     // 初始化hero区域可视化
@@ -579,7 +582,7 @@ class ArtistsPage extends Component {
 
     // 设置艺术家卡片加载状态
     _setArtistCardLoading(artistName: string, isLoading: boolean): void {
-        const artistCards = this.container.querySelectorAll(`[data-artist="${artistName}"]`);
+        const artistCards = this.container.querySelectorAll(`[data-artist="${CSS.escape(artistName)}"]`);
         artistCards.forEach((card: HTMLElement) => {
             const img = card.querySelector('img');
             if (img) {
@@ -596,7 +599,7 @@ class ArtistsPage extends Component {
 
     // 更新艺术家卡片封面
     _updateArtistCardCover(artistName: string, imageUrl: string): void {
-        const artistCards = this.container.querySelectorAll(`[data-artist="${artistName}"]`);
+        const artistCards = this.container.querySelectorAll(`[data-artist="${CSS.escape(artistName)}"]`);
         artistCards.forEach((card: HTMLElement) => {
             const img = card.querySelector('img');
             if (img && imageUrl) {
@@ -618,7 +621,7 @@ class ArtistsPage extends Component {
     }
 
     // 启动封面获取流程
-    _startCoverFetching(): void {
+    _startCoverFetching(candidates: ArtistInfo[] = this.filteredArtists): void {
         if (!trackCoverNetworkPreferenceService.isEnabled()) {
             return;
         }
@@ -628,7 +631,7 @@ class ArtistsPage extends Component {
         }
 
         // 检查是否有需要获取封面的艺术家
-        const artistsNeedingCovers = this.filteredArtists.filter((artist) =>
+        const artistsNeedingCovers = candidates.filter((artist) =>
             !artist.cover &&
             !this._coverFailures.has(artist.name) &&
             !this._coverLoading.has(artist.name)
@@ -641,16 +644,16 @@ class ArtistsPage extends Component {
         this._coverFetchingInProgress = true;
 
         this.requestIdleCallbackManaged(() => {
-            this._fetchCoversForVisibleArtists().finally(() => {
+            this._fetchCoversForVisibleArtists(candidates).finally(() => {
                 this._coverFetchingInProgress = false;
             });
         }, {timeout: 100});
     }
 
     // 为可见的艺术家获取封面
-    async _fetchCoversForVisibleArtists(): Promise<void> {
+    async _fetchCoversForVisibleArtists(candidates: ArtistInfo[]): Promise<void> {
         // 只为没有封面的艺术家获取封面
-        const artistsNeedingCovers = this.filteredArtists.filter((artist) =>
+        const artistsNeedingCovers = candidates.filter((artist) =>
             !artist.cover &&
             !this._coverFailures.has(artist.name) &&
             !this._coverLoading.has(artist.name)
@@ -751,18 +754,124 @@ class ArtistsPage extends Component {
 
     // 更新艺术家显示区域
     updateArtistsDisplay(): void {
-        const galaxyContainer = this.container.querySelector('.artists-galaxy');
-        if (galaxyContainer) {
-            // 根据当前视图模式重新渲染
-            galaxyContainer.innerHTML = this.viewMode === 'constellation' ?
-                this.renderConstellationView() :
-                this.renderGalaxyView();
-
-            galaxyContainer.className = `artists-galaxy ${this.viewMode === 'constellation' ? 'constellation-view' : 'galaxy-view'}`;
-
-            // 重新绑定事件
-            this.bindViewSpecificEvents();
+        const browser = this.container.querySelector('.artists-browser');
+        if (browser) {
+            browser.className = `artists-browser ${this.viewMode}-view`;
+            this.mountArtistVirtualizer();
         }
+    }
+
+    private mountArtistVirtualizer(): void {
+        this.destroyArtistVirtualizer();
+        const container = this.container as HTMLElement | null;
+        const body = container?.querySelector<HTMLElement>('.artist-virtual-body');
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (!body || !scrollElement) {
+            return;
+        }
+
+        if (this.filteredArtists.length === 0) {
+            body.innerHTML = '<div class="artists-no-results">没有找到匹配的艺术家</div>';
+            return;
+        }
+
+        const availableWidth = body.clientWidth || this.container.clientWidth || 800;
+        const columns = this.viewMode === 'grid'
+            ? Math.max(1, Math.floor((availableWidth + 20) / 220))
+            : 1;
+        const rowCount = Math.ceil(this.filteredArtists.length / columns);
+        const scrollMargin = this.getArtistScrollMargin(body, scrollElement);
+
+        body.addEventListener('click', (event: MouseEvent) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.artist-library-item');
+            const index = Number.parseInt(item?.dataset.artistIndex || '', 10);
+            const artist = Number.isInteger(index) ? this.filteredArtists[index] : null;
+            if (!artist || !item) {
+                return;
+            }
+
+            if (target?.closest('.artist-card-play')) {
+                event.stopPropagation();
+                this.playArtistWithAnimation(item, artist);
+                return;
+            }
+            this.showArtistDetailWithTransition(artist, item);
+        });
+
+        this.artistVirtualizer = new ElementVirtualizer({
+            count: rowCount,
+            estimateSize: () => this.viewMode === 'grid' ? 244 : 82,
+            getItemKey: (index) => `artist-row-${index}`,
+            getScrollElement: () => scrollElement,
+            scrollMargin,
+            overscan: 3,
+            onChange: (items, totalSize) => {
+                if (!this.isVisible || !this.artistVirtualizer) {
+                    return;
+                }
+
+                body.style.height = `${totalSize}px`;
+                body.innerHTML = items
+                    .map(item => this.renderArtistVirtualRow(item, columns, scrollMargin))
+                    .join('');
+                body.querySelectorAll<HTMLElement>('.artist-virtual-row').forEach((row) => {
+                    this.artistVirtualizer?.measureElement(row);
+                });
+
+                const visibleArtists = items.flatMap((item) => {
+                    const start = item.index * columns;
+                    return this.filteredArtists.slice(start, start + columns);
+                });
+                this._startCoverFetching(visibleArtists);
+            }
+        });
+        this.artistVirtualizer.mount();
+    }
+
+    private renderArtistVirtualRow(item: VirtualItem, columns: number, scrollMargin: number): string {
+        const start = item.index * columns;
+        const artists = this.filteredArtists.slice(start, start + columns);
+        const translateY = item.start - scrollMargin;
+        return `
+            <div class="artist-virtual-row ${this.viewMode}-row"
+                 data-index="${item.index}"
+                 style="transform: translateY(${translateY}px); --artist-columns:${columns};">
+                ${artists.map((artist, offset) => this.renderArtistLibraryItem(artist, start + offset)).join('')}
+            </div>
+        `;
+    }
+
+    private renderArtistLibraryItem(artist: ArtistInfo, index: number): string {
+        const cover = artist.cover || 'assets/images/default-cover.svg';
+        return `
+            <div class="artist-library-item" data-artist-index="${index}" data-artist="${this.escapeHtml(artist.name)}" tabindex="0">
+                <div class="artist-avatar">
+                    <img src="${cover}" alt="${this.escapeHtml(artist.name)}" loading="lazy">
+                </div>
+                <div class="artist-library-info">
+                    <div class="artist-library-name">${this.escapeHtml(artist.name)}</div>
+                    <div class="artist-library-stats">
+                        ${artist.tracks.length} 首歌曲 · ${artist.albums.size} 张专辑
+                        ${this.viewMode === 'list' ? ` · ${this.formatDuration(artist.totalDuration)}` : ''}
+                    </div>
+                </div>
+                <button class="artist-card-play" type="button" title="播放该艺术家的歌曲">
+                    <svg viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg>
+                </button>
+            </div>
+        `;
+    }
+
+    private getArtistScrollMargin(body: HTMLElement, scrollElement: HTMLElement): number {
+        const bodyRect = body.getBoundingClientRect();
+        const scrollRect = scrollElement.getBoundingClientRect();
+        return bodyRect.top - scrollRect.top + scrollElement.scrollTop;
+    }
+
+    private destroyArtistVirtualizer(): void {
+        this.artistVirtualizer?.destroy();
+        this.artistVirtualizer = null;
     }
 
     // 获取总歌曲数
@@ -995,11 +1104,7 @@ class ArtistsPage extends Component {
 
     // 绑定视图特定的事件
     bindViewSpecificEvents(): void {
-        if (this.viewMode === 'constellation') {
-            this.bindConstellationEvents();
-        } else {
-            this.bindGalaxyEvents();
-        }
+        // 新版方格和列表使用虚拟容器上的事件委托。
     }
 
     // 绑定星座视图事件
@@ -1186,39 +1291,12 @@ class ArtistsPage extends Component {
 
     // 切换视图模式
     switchViewMode(newMode: ArtistViewMode): void {
-        const galaxyContainer = this.container.querySelector('.artists-galaxy') as HTMLElement | null;
-        if (!galaxyContainer) return;
-
-        // 添加淡出效果
-        galaxyContainer.style.opacity = '0';
-        galaxyContainer.style.transform = 'scale(0.95)';
-
-        this.setTimeoutManaged(() => {
-            this.viewMode = newMode;
-
-            // 更新按钮状态
-            this.container.querySelectorAll('.mode-btn').forEach((btn: HTMLElement) => {
-                btn.classList.toggle('active', btn.dataset.view === newMode);
-            });
-
-            // 重新渲染内容
-            galaxyContainer.innerHTML = this.viewMode === 'constellation' ?
-                this.renderConstellationView() :
-                this.renderGalaxyView();
-            galaxyContainer.className = `artists-galaxy ${this.viewMode === 'constellation' ? 'constellation-view' : 'galaxy-view'}`;
-
-            // 重新绑定事件
-            this.bindViewSpecificEvents();
-
-            // 视图切换后启动封面获取
-            this._startCoverFetching();
-
-            // 添加淡入效果
-            this.setTimeoutManaged(() => {
-                galaxyContainer.style.opacity = '1';
-                galaxyContainer.style.transform = 'scale(1)';
-            }, 50);
-        }, 300);
+        this.viewMode = newMode;
+        artistViewModePreferenceService.setMode(newMode);
+        this.container.querySelectorAll('.mode-btn').forEach((btn: HTMLElement) => {
+            btn.classList.toggle('active', btn.dataset.view === newMode);
+        });
+        this.updateArtistsDisplay();
     }
 
     renderArtistDetail(): void {
@@ -1542,7 +1620,7 @@ class ArtistsPage extends Component {
 }
 
 function isArtistViewMode(value: unknown): value is ArtistViewMode {
-    return value === 'constellation' || value === 'galaxy';
+    return value === 'grid' || value === 'list';
 }
 
 function getErrorMessage(error: unknown): string {

@@ -2789,6 +2789,166 @@
   }
 }
 
+// 艺术家方格与列表共用虚拟滚动容器
+.artists-browser {
+  position: relative;
+  min-height: 320px;
+  margin: 0 28px 32px;
+
+  .artist-virtual-body {
+    position: relative;
+    width: 100%;
+  }
+
+  .artist-virtual-row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  .grid-row {
+    display: grid;
+    grid-template-columns: repeat(var(--artist-columns), minmax(0, 1fr));
+    gap: 20px;
+    padding-bottom: 20px;
+
+    .artist-library-item {
+      min-width: 0;
+      padding: 18px;
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .artist-avatar {
+      width: 132px;
+      height: 132px;
+      margin-bottom: 14px;
+    }
+
+    .artist-card-play {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+    }
+  }
+
+  .list-row {
+    padding-bottom: 10px;
+
+    .artist-library-item {
+      min-height: 72px;
+      padding: 10px 16px;
+    }
+
+    .artist-avatar {
+      width: 52px;
+      height: 52px;
+      margin-right: 14px;
+    }
+
+    .artist-library-info {
+      text-align: left;
+    }
+
+    .artist-card-play {
+      margin-left: auto;
+    }
+  }
+
+  .artist-library-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    border: 1px solid rgba(var(--color-primary-rgb), .12);
+    border-radius: 16px;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+
+    &:hover,
+    &:focus-visible {
+      border-color: rgba(var(--color-primary-rgb), .45);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .12);
+      outline: none;
+      transform: translateY(-2px);
+    }
+  }
+
+  .artist-avatar {
+    flex: 0 0 auto;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity .16s ease, filter .16s ease;
+    }
+  }
+
+  .artist-library-info {
+    min-width: 0;
+  }
+
+  .artist-library-name {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .artist-library-stats {
+    overflow: hidden;
+    margin-top: 6px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .artist-card-play {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+    cursor: pointer;
+
+    svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+  }
+
+  .artists-no-results {
+    padding: 64px 20px;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artists-browser .artist-library-item {
+    transition: none;
+
+    &:hover,
+    &:focus-visible {
+      transform: none;
+    }
+  }
+}
+
 // 响应式设计
 @media (max-width: 768px) {
   .page-content {
