@@ -1,4 +1,5 @@
 import type {Track} from '@api/types/track';
+import type {SystemMediaKeyAction} from '@api/types/electron';
 import type {
     PlaybackState,
     PlaybackStoreChange,
@@ -34,6 +35,13 @@ interface SystemMediaSessionControllerOptions {
     defaultArtwork?: string;
     positionSyncIntervalMs?: number;
     actionDeduplicationMs?: number;
+    nativeMediaKeys?: {
+        setEnabled(enabled: boolean): Promise<boolean>;
+        onTriggered(handler: (action: SystemMediaKeyAction) => void): Unsubscribe;
+    };
+    subscribeAudioEngineChanges?: (
+        handler: (engineType: string | undefined) => void
+    ) => Unsubscribe;
 }
 
 export class SystemMediaSessionController {
@@ -44,13 +52,18 @@ export class SystemMediaSessionController {
     private readonly defaultArtwork?: string;
     private readonly positionSyncIntervalMs: number;
     private readonly actionDeduplicationMs: number;
+    private readonly nativeMediaKeys?: SystemMediaSessionControllerOptions['nativeMediaKeys'];
+    private readonly subscribeAudioEngineChanges?: SystemMediaSessionControllerOptions['subscribeAudioEngineChanges'];
     private unsubscribe: Unsubscribe | null = null;
+    private nativeMediaKeysUnsubscribe: Unsubscribe | null = null;
+    private audioEngineUnsubscribe: Unsubscribe | null = null;
     private positionTimer: ReturnType<typeof setTimeout> | null = null;
     private lastPositionSyncAt = 0;
     private metadataGeneration = 0;
     private lastAction: MediaSessionAction | null = null;
     private lastActionAt = 0;
     private actionQueue: Promise<void> = Promise.resolve();
+    private started = false;
 
     constructor({
         playback,
@@ -59,7 +72,9 @@ export class SystemMediaSessionController {
         resolveArtwork,
         defaultArtwork,
         positionSyncIntervalMs = 1000,
-        actionDeduplicationMs = 250
+        actionDeduplicationMs = 250,
+        nativeMediaKeys,
+        subscribeAudioEngineChanges
     }: SystemMediaSessionControllerOptions) {
         this.playback = playback;
         this.mediaSession = mediaSession;
@@ -68,23 +83,40 @@ export class SystemMediaSessionController {
         this.defaultArtwork = defaultArtwork;
         this.positionSyncIntervalMs = positionSyncIntervalMs;
         this.actionDeduplicationMs = actionDeduplicationMs;
+        this.nativeMediaKeys = nativeMediaKeys;
+        this.subscribeAudioEngineChanges = subscribeAudioEngineChanges;
     }
 
     start(): void {
-        if (!this.mediaSession || this.unsubscribe) {
+        if (this.started) {
             return;
         }
 
-        this.registerActionHandlers();
+        this.started = true;
+        if (this.mediaSession) {
+            this.registerActionHandlers();
+        }
         this.unsubscribe = this.playback.subscribe((state, change) => {
             this.handlePlaybackChange(state, change);
         });
+        this.nativeMediaKeysUnsubscribe = this.nativeMediaKeys?.onTriggered((action) => {
+            this.handleNativeMediaKey(action);
+        }) ?? null;
+        this.audioEngineUnsubscribe = this.subscribeAudioEngineChanges?.((engineType) => {
+            void this.setAudioEngineType(engineType);
+        }) ?? null;
         this.syncAll(this.playback.getState());
     }
 
     dispose(): void {
+        this.started = false;
         this.unsubscribe?.();
         this.unsubscribe = null;
+        this.nativeMediaKeysUnsubscribe?.();
+        this.nativeMediaKeysUnsubscribe = null;
+        this.audioEngineUnsubscribe?.();
+        this.audioEngineUnsubscribe = null;
+        void this.nativeMediaKeys?.setEnabled(false);
         this.clearPositionTimer();
         this.metadataGeneration++;
 
@@ -98,6 +130,14 @@ export class SystemMediaSessionController {
         this.mediaSession.metadata = null;
         this.mediaSession.playbackState = 'none';
         this.clearPositionState();
+    }
+
+    async setAudioEngineType(engineType: string | null | undefined): Promise<void> {
+        if (!this.nativeMediaKeys) {
+            return;
+        }
+
+        await this.nativeMediaKeys.setEnabled(engineType === 'wasapi');
     }
 
     handleAction(action: MediaSessionAction, details?: MediaSessionActionDetails): void {
@@ -115,6 +155,20 @@ export class SystemMediaSessionController {
             .catch((error) => {
                 console.error(`❌ SystemMediaSessionController: 执行媒体动作失败 (${action})`, error);
             });
+    }
+
+    private handleNativeMediaKey(action: SystemMediaKeyAction): void {
+        switch (action) {
+            case 'playPause':
+                this.handleAction(this.playback.getState().isPlaying ? 'pause' : 'play');
+                break;
+            case 'previousTrack':
+                this.handleAction('previoustrack');
+                break;
+            case 'nextTrack':
+                this.handleAction('nexttrack');
+                break;
+        }
     }
 
     private static getDefaultMediaSession(): MediaSession | null {
@@ -332,4 +386,3 @@ export class SystemMediaSessionController {
         this.positionTimer = null;
     }
 }
-

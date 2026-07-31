@@ -188,6 +188,10 @@ class PlaybackController {
         return playbackService.getPlaybackSnapshot(playbackStoreProvider.getState());
     }
 
+    getAudioEngineType(): AudioEngineType | null {
+        return playbackService.getAudioEngineType();
+    }
+
     on<K extends PlaybackEventName>(event: K, handler: PlaybackEventHandler<K>): Unsubscribe {
         return playbackService.on(event, handler);
     }

@@ -2,6 +2,7 @@ import {updateNotificationService} from '@/features/appShell/service';
 import {cacheManager} from '@/shared/cache';
 import type {PlaybackUIFacade} from '@/app/runtime/ui/PlaybackUIFacade';
 import type {PlayMode} from '@api/types/playback';
+import type {AudioEngineType} from '@/features/playback/service';
 
 export interface InitResult {
     status: boolean;
@@ -23,6 +24,9 @@ interface AppLifecycleControllerOptions {
     app: AppLifecycleHost;
     playback: AppLifecyclePlayback;
     playbackUI: PlaybackUIFacade;
+    systemMediaSession: {
+        setAudioEngineType(engineType: AudioEngineType | null): Promise<void>;
+    };
 }
 
 interface AppLifecyclePlayback {
@@ -31,17 +35,20 @@ interface AppLifecyclePlayback {
     savePlaybackState(): Promise<void>;
     setPlayMode(mode: PlayMode): boolean;
     setVolume(volume: number): Promise<boolean>;
+    getAudioEngineType(): AudioEngineType | null;
 }
 
 export class AppLifecycleController {
     private readonly app: AppLifecycleHost;
     private readonly playback: AppLifecyclePlayback;
     private readonly playbackUI: PlaybackUIFacade;
+    private readonly systemMediaSession: AppLifecycleControllerOptions['systemMediaSession'];
 
-    constructor({app, playback, playbackUI}: AppLifecycleControllerOptions) {
+    constructor({app, playback, playbackUI, systemMediaSession}: AppLifecycleControllerOptions) {
         this.app = app;
         this.playback = playback;
         this.playbackUI = playbackUI;
+        this.systemMediaSession = systemMediaSession;
     }
 
     async init(): Promise<InitResult> {
@@ -107,6 +114,7 @@ export class AppLifecycleController {
         if (!success) {
             throw new Error('Failed to initialize audio engine');
         }
+        await this.systemMediaSession.setAudioEngineType(this.playback.getAudioEngineType());
     }
 
     private async saveCurrentVolume(): Promise<void> {

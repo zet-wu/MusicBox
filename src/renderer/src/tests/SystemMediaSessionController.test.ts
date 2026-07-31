@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import type {Track} from '../api/types/track';
+import type {SystemMediaKeyAction} from '../api/types/electron';
 import type {
     PlaybackState,
     PlaybackStoreChange,
@@ -158,5 +159,34 @@ describe('SystemMediaSessionController', () => {
         expect(harness.mediaSession.playbackState).toBe('none');
         expect(harness.mediaSession.setActionHandler).toHaveBeenCalledWith('nexttrack', null);
         expect(harness.mediaSession.setPositionState).toHaveBeenLastCalledWith();
+    });
+
+    it('仅为WASAPI启用后备媒体键并转发动作', async () => {
+        const harness = createHarness();
+        const nativeHandlers: Array<(action: SystemMediaKeyAction) => void> = [];
+        const nativeMediaKeys = {
+            setEnabled: vi.fn(async () => true),
+            onTriggered: vi.fn((handler: (action: SystemMediaKeyAction) => void) => {
+                nativeHandlers.push(handler);
+                return () => undefined;
+            })
+        };
+        const controller = new SystemMediaSessionController({
+            playback: harness.playback,
+            mediaSession: null,
+            nativeMediaKeys
+        });
+        controller.start();
+
+        await controller.setAudioEngineType('webaudio');
+        await controller.setAudioEngineType('wasapi');
+        expect(nativeMediaKeys.setEnabled).toHaveBeenNthCalledWith(1, false);
+        expect(nativeMediaKeys.setEnabled).toHaveBeenNthCalledWith(2, true);
+
+        nativeHandlers[0]?.('playPause');
+        await vi.waitFor(() => expect(harness.playback.pause).toHaveBeenCalledOnce());
+
+        nativeHandlers[0]?.('nextTrack');
+        await vi.waitFor(() => expect(harness.playback.nextTrack).toHaveBeenCalledOnce());
     });
 });

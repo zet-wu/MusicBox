@@ -32,6 +32,7 @@ import {mediaFileDialogService} from '@/features/media/service';
 import {coverLookupService} from '@/features/mediaAssets/service/CoverLookupService';
 import {extensionHostService} from '@/features/extensions/service';
 import {trackCoverNetworkPreferenceService} from '@/features/settings/service';
+import {systemMediaKeysGateway} from '@/infrastructure/electron';
 import {appShellRuntimeHost} from '@/features/appShell/service';
 import type {AudioEngineManagerBridge} from '@/features/equalizer/service';
 
@@ -130,7 +131,19 @@ export function createAppComposition({
             return result.success && typeof result.imageUrl === 'string'
                 ? result.imageUrl
                 : null;
-        }
+        },
+        nativeMediaKeys: {
+            setEnabled: (enabled) => systemMediaKeysGateway.isAvailable()
+                ? systemMediaKeysGateway.setEnabled(enabled)
+                : Promise.resolve(false),
+            onTriggered: (handler) => systemMediaKeysGateway.onTriggered((_event, action) => {
+                handler(action);
+            })
+        },
+        subscribeAudioEngineChanges: (handler) => playbackController.on(
+            'audioEngineChanged',
+            ({engineType}) => handler(engineType)
+        )
     });
     systemMediaSessionController.start();
 
@@ -248,9 +261,11 @@ export function createAppComposition({
             restorePlaybackState: () => playbackAppController.restorePlaybackState(),
             savePlaybackState: () => playbackAppController.savePlaybackState(),
             setPlayMode: (mode) => playbackController.setPlayMode(mode),
-            setVolume: (volume) => playbackController.setVolume(volume)
+            setVolume: (volume) => playbackController.setVolume(volume),
+            getAudioEngineType: () => playbackController.getAudioEngineType()
         },
-        playbackUI: ui.playback
+        playbackUI: ui.playback,
+        systemMediaSession: systemMediaSessionController
     });
 
     return {

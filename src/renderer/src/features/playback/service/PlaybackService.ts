@@ -199,6 +199,13 @@ export class PlaybackService {
         return playbackApiAdapter.getAudioEngine<T>();
     }
 
+    getAudioEngineType(): AudioEngineType | null {
+        const engineType = this.getAudioEngine()?.getEngineType();
+        return engineType === 'webaudio' || engineType === 'wasapi'
+            ? engineType
+            : null;
+    }
+
     async switchAudioEngine(engineType: AudioEngineType): Promise<boolean> {
         return await playbackApiAdapter.switchAudioEngine(engineType);
     }
