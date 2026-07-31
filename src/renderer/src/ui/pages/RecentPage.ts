@@ -21,6 +21,7 @@ class RecentPage extends Component {
     private container: Element | null;
     private recentTracks: RecentTrack[];
     private listenersSetup: boolean;
+    private historyUnsubscribe: (() => void) | null;
     isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -28,6 +29,7 @@ class RecentPage extends Component {
         this.container = this.element;
         this.recentTracks = [];
         this.listenersSetup = false; // 事件监听器是否已设置
+        this.historyUnsubscribe = null;
         this.isVisible = false;
     }
 
@@ -53,6 +55,8 @@ class RecentPage extends Component {
     }
 
     destroy(): void {
+        this.historyUnsubscribe?.();
+        this.historyUnsubscribe = null;
         this.recentTracks.length = 0;
         this.listenersSetup = false;
         super.destroy();
@@ -62,7 +66,14 @@ class RecentPage extends Component {
         this.container = this.element;
     }
 
-    setupAPIListeners(): void {}
+    setupAPIListeners(): void {
+        this.historyUnsubscribe = recentPlaybackHistoryService.subscribe(() => {
+            this.loadPlayHistory();
+            if (this.isVisible) {
+                this.render();
+            }
+        });
+    }
 
     loadPlayHistory(): void {
         this.recentTracks = recentPlaybackHistoryService.loadHistory() as RecentTrack[];
@@ -70,14 +81,12 @@ class RecentPage extends Component {
 
     // 清空播放历史
     clearHistory(): void {
-        this.recentTracks = recentPlaybackHistoryService.clearHistory() as RecentTrack[];
-        this.render();
+        recentPlaybackHistoryService.clearHistory();
     }
 
     // 移除单个历史记录
     removeHistoryItem(trackPath: string): void {
-        this.recentTracks = recentPlaybackHistoryService.removeHistoryItem(trackPath) as RecentTrack[];
-        this.render();
+        recentPlaybackHistoryService.removeHistoryItem(trackPath);
     }
 
     render(): void {
@@ -115,7 +124,7 @@ class RecentPage extends Component {
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
                             </svg>
-                            清空历史
+                            清空最近播放记录
                         </button>
                     </div>
 

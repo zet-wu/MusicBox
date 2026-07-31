@@ -45,6 +45,8 @@ class StatisticsPage extends Component {
     private moodHistory: MoodData[];
     private diaryHistory: DiaryEntry[];
     private listenersSetup: boolean;
+    private historyUnsubscribe: (() => void) | null;
+    private isVisible: boolean;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -55,6 +57,8 @@ class StatisticsPage extends Component {
         this.moodHistory = [];
         this.diaryHistory = [];
         this.listenersSetup = false;
+        this.historyUnsubscribe = null;
+        this.isVisible = false;
     }
 
     async show(): Promise<void> {
@@ -66,6 +70,7 @@ class StatisticsPage extends Component {
         if (this.element) {
             (this.element as HTMLElement).style.display = 'block';
         }
+        this.isVisible = true;
         const pageData = await libraryPageDataService.getStatisticsPageData();
         this.tracks = pageData.tracks;
         this.loadPlayHistory();
@@ -76,16 +81,20 @@ class StatisticsPage extends Component {
     }
 
     hide(): void {
+        this.isVisible = false;
         if (this.container) {
             this.container.innerHTML = '';
         }
     }
 
     destroy(): void {
+        this.historyUnsubscribe?.();
+        this.historyUnsubscribe = null;
         this.tracks.length = 0;
         this.recentTracks.length = 0;
         this.playStats = {...EMPTY_PLAY_STATS};
         this.listenersSetup = false;
+        this.isVisible = false;
         super.destroy();
     }
 
@@ -97,6 +106,14 @@ class StatisticsPage extends Component {
         // 监听音乐库更新
         this.addAPIEventListenerManaged('libraryUpdated', (tracks: Track[]) => {
             this.tracks = tracks || [];
+        });
+
+        this.historyUnsubscribe = recentPlaybackHistoryService.subscribe(() => {
+            this.loadPlayHistory();
+            this.calculatePlayStats();
+            if (this.isVisible) {
+                this.render();
+            }
         });
 
     }
@@ -185,6 +202,15 @@ class StatisticsPage extends Component {
                         音乐统计
                     </h1>
                     <p class="page-subtitle">你的音乐聆听数据与情感记录</p>
+                    <div class="statistics-header-actions">
+                        <button
+                            class="statistics-clear-button"
+                            id="clear-play-statistics"
+                            ${this.playStats.totalPlayedSongs === 0 ? 'disabled' : ''}
+                        >
+                            清空播放统计
+                        </button>
+                    </div>
                 </div>
 
                 <div class="stats-overview">
@@ -318,6 +344,18 @@ class StatisticsPage extends Component {
                 ` : ''}
             </div>
         `;
+
+        this.setupPageEventListeners();
+    }
+
+    setupPageEventListeners(): void {
+        const clearButton = this.container?.querySelector<HTMLButtonElement>('#clear-play-statistics');
+        clearButton?.addEventListener('click', async () => {
+            const confirmed = await recentPlaybackHistoryService.confirmClearPlayStatistics();
+            if (confirmed) {
+                recentPlaybackHistoryService.clearPlayStatistics();
+            }
+        });
     }
 }
 

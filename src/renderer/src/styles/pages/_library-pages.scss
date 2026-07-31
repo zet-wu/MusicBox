@@ -2825,6 +2825,31 @@
 
 // 统计页面样式
 .statistics-page {
+  .statistics-header-actions {
+    margin-top: var(--spacing-md);
+  }
+
+  .statistics-clear-button {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      transform: translateY(-1px);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+
   .stats-overview {
     margin-bottom: var(--spacing-xl);
 
