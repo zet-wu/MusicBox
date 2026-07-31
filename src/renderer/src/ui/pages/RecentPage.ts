@@ -5,17 +5,14 @@
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
 import {localCoverManager} from "@/features/mediaAssets/service/LocalCoverManager";
 import {recentPlaybackHistoryService} from "@/features/playback/service/RecentPlaybackHistoryService";
+import {
+    groupRecentTracksByDate,
+    type RecentTrack,
+    type RecentTrackGroups
+} from "@/features/playback/domain/RecentTrackGrouping";
 import {trackCoverNetworkPreferenceService} from "@/features/settings/service";
 import {formatTime} from "@utils/index.js";
 import {Component} from "@ui/base/Component";
-import type {Track} from "@api/types/library";
-
-interface RecentTrack extends Track {
-    playTime?: number;
-    cover?: string | null;
-}
-
-type TrackGroups = Record<string, RecentTrack[]>;
 
 class RecentPage extends Component {
     private container: Element | null;
@@ -23,6 +20,7 @@ class RecentPage extends Component {
     private listenersSetup: boolean;
     private historyUnsubscribe: (() => void) | null;
     isVisible: boolean;
+    private viewGeneration = 0;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -34,6 +32,7 @@ class RecentPage extends Component {
     }
 
     async show(): Promise<void> {
+        this.viewGeneration++;
         if (!this.listenersSetup) {
             this.setupElements();
             this.setupAPIListeners();
@@ -48,6 +47,7 @@ class RecentPage extends Component {
     }
 
     hide(): void {
+        this.viewGeneration++;
         this.isVisible = false;
         if (this.container) {
             this.container.innerHTML = '';
@@ -129,14 +129,14 @@ class RecentPage extends Component {
                     </div>
 
                     <div class="recent-content">
-                        ${Object.entries(groupedTracks).map(([date, tracks]) => `
+                        ${Object.entries(groupedTracks).map(([date, entries]) => `
                             <div class="date-group">
                                 <div class="date-header">
                                     <h3 class="date-title">${date}</h3>
-                                    <span class="date-count">${tracks.length} 首</span>
+                                    <span class="date-count">${entries.length} 首</span>
                                 </div>
-                                <div class="track-list">
-                                    ${tracks.map((track, index) => this.renderTrackItem(track, index)).join('')}
+                                <div class="recent-track-list">
+                                    ${entries.map(({track, index}) => this.renderTrackItem(track, index)).join('')}
                                 </div>
                             </div>
                         `).join('')}
@@ -162,38 +162,8 @@ class RecentPage extends Component {
         this.preloadVisibleCovers();
     }
 
-    groupTracksByDate(): TrackGroups {
-        const groups: TrackGroups = {};
-        const now = new Date();
-
-        this.recentTracks.forEach(track => {
-            const playDate = new Date(track.playTime || Date.now());
-            const diffDays = Math.floor((now.getTime() - playDate.getTime()) / (1000 * 60 * 60 * 24));
-
-            let dateKey: string;
-            if (diffDays === 0) {
-                dateKey = '今天';
-            } else if (diffDays === 1) {
-                dateKey = '昨天';
-            } else if (diffDays < 7) {
-                dateKey = `${diffDays} 天前`;
-            } else if (diffDays < 30) {
-                const weeks = Math.floor(diffDays / 7);
-                dateKey = `${weeks} 周前`;
-            } else {
-                dateKey = playDate.toLocaleDateString('zh-CN', {
-                    year: 'numeric',
-                    month: 'long'
-                });
-            }
-
-            if (!groups[dateKey]) {
-                groups[dateKey] = [];
-            }
-            groups[dateKey].push(track);
-        });
-
-        return groups;
+    groupTracksByDate(): RecentTrackGroups {
+        return groupRecentTracksByDate(this.recentTracks);
     }
 
     renderTrackItem(track: RecentTrack, index: number): string {
@@ -204,7 +174,7 @@ class RecentPage extends Component {
         });
 
         return `
-            <div class="track-item" data-track-path="${track.filePath}" data-index="${index}">
+            <div class="recent-track-item" data-track-path="${track.filePath}" data-index="${index}">
                 <div class="track-cover">
                     <img src="${this.getTrackCover(track)}" alt="封面" loading="lazy" onerror="this.src='assets/images/default-cover.svg'">
                     <div class="track-overlay">
@@ -255,6 +225,7 @@ class RecentPage extends Component {
     }
 
     async loadTrackCoverAsync(track: RecentTrack): Promise<void> {
+        const viewGeneration = this.viewGeneration;
         try {
             // 使用requestIdleCallback优化性能，在浏览器空闲时加载封面
             const loadCover = async () => {
@@ -268,6 +239,7 @@ class RecentPage extends Component {
                 );
 
                 if (coverResult.success && coverResult.imageUrl && typeof coverResult.imageUrl === 'string') {
+                    if (!this.isVisible || viewGeneration !== this.viewGeneration) return;
                     // 确保路径格式正确，处理路径
                     let coverUrl = coverResult.imageUrl;
 
@@ -286,9 +258,9 @@ class RecentPage extends Component {
 
                     // 使用requestAnimationFrame确保DOM更新在下一帧进行
                     this.requestAnimationFrameManaged(() => {
-                        if (!this.container) return;
+                        if (!this.container || !this.isVisible || viewGeneration !== this.viewGeneration) return;
 
-                        const trackItems = this.container.querySelectorAll<HTMLElement>('.track-item');
+                        const trackItems = this.container.querySelectorAll<HTMLElement>('.recent-track-item');
                         trackItems.forEach((item, _index) => {
                             const itemIndex = parseInt(item.dataset.index || '-1', 10);
                             if (this.recentTracks[itemIndex] === track) {
@@ -360,7 +332,7 @@ class RecentPage extends Component {
         }
 
         // 歌曲项目事件
-        this.container.querySelectorAll('.track-item').forEach(item => {
+        this.container.querySelectorAll('.recent-track-item').forEach(item => {
             const index = parseInt((item as HTMLElement).dataset.index || '-1', 10);
             const track = this.recentTracks[index];
 
@@ -371,13 +343,13 @@ class RecentPage extends Component {
             if (playBtn) {
                 playBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.emit('trackPlayed', track, index);
+                    this.emit('trackPlayed', track, index, this.recentTracks);
                 });
             }
 
             // 双击播放
             item.addEventListener('dblclick', () => {
-                this.emit('trackPlayed', track, index);
+                this.emit('trackPlayed', track, index, this.recentTracks);
             });
 
             // 添加到播放列表
