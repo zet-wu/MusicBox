@@ -3,7 +3,7 @@ import type {Result} from '@api/types/common';
 import type {LibraryIndexRebuildResult} from '@api/types/electron';
 import type {CacheValidationResult, MusicBoxAPIEvents, ScanProgress} from '@api/types/events';
 import type {Track} from '@api/types/track';
-import {libraryDataService} from './LibraryDataService';
+import {libraryDataService, type PlaylistCoverDataResult} from './LibraryDataService';
 
 type Emit = <K extends keyof MusicBoxAPIEvents>(event: K, data: MusicBoxAPIEvents[K]) => void;
 
@@ -146,14 +146,22 @@ export class LibraryBridge {
         }
     }
 
-    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<Result> {
+    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<PlaylistCoverDataResult> {
         const result = await libraryDataService.updatePlaylistCover(playlistId, imagePath);
         if (result.success) {
-            this.emit('playlistCoverUpdated', {playlistId, imagePath});
-            return {success: true};
+            this.emit('playlistCoverUpdated', {playlistId, imagePath: result.coverPath || imagePath});
+            return result;
         }
 
-        return {success: false, error: '更新歌单封面失败'};
+        return result;
+    }
+
+    async setPlaylistCoverFromTrack(playlistId: string, trackId: string): Promise<PlaylistCoverDataResult> {
+        const result = await libraryDataService.setPlaylistCoverFromTrack(playlistId, trackId);
+        if (result.success) {
+            this.emit('playlistCoverUpdated', {playlistId, imagePath: result.coverPath || ''});
+        }
+        return result;
     }
 
     async getPlaylistCover(playlistId: string): Promise<{success: boolean; coverPath?: string; error?: string}> {

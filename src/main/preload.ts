@@ -288,6 +288,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         // 歌单封面
         updatePlaylistCover: (playlistId: string, imagePath: string) => ipcRenderer.invoke('library:updatePlaylistCover', playlistId, imagePath),
+        setPlaylistCoverFromTrack: (playlistId: string, trackId: string) =>
+            ipcRenderer.invoke('library:setPlaylistCoverFromTrack', playlistId, trackId),
         getPlaylistCover: (playlistId: string) => ipcRenderer.invoke('library:getPlaylistCover', playlistId),
         removePlaylistCover: (playlistId: string) => ipcRenderer.invoke('library:removePlaylistCover', playlistId),
 

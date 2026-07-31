@@ -108,6 +108,11 @@ export interface EmbeddedTrackCover {
     data: Uint8Array | number[];
 }
 
+export interface PlaylistCoverMutationResult extends Result {
+    coverPath?: string;
+    errorCode?: string;
+}
+
 export interface ElectronLibraryAPI {
     scanDirectory(path: string): Promise<boolean>;
     importLibraryDirectory(path: string): Promise<LibraryImportResult>;
@@ -147,7 +152,8 @@ export interface ElectronLibraryAPI {
     getTracksByDrive(driveId: string): Promise<Track[]>;
     removeTracksByDrive(driveId: string): Promise<Result>;
     clearIgnoreList(): Promise<Result>;
-    updatePlaylistCover(playlistId: string, imagePath: string): Promise<Result>;
+    updatePlaylistCover(playlistId: string, imagePath: string): Promise<PlaylistCoverMutationResult>;
+    setPlaylistCoverFromTrack(playlistId: string, trackId: string): Promise<PlaylistCoverMutationResult>;
     getPlaylistCover(playlistId: string): Promise<{success: boolean; coverPath?: string; error?: string}>;
     removePlaylistCover(playlistId: string): Promise<Result>;
     onLibraryUpdated(callback: (event: unknown, data: Track[]) => void): Unsubscribe;

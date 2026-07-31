@@ -8,6 +8,7 @@ import type {
     LibraryImportResult,
     LibraryIndexRebuildResult,
     LibrarySource,
+    PlaylistCoverMutationResult,
     PlaylistSourceBinding
 } from '@api/types/electron';
 
@@ -157,8 +158,12 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.call('getPlaylistDetail', playlistId);
     }
 
-    updatePlaylistCover(playlistId: string, imagePath: string): Promise<Result> {
+    updatePlaylistCover(playlistId: string, imagePath: string): Promise<PlaylistCoverMutationResult> {
         return this.call('updatePlaylistCover', playlistId, imagePath);
+    }
+
+    setPlaylistCoverFromTrack(playlistId: string, trackId: string): Promise<PlaylistCoverMutationResult> {
+        return this.call('setPlaylistCoverFromTrack', playlistId, trackId);
     }
 
     getPlaylistCover(playlistId: string): Promise<{success: boolean; coverPath?: string; error?: string}> {

@@ -10,6 +10,7 @@ import {PlaybackRuntimeState} from '@/features/playback/service/PlaybackRuntimeS
 import {PlaybackStateSynchronizer} from '@/features/playback/service/PlaybackStateSynchronizer';
 import {DesktopLyricsSync} from '@/features/desktopLyrics/service/DesktopLyricsSync';
 import {LibraryBridge} from '@/features/library/service/LibraryBridge';
+import type {PlaylistCoverDataResult} from '@/features/library/service/LibraryDataService';
 import type {Result} from '@api/types/common';
 import type {CacheValidationResult} from '@api/types/events';
 import type {LibraryIndexRebuildResult} from '@api/types/electron';
@@ -748,8 +749,12 @@ export class MusicBoxAPI extends EventEmitter {
     }
 
     // 歌单封面管理方法
-    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<Result> {
+    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<PlaylistCoverDataResult> {
         return await this.libraryBridge.updatePlaylistCover(playlistId, imagePath);
+    }
+
+    async setPlaylistCoverFromTrack(playlistId: string, trackId: string): Promise<PlaylistCoverDataResult> {
+        return await this.libraryBridge.setPlaylistCoverFromTrack(playlistId, trackId);
     }
 
     async getPlaylistCover(playlistId: string): Promise<{success: boolean; coverPath?: string; error?: string}> {

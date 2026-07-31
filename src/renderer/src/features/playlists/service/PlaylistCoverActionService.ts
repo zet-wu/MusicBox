@@ -43,7 +43,7 @@ class PlaylistCoverActionService {
 
             if (result.success) {
                 appNotificationService.showInfo('歌单封面设置成功');
-                return {changed: true, coverImage: imagePath};
+                return {changed: true, coverImage: result.coverPath || null};
             }
 
             throw new Error(result.error || '设置封面失败');

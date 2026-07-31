@@ -32,6 +32,7 @@ export type PlaylistDetailResult = {
 export type PlaylistCoverDataResult = {
     success: boolean;
     coverPath?: string;
+    errorCode?: string;
     error?: string;
 };
 
@@ -386,7 +387,7 @@ export class LibraryDataService {
         );
     }
 
-    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<Result> {
+    async updatePlaylistCover(playlistId: string, imagePath: string): Promise<PlaylistCoverDataResult> {
         this.assertNonEmptyString(playlistId, 'playlistId');
         this.assertFilePath(imagePath, 'imagePath');
 
@@ -394,6 +395,17 @@ export class LibraryDataService {
             () => libraryGateway.updatePlaylistCover(playlistId, imagePath),
             'library.updatePlaylistCover',
             {success: false, error: '更新歌单封面失败'}
+        );
+    }
+
+    async setPlaylistCoverFromTrack(playlistId: string, trackId: string): Promise<PlaylistCoverDataResult> {
+        this.assertNonEmptyString(playlistId, 'playlistId');
+        this.assertNonEmptyString(trackId, 'trackId');
+
+        return await this.callGateway(
+            () => libraryGateway.setPlaylistCoverFromTrack(playlistId, trackId),
+            'library.setPlaylistCoverFromTrack',
+            {success: false, error: '从歌曲设置歌单封面失败'}
         );
     }
 
