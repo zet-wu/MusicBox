@@ -304,7 +304,7 @@ await window.extensionService.uninstallExtension('extension-id');
 
 ### Q: 如何访问应用的组件？
 
-A: 通过 API 访问，不要直接访问 `app`。
+A: 通过 API 访问，不要直接访问 `app` 或 `appReady.detail.components`。后者只用于有限的旧插件兼容，内部组件可能随重构移除；旧的 `components.trackList` 已移除，集合导航与播放应使用公开 API。
 
 ### Q: 如何持久化数据？
 

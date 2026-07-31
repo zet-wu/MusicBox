@@ -11,7 +11,7 @@
 - 桌面歌词入口：`src/renderer/src/DesktopLyrics.html`
 - 主 renderer 入口：`src/renderer/src/app/bootstrap/main.ts`
 
-`app/bootstrap/main.ts` 会先加载工具、应用 API、插件框架、页面、组件和弹窗，再导入 `./app` 创建应用实例。
+`app/bootstrap/main.ts` 会先加载工具、应用 API和插件框架，再导入 `./app`；页面、组件和弹窗由组合根按依赖关系实例化，不依赖入口文件的重复副作用导入。
 
 ## Canonical 目录
 

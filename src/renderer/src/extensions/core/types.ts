@@ -47,7 +47,8 @@ export interface MusicBoxApp {
 
 /**
  * Recommended app-ready host for extensions. Legacy appReady.detail.app and
- * appReady.detail.components are still emitted for older plugins.
+ * appReady.detail.components are still emitted for older plugins, but the
+ * collection-owned legacy trackList component is no longer exposed.
  */
 export interface MusicBoxPluginHost {
     readonly isInitialized: boolean;
@@ -62,6 +63,7 @@ export interface MusicBoxPluginHost {
 /**
  * Detail payload for the appReady DOM event emitted after extension startup.
  * Prefer pluginHost/host; app and components are legacy compatibility fields.
+ * Plugins must not depend on a components.trackList property.
  */
 export interface AppReadyEventDetail {
     pluginHost: MusicBoxPluginHost;
