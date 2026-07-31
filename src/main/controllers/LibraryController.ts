@@ -20,6 +20,16 @@ import type {TrackMetadata} from '../types/global';
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.ape'];
 const BATCH_SIZE = 10;
 
+export interface LibraryIndexRebuildResult extends LibraryIndexClearSummary {
+    success: boolean;
+    state: 'rebuilt' | 'no_folders' | 'partial' | 'failed';
+    configuredFolderCount: number;
+    scannedFolderCount: number;
+    rebuiltTrackCount: number;
+    failedFolders: string[];
+    error?: string;
+}
+
 @Controller('library')
 export class LibraryController extends BaseController {
     // shared audio engine state (reference shared with AudioController)
@@ -33,6 +43,7 @@ export class LibraryController extends BaseController {
         private windowManager: WindowManager,
         private embeddedCoverService: EmbeddedCoverService,
         private parseMetadata: (filePath: string, adapter?: any, opts?: any) => Promise<TrackMetadata>,
+        private loadMusicFolders: () => Promise<string[]>,
         audioEngineState: any
     ) {
         super();
@@ -277,6 +288,22 @@ export class LibraryController extends BaseController {
 
     // ── 扫描 ──────────────────────────────────────────────
 
+    async scanDirectories(directoryPaths: string[]): Promise<{scannedFolderCount: number; failedFolders: string[]}> {
+        const failedFolders: string[] = [];
+        let scannedFolderCount = 0;
+
+        for (const directoryPath of directoryPaths) {
+            const success = await this.scanDirectory(directoryPath);
+            if (success) {
+                scannedFolderCount++;
+            } else {
+                failedFolders.push(directoryPath);
+            }
+        }
+
+        return {scannedFolderCount, failedFolders};
+    }
+
     @IpcHandle('library:scanDirectory')
     async scanDirectory(directoryPath: string): Promise<boolean> {
         try {
@@ -290,6 +317,10 @@ export class LibraryController extends BaseController {
             const tracks: any[] = [];
             const tracksToCache: any[] = [];
             const fsPromises = fs.promises;
+            const rootStat = await fsPromises.stat(directoryPath);
+            if (!rootStat.isDirectory()) {
+                throw new Error('扫描路径不是目录');
+            }
 
             const collectFiles = async (dir: string): Promise<{ path: string; stat: fs.Stats; name: string }[]> => {
                 const files: any[] = [];
@@ -374,6 +405,10 @@ export class LibraryController extends BaseController {
     private async scanNetworkDirectory(networkPath: string, scanStartTime: number): Promise<boolean> {
         const tracks: any[] = [];
         const tracksToCache: any[] = [];
+        const rootStat = await this.networkFileAdapter.stat(networkPath);
+        if (typeof rootStat.isDirectory === 'function' && !rootStat.isDirectory()) {
+            throw new Error('网络扫描路径不是目录');
+        }
 
         const collectNetworkFiles = async (dirPath: string): Promise<{ path: string; stat: any; name: string }[]> => {
             const files: any[] = [];
@@ -649,15 +684,60 @@ export class LibraryController extends BaseController {
         }
     }
 
-    @IpcHandle('library:clearLibraryIndex')
-    async clearLibraryIndex(): Promise<({success: true} & LibraryIndexClearSummary) | {success: false; error: string}> {
+    @IpcHandle('library:rebuildLibraryIndex')
+    async rebuildLibraryIndex(): Promise<LibraryIndexRebuildResult> {
+        let summary: LibraryIndexClearSummary = {
+            clearedTrackCount: 0,
+            preservedPlaylistCount: 0,
+            preservedPlaylistReferenceCount: 0,
+            preservedIgnoredFileCount: 0
+        };
+
         try {
-            const summary = await this.libraryCacheManager.clearLibraryIndex();
+            summary = await this.libraryCacheManager.clearLibraryIndex();
+            this.windowManager.sendToMainWindow('library:updated', []);
             console.log(`✅ 音乐库索引已清除，共移除 ${summary.clearedTrackCount} 首歌曲`);
-            return {success: true, ...summary};
+
+            const musicFolders = await this.loadMusicFolders();
+            if (musicFolders.length === 0) {
+                return {
+                    success: true,
+                    state: 'no_folders',
+                    configuredFolderCount: 0,
+                    scannedFolderCount: 0,
+                    rebuiltTrackCount: 0,
+                    failedFolders: [],
+                    ...summary
+                };
+            }
+
+            const scanResult = await this.scanDirectories(musicFolders);
+            const rebuiltTrackCount = this.libraryCacheManager.getAllTracks().length;
+            const state = scanResult.failedFolders.length === 0
+                ? 'rebuilt'
+                : scanResult.scannedFolderCount > 0 ? 'partial' : 'failed';
+
+            return {
+                success: state !== 'failed',
+                state,
+                configuredFolderCount: musicFolders.length,
+                rebuiltTrackCount,
+                ...scanResult,
+                ...summary,
+                error: state === 'failed' ? '所有音乐文件夹扫描失败' : undefined
+            };
         } catch (error: any) {
-            console.error('❌ 清除音乐库索引失败:', error);
-            return {success: false, error: error.message};
+            console.error('❌ 重建音乐库索引失败:', error);
+            return {
+                success: false,
+                state: 'failed',
+                configuredFolderCount: 0,
+                scannedFolderCount: 0,
+                rebuiltTrackCount: this.libraryCacheManager.getAllTracks().length,
+                failedFolders: [],
+                ...summary,
+                error: error.message
+            };
         }
     }
 

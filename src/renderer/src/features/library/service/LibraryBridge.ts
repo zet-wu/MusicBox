@@ -1,6 +1,6 @@
 import {libraryGateway} from '@/infrastructure/electron';
 import type {Result} from '@api/types/common';
-import type {LibraryIndexClearResult} from '@api/types/electron';
+import type {LibraryIndexRebuildResult} from '@api/types/electron';
 import type {CacheValidationResult, MusicBoxAPIEvents, ScanProgress} from '@api/types/events';
 import type {Track} from '@api/types/track';
 import {libraryDataService} from './LibraryDataService';
@@ -117,19 +117,25 @@ export class LibraryBridge {
         }
     }
 
-    async clearLibraryIndex(): Promise<LibraryIndexClearResult> {
+    async rebuildLibraryIndex(): Promise<LibraryIndexRebuildResult> {
         try {
-            const result = await libraryDataService.clearLibraryIndex();
+            const result = await libraryDataService.rebuildLibraryIndex();
             if (result.success) {
-                this.emit('libraryUpdated', []);
+                const tracks = await libraryDataService.getTracks();
+                this.emit('libraryUpdated', tracks);
                 return result;
             }
 
             return result;
         } catch (error) {
-            console.error('❌ 清除音乐库索引失败:', error);
+            console.error('❌ 重建音乐库索引失败:', error);
             return {
                 success: false,
+                state: 'failed',
+                configuredFolderCount: 0,
+                scannedFolderCount: 0,
+                rebuiltTrackCount: 0,
+                failedFolders: [],
                 error: error instanceof Error ? error.message : String(error)
             };
         }

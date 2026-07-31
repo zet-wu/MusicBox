@@ -15,7 +15,7 @@ class CacheSettingsRenderer {
     }
 
     setClearLoading(elements: CacheSettingsElements, loading: boolean): void {
-        this.setButtonState(elements.clearCacheButton, loading, '清除中...', '清除索引');
+        this.setButtonState(elements.clearCacheButton, loading, '重建中...', '重建索引');
     }
 
     updateDescription(elements: CacheSettingsElements, description: string): void {

@@ -1,6 +1,6 @@
 import {libraryGateway} from '@/infrastructure/electron';
 import type {Result} from '@api/types/common';
-import type {EmbeddedTrackCover, LibraryIndexClearResult} from '@api/types/electron';
+import type {EmbeddedTrackCover, LibraryIndexRebuildResult} from '@api/types/electron';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 
 export type PlaylistMutationResult = {
@@ -131,11 +131,19 @@ export class LibraryDataService {
         }
     }
 
-    async clearLibraryIndex(): Promise<LibraryIndexClearResult> {
+    async rebuildLibraryIndex(): Promise<LibraryIndexRebuildResult> {
         return await this.callGateway(
-            () => libraryGateway.clearLibraryIndex(),
-            'library.clearLibraryIndex',
-            {success: false, error: '清除音乐库索引失败'}
+            () => libraryGateway.rebuildLibraryIndex(),
+            'library.rebuildLibraryIndex',
+            {
+                success: false,
+                state: 'failed',
+                configuredFolderCount: 0,
+                scannedFolderCount: 0,
+                rebuiltTrackCount: 0,
+                failedFolders: [],
+                error: '重建音乐库索引失败'
+            }
         );
     }
 

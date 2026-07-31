@@ -5,7 +5,7 @@
 
 import {BaseAPI} from "@api/core";
 import type {CacheStatistics, GetTracksOptions, Playlist, Result, Track} from "@api/types";
-import type {LibraryIndexClearResult} from "@api/types/electron";
+import type {LibraryIndexRebuildResult} from "@api/types/electron";
 import {libraryDataService} from "@/features/library/service/LibraryDataService";
 import {libraryService} from "@/features/library/service/LibraryService";
 
@@ -38,8 +38,8 @@ export class LibraryAPI extends BaseAPI {
         return await libraryDataService.hasCachedLibrary();
     }
 
-    async clearLibraryIndex(): Promise<LibraryIndexClearResult> {
-        return await libraryService.clearLibraryIndex();
+    async rebuildLibraryIndex(): Promise<LibraryIndexRebuildResult> {
+        return await libraryService.rebuildLibraryIndex();
     }
 
     async getPlaylists(): Promise<Playlist[]> {

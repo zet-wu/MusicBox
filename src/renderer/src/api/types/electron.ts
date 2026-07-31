@@ -79,12 +79,17 @@ export interface PlaylistDetailResult {
     error?: string;
 }
 
-export interface LibraryIndexClearResult {
+export interface LibraryIndexRebuildResult {
     success: boolean;
+    state: 'rebuilt' | 'no_folders' | 'partial' | 'failed';
     clearedTrackCount?: number;
     preservedPlaylistCount?: number;
     preservedPlaylistReferenceCount?: number;
     preservedIgnoredFileCount?: number;
+    configuredFolderCount: number;
+    scannedFolderCount: number;
+    rebuiltTrackCount: number;
+    failedFolders: string[];
     error?: string;
 }
 
@@ -122,7 +127,7 @@ export interface ElectronLibraryAPI {
     loadCachedTracks(): Promise<Track[]>;
     validateCache(): Promise<CacheValidationResult>;
     getCacheStatistics(): Promise<CacheStatistics | null>;
-    clearLibraryIndex(): Promise<LibraryIndexClearResult>;
+    rebuildLibraryIndex(): Promise<LibraryIndexRebuildResult>;
     removeTrack(trackFileId: string): Promise<Result>;
     getTracksByDrive(driveId: string): Promise<Track[]>;
     removeTracksByDrive(driveId: string): Promise<Result>;

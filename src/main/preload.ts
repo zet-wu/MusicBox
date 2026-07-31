@@ -262,7 +262,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         loadCachedTracks: () => ipcRenderer.invoke('library:loadCachedTracks'),
         validateCache: () => ipcRenderer.invoke('library:validateCache'),
         getCacheStatistics: () => ipcRenderer.invoke('library:getCacheStatistics'),
-        clearLibraryIndex: () => ipcRenderer.invoke('library:clearLibraryIndex'),
+        rebuildLibraryIndex: () => ipcRenderer.invoke('library:rebuildLibraryIndex'),
         removeTrack: (trackFileId: string) => ipcRenderer.invoke('library:removeTrack', trackFileId),
         getTracksByDrive: (driveId: string) => ipcRenderer.invoke('library:getTracksByDrive', driveId),
         removeTracksByDrive: (driveId: string) => ipcRenderer.invoke('library:removeTracksByDrive', driveId),

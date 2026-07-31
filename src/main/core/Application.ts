@@ -11,6 +11,20 @@ import {ConfigManager} from './ConfigManager';
 import {BaseController} from '../decorators/IpcHandler';
 import {registerAudioStreamProtocol} from '../services/audio/AudioStreamProtocol';
 
+interface LibraryScanner {
+    scanDirectories(directoryPaths: string[]): Promise<{scannedFolderCount: number; failedFolders: string[]}>;
+}
+
+interface MusicFolderSettingsProvider {
+    getMusicFolders(): Promise<string[]>;
+    getAutoScanSettings(): Promise<{
+        musicFolders: string[];
+        autoScanEnabled: boolean;
+        scanFrequency: string;
+        lastScanTime: number;
+    }>;
+}
+
 /**
  * 性能计时器
  */
@@ -49,6 +63,8 @@ export class Application {
     private windowManager: WindowManager;
     private configManager: ConfigManager;
     private controllers: BaseController[] = [];
+    private libraryScanner: LibraryScanner | null = null;
+    private musicFolderSettingsProvider: MusicFolderSettingsProvider | null = null;
     private embeddedCoverService: {destroy(): Promise<void>} | null = null;
     private isInitialized = false;
     private isConfigured = false;
@@ -101,10 +117,9 @@ export class Application {
 
             if (!this.isBenchmarkMode()) {
                 // 5. 后台初始化重型服务
-                this.initializeHeavyServices().catch(e => console.error('❌ 后台服务初始化失败:', e));
-
-                // 6. 启动自动扫描调度器
-                this.startAutoScanner().catch(e => console.error('❌ 自动扫描调度器启动失败:', e));
+                this.initializeHeavyServices()
+                    .then(() => this.startAutoScanner())
+                    .catch(e => console.error('❌ 后台服务初始化失败:', e));
             }
 
             this.runBenchmarkScriptIfRequested().catch(e => console.error('❌ Benchmark脚本执行失败:', e));
@@ -140,26 +155,21 @@ export class Application {
     private async startAutoScanner(): Promise<void> {
         try {
             const scheduler = await this.container.get<any>('autoScanScheduler');
-            const networkFileAdapter = await this.container.get<any>('networkFileAdapter');
-            const {parseMetadata} = await import('../utils/metadata');
-
-            const settingsLoader = async () => {
-                const config = await this.configManager.loadConfig('music-folders-settings');
-                return config || {
-                    musicFolders: [],
-                    autoScanEnabled: false,
-                    scanFrequency: 'on_startup',
-                    lastScanTime: 0
-                };
+            const settingsLoader = async () => this.musicFolderSettingsProvider?.getAutoScanSettings() || {
+                musicFolders: [],
+                autoScanEnabled: false,
+                scanFrequency: 'on_startup',
+                lastScanTime: 0
             };
 
             const scanHandler = async (folders: string[]) => {
-                for (const folder of folders) {
-                    const isNetwork = networkFileAdapter.isNetworkPath(folder);
-                    // 简化扫描：依赖 LibraryController 的扫描逻辑
-                    console.log(`🔍 AutoScan: 扫描文件夹 ${folder} (${isNetwork ? '网络' : '本地'})`);
+                if (!this.libraryScanner) {
+                    throw new Error('音乐库扫描器尚未初始化');
                 }
-                void parseMetadata; // keep import used
+                const result = await this.libraryScanner.scanDirectories(folders);
+                if (result.failedFolders.length > 0) {
+                    throw new Error(`扫描失败: ${result.failedFolders.join(', ')}`);
+                }
             };
 
             scheduler.initialize(scanHandler, settingsLoader);
@@ -364,6 +374,14 @@ export class Application {
         this.embeddedCoverService = embeddedCoverService;
         const trayController = new TrayController(this.windowManager);
         this.windowManager.setTraySettingsGetter(() => trayController.getSettings());
+        const settingsController = new SettingsController();
+        const libraryController = new LibraryController(
+            libraryCacheManager, metadataHandler, networkDriveManager,
+            networkFileAdapter, this.windowManager, embeddedCoverService,
+            parseMetadata, () => settingsController.getMusicFolders(), audioController.state
+        );
+        this.libraryScanner = libraryController;
+        this.musicFolderSettingsProvider = settingsController;
 
         const startupControllers = [
             new WindowController(this.windowManager),
@@ -375,13 +393,9 @@ export class Application {
             new BenchmarkController(),
             new DesktopLyricsController(this.windowManager),
             new NetworkController(networkDriveManager, networkFileAdapter, this.windowManager),
-            new LibraryController(
-                libraryCacheManager, metadataHandler, networkDriveManager,
-                networkFileAdapter, this.windowManager, embeddedCoverService,
-                parseMetadata, audioController.state
-            ),
+            libraryController,
             new SystemController(),
-            new SettingsController(),
+            settingsController,
             new MemoryController(),
             new UserDataController(),
             new HardwareAccelerationController(),

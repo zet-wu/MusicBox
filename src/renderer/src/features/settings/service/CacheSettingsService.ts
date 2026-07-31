@@ -48,15 +48,31 @@ class CacheSettingsService {
         };
     }
 
-    async clearLibraryIndex(): Promise<CacheActionDisplay> {
-        const result = await cacheMaintenanceService.clearLibraryIndex();
+    async rebuildLibraryIndex(): Promise<CacheActionDisplay> {
+        const result = await cacheMaintenanceService.rebuildLibraryIndex();
+        if (result.state === 'no_folders') {
+            return {
+                success: true,
+                message: '音乐库索引已清除',
+                description: '未配置音乐文件夹，当前音乐库为空；歌单、收藏、忽略列表和原始音乐文件均已保留。'
+            };
+        }
+
+        if (result.state === 'partial') {
+            return {
+                success: true,
+                message: `音乐库索引已部分重建，恢复 ${result.rebuiltTrackCount} 首歌曲`,
+                description: `${result.scannedFolderCount}/${result.configuredFolderCount} 个音乐文件夹扫描成功；失败目录：${result.failedFolders.join('、')}`
+            };
+        }
+
         return {
             success: result.success,
             message: result.success
-                ? `音乐库索引已清除，共移除 ${result.clearedTrackCount || 0} 首歌曲`
-                : result.error || '清除音乐库索引失败',
+                ? `音乐库索引已重建，共恢复 ${result.rebuiltTrackCount} 首歌曲`
+                : result.error || '重建音乐库索引失败',
             description: result.success
-                ? '歌单、收藏、忽略列表和音乐文件夹设置已保留；请重新扫描音乐文件夹以恢复歌曲。'
+                ? `已扫描 ${result.scannedFolderCount} 个音乐文件夹；歌单、收藏、忽略列表和原始音乐文件均已保留。`
                 : undefined
         };
     }
