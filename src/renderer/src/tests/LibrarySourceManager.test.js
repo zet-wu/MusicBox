@@ -38,6 +38,23 @@ describe('歌单绑定有效性', () => {
             orphanBindings: [orphan]
         });
     });
+
+    it('批量删除孤儿绑定并保留当前歌单绑定', async () => {
+        const manager = await createManager();
+        await manager.loadAndMigrate({musicFolders: [], scannedDirectories: [], tracks: []});
+        const {source} = await manager.ensureSource('directory', 'C:/Music', 'settings');
+        const {binding: active} = await manager.createPlaylistBinding('playlist-new', source.id);
+        const {binding: orphan} = await manager.createPlaylistBinding('playlist-lost', source.id);
+
+        const removed = await manager.removeOrphanedPlaylistBindings(['playlist-new']);
+
+        expect(removed.map(binding => binding.id)).toEqual([orphan.id]);
+        expect(manager.getPlaylistBindings().map(binding => binding.id)).toEqual([active.id]);
+
+        const reloaded = new LibrarySourceManager(manager.sourceFilePath);
+        await reloaded.loadAndMigrate({musicFolders: [], scannedDirectories: [], tracks: []});
+        expect(reloaded.getPlaylistBindings().map(binding => binding.id)).toEqual([active.id]);
+    });
 });
 
 describe('LibrarySourceManager 旧数据迁移', () => {
