@@ -9,6 +9,7 @@ export type PlaybackEventName =
     | 'durationChanged'
     | 'positionChanged'
     | 'playbackStateChanged'
+    | 'playbackStarted'
     | 'volumeChanged'
     | 'trackChanged'
     | 'trackIndexChanged'

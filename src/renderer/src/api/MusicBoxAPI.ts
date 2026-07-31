@@ -40,6 +40,9 @@ export class MusicBoxAPI extends EventEmitter {
     audioEngineReady: Promise<void>;
     _trackSwitchLock: boolean;
     _lyricsRequestLock: Set<string>;
+    private playbackSessionSequence: number;
+    private playbackSessionTrack: Track | null;
+    private playbackSessionActive: boolean;
 
     constructor() {
         super();
@@ -93,6 +96,10 @@ export class MusicBoxAPI extends EventEmitter {
 
         // 歌词获取去重机制
         this._lyricsRequestLock = new Set(); // 正在请求歌词的歌曲集合
+
+        this.playbackSessionSequence = 0;
+        this.playbackSessionTrack = null;
+        this.playbackSessionActive = false;
 
         this.audioEngineReady = this.initializeWebAudio().then(() => {
             this.setupEventListeners();
@@ -285,6 +292,7 @@ export class MusicBoxAPI extends EventEmitter {
                 const result = await this.audioEngine.play();
                 if (result) {
                     // 不在这里手动设置状态，让音频引擎的事件回调来处理
+                    this.emitPlaybackStarted(this.currentTrack);
                     return true;
                 } else {
                     console.log(`❌ API: ${this.getAudioEngineLabel()} 播放失败`);
@@ -297,6 +305,7 @@ export class MusicBoxAPI extends EventEmitter {
             if (result) {
                 this.isPlaying = true;
                 this.emit('playbackStateChanged', 'playing');
+                this.emitPlaybackStarted(this.currentTrack);
             }
             return result;
         } catch (error) {
@@ -389,6 +398,7 @@ export class MusicBoxAPI extends EventEmitter {
                 if (result) {
                     this.isPlaying = false;
                     this.position = 0;
+                    this.resetPlaybackSession();
                     this.emit('playbackStateChanged', 'stopped');
                     this.publishPositionChanged(0, 'commit');
                 }
@@ -399,6 +409,7 @@ export class MusicBoxAPI extends EventEmitter {
             if (result) {
                 this.isPlaying = false;
                 this.position = 0;
+                this.resetPlaybackSession();
                 this.emit('playbackStateChanged', 'stopped');
                 this.publishPositionChanged(0, 'commit');
             }
@@ -620,6 +631,7 @@ export class MusicBoxAPI extends EventEmitter {
                     this.emit('durationChanged', this.duration);
                     this.publishPositionChanged(0, 'commit');
                     this.emit('playbackStateChanged', this.isPlaying ? 'playing' : 'paused');
+                    this.emitPlaybackStarted(this.currentTrack, true);
 
                     // 释放切换锁
                     this._trackSwitchLock = false;
@@ -685,6 +697,7 @@ export class MusicBoxAPI extends EventEmitter {
                     this.emit('durationChanged', this.duration);
                     this.publishPositionChanged(0, 'commit');
                     this.emit('playbackStateChanged', this.isPlaying ? 'playing' : 'paused');
+                    this.emitPlaybackStarted(this.currentTrack, true);
 
                     // 释放切换锁
                     this._trackSwitchLock = false;
@@ -938,6 +951,35 @@ export class MusicBoxAPI extends EventEmitter {
 
     private publishPositionChanged(position: number, reason: 'tick' | 'commit' = 'tick'): void {
         this.playbackPositionUpdates.publish(position, {reason});
+    }
+
+    private emitPlaybackStarted(track: Track | null, forceNewSession = false): void {
+        if (!track?.filePath) {
+            return;
+        }
+
+        if (
+            !forceNewSession
+            && this.playbackSessionActive
+            && isSameTrack(this.playbackSessionTrack, track)
+        ) {
+            return;
+        }
+
+        this.playbackSessionSequence += 1;
+        this.playbackSessionTrack = track;
+        this.playbackSessionActive = true;
+        const startedAt = Date.now();
+        this.emit('playbackStarted', {
+            track,
+            startedAt,
+            sessionId: `${startedAt}-${this.playbackSessionSequence}`
+        });
+    }
+
+    private resetPlaybackSession(): void {
+        this.playbackSessionTrack = null;
+        this.playbackSessionActive = false;
     }
 
     saveCurrentPlaybackState(): void {

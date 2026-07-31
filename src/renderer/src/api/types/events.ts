@@ -22,8 +22,15 @@ export interface AudioEngineChangedEvent {
     engineType?: string;
 }
 
+export interface PlaybackStartedEvent {
+    track: Track;
+    startedAt: number;
+    sessionId: string;
+}
+
 export interface MusicBoxAPIEvents {
     trackChanged: Track | null;
+    playbackStarted: PlaybackStartedEvent;
     trackIndexChanged: number;
     playbackStateChanged: PlaybackStateName;
     positionChanged: number;
