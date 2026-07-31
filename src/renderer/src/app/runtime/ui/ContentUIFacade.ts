@@ -39,16 +39,16 @@ export class ContentUIFacade {
         this.app.components.contextMenu?.show(x, y, track, index, selectedTracks, selectedTrackItems);
     }
 
-    showCollectionContextMenu(x: number, y: number, tracks: Track[]): void {
-        if (tracks.length === 0) return;
+    showCollectionContextMenu(x: number, y: number, tracks: Track[], playlist?: Playlist): void {
+        if (tracks.length === 0 && !playlist) return;
         this.app.components.contextMenu?.show(
             x,
             y,
-            tracks[0],
+            tracks[0] || null,
             0,
             null,
             tracks,
-            {collectionActionsOnly: true}
+            {collectionActionsOnly: true, playlist}
         );
     }
 

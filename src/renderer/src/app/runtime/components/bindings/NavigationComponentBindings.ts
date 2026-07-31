@@ -40,4 +40,12 @@ export function bindNavigationComponentEvents({
     components.navigation.on('showRenameDialog', (playlist: Playlist) => {
         dialogs.showRenamePlaylistDialog(playlist);
     });
+
+    components.contextMenu.on('editPlaylist', (playlist: Playlist) => {
+        dialogs.showRenamePlaylistDialog(playlist);
+    });
+
+    components.contextMenu.on('deletePlaylist', async (playlist: Playlist) => {
+        await components.navigation.deletePlaylist(playlist);
+    });
 }

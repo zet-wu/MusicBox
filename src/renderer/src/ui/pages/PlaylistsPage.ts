@@ -203,11 +203,9 @@ export class PlaylistsPage extends Component {
     private async showPlaylistContextMenu(playlist: Playlist, x: number, y: number): Promise<void> {
         const requestId = ++this.contextMenuRequestId;
         const result = await libraryDataService.getPlaylistDetail(playlist.id);
-        if (requestId !== this.contextMenuRequestId || !this.isVisible || !result.success) return;
-        const tracks = result.tracks || [];
-        if (tracks.length > 0) {
-            this.emit('collectionRightClick', tracks, x, y);
-        }
+        if (requestId !== this.contextMenuRequestId || !this.isVisible) return;
+        const tracks = result.success ? result.tracks || [] : [];
+        this.emit('playlistCollectionRightClick', playlist, tracks, x, y);
     }
 
     private sortPlaylists(): void {

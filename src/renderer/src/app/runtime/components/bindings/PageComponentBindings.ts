@@ -162,9 +162,12 @@ export class PageComponentBindings {
                 components.playlistsPage?.on('playlistSelected', async (playlist: Playlist) => {
                     await app.handlePlaylistSelected(playlist);
                 });
-                components.playlistsPage?.on('collectionRightClick', (tracks: Track[], x: number, y: number) => {
-                    content.showCollectionContextMenu(x, y, tracks);
-                });
+                components.playlistsPage?.on(
+                    'playlistCollectionRightClick',
+                    (playlist: Playlist, tracks: Track[], x: number, y: number) => {
+                        content.showCollectionContextMenu(x, y, tracks, playlist);
+                    }
+                );
                 break;
 
             case 'statisticsPage':

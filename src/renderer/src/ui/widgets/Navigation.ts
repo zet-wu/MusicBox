@@ -15,7 +15,7 @@ import type {MountedNetworkDrive} from "@api/types/electron";
 type SidebarView = AppView;
 
 interface SidebarPlaylist extends Playlist {
-    coverImage?: string;
+    coverImage?: string | null;
     trackIds?: string[];
 }
 

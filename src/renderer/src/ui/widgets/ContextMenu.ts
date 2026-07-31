@@ -3,10 +3,11 @@
  */
 
 import {Component} from "@ui/base/Component";
-import type {Track} from "@api/types/library";
+import type {Playlist, Track} from "@api/types/library";
 
 export interface ContextMenuDisplayOptions {
     collectionActionsOnly?: boolean;
+    playlist?: Playlist;
 }
 
 class ContextMenu extends Component {
@@ -16,6 +17,7 @@ class ContextMenu extends Component {
     private currentIndex: number;
     private selectedTracks: Set<number> | null;
     private selectedTrackItems: Track[];
+    private currentPlaylist: Playlist | null;
     private listenersSetup: boolean;
     private menu!: HTMLElement;
     private playItem!: HTMLElement;
@@ -29,6 +31,9 @@ class ContextMenu extends Component {
     private deleteItem!: HTMLElement;
     private batchDeleteItem!: HTMLElement;
     private batchDeleteLabel!: HTMLElement;
+    private detailsDivider!: HTMLElement;
+    private editInfoLabel!: HTMLElement;
+    private deleteLabel!: HTMLElement;
 
     constructor(element: HTMLElement | null) {
         super(element);
@@ -38,16 +43,17 @@ class ContextMenu extends Component {
         this.currentIndex = -1;
         this.selectedTracks = null;
         this.selectedTrackItems = [];
+        this.currentPlaylist = null;
         this.listenersSetup = false;
     }
 
     show(
         x: number,
         y: number,
-        track: Track,
+        track: Track | null,
         index: number,
         selectedTracks: Set<number> | null = null,
-        selectedTrackItems: Track[] = [track],
+        selectedTrackItems: Track[] = track ? [track] : [],
         options: ContextMenuDisplayOptions = {}
     ): void {
         if (!this.listenersSetup) {
@@ -60,18 +66,25 @@ class ContextMenu extends Component {
         this.currentIndex = index;
         this.selectedTracks = selectedTracks;
         this.selectedTrackItems = [...selectedTrackItems];
+        this.currentPlaylist = options.playlist || null;
         this.isVisible = true;
 
         // 多选模式：隐藏单曲操作，显示批量删除
         const isMulti = selectedTracks && selectedTracks.size > 1;
         const collectionActionsOnly = options.collectionActionsOnly === true;
+        const hasCollectionTracks = this.selectedTrackItems.length > 0;
+        const isPlaylistCollection = Boolean(this.currentPlaylist);
         this.playItem.style.display = isMulti || collectionActionsOnly ? 'none' : '';
-        this.playNextItem.style.display = '';
-        this.addToPlaylistItem.style.display = '';
-        this.addToCustomPlaylistItem.style.display = '';
-        this.editInfoItem.style.display = isMulti || collectionActionsOnly ? 'none' : '';
-        this.deleteItem.style.display = isMulti || collectionActionsOnly ? 'none' : '';
+        this.playNextItem.style.display = collectionActionsOnly && !hasCollectionTracks ? 'none' : '';
+        this.addToPlaylistItem.style.display = collectionActionsOnly && !hasCollectionTracks ? 'none' : '';
+        this.addToCustomPlaylistItem.style.display = collectionActionsOnly && !hasCollectionTracks ? 'none' : '';
+        this.editInfoItem.style.display = isPlaylistCollection || (!isMulti && !collectionActionsOnly) ? '' : 'none';
+        this.deleteItem.style.display = isPlaylistCollection || (!isMulti && !collectionActionsOnly) ? '' : 'none';
         this.batchDeleteItem.style.display = isMulti && !collectionActionsOnly ? '' : 'none';
+        this.detailsDivider.style.display = isPlaylistCollection || !collectionActionsOnly ? '' : 'none';
+        this.editInfoLabel.textContent = isPlaylistCollection ? '编辑歌单信息' : '编辑歌曲信息';
+        this.deleteLabel.textContent = isPlaylistCollection ? '删除歌单' : '删除';
+        this.deleteItem.classList.toggle('danger', isPlaylistCollection);
         if (isMulti) {
             this.batchDeleteLabel.textContent = `批量删除 (${selectedTracks.size} 首)`;
         }
@@ -109,6 +122,7 @@ class ContextMenu extends Component {
         this.currentIndex = -1;
         this.selectedTracks = null;
         this.selectedTrackItems = [];
+        this.currentPlaylist = null;
     }
 
     destroy(): void {
@@ -131,6 +145,9 @@ class ContextMenu extends Component {
         this.deleteItem = this.element.querySelector('#context-delete') as HTMLElement;
         this.batchDeleteItem = this.element.querySelector('#context-batch-delete') as HTMLElement;
         this.batchDeleteLabel = this.element.querySelector('#context-batch-delete-label') as HTMLElement;
+        this.detailsDivider = this.element.querySelector('.context-menu-divider') as HTMLElement;
+        this.editInfoLabel = this.editInfoItem.querySelector('span') as HTMLElement;
+        this.deleteLabel = this.deleteItem.querySelector('span') as HTMLElement;
     }
 
     setupEventListeners(): void {
@@ -167,12 +184,20 @@ class ContextMenu extends Component {
         });
 
         this.addEventListenerManaged(this.editInfoItem, 'click', () => {
-            this.emit('editInfo', {track: this.currentTrack, index: this.currentIndex});
+            if (this.currentPlaylist) {
+                this.emit('editPlaylist', this.currentPlaylist);
+            } else {
+                this.emit('editInfo', {track: this.currentTrack, index: this.currentIndex});
+            }
             this.hide();
         });
 
         this.addEventListenerManaged(this.deleteItem, 'click', () => {
-            this.emit('delete', {track: this.currentTrack, index: this.currentIndex});
+            if (this.currentPlaylist) {
+                this.emit('deletePlaylist', this.currentPlaylist);
+            } else {
+                this.emit('delete', {track: this.currentTrack, index: this.currentIndex});
+            }
             this.hide();
         });
 
