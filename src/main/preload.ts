@@ -234,6 +234,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         importLibraryFiles: (paths: string[], targetPlaylistId?: string) =>
             ipcRenderer.invoke('library:importLibraryFiles', paths, targetPlaylistId),
         getLibrarySources: () => ipcRenderer.invoke('library:getLibrarySources'),
+        registerLibraryDirectory: (path: string) =>
+            ipcRenderer.invoke('library:registerLibraryDirectory', path),
+        removeLibraryDirectory: (path: string) =>
+            ipcRenderer.invoke('library:removeLibraryDirectory', path),
         removeLibrarySource: (sourceId: string) => ipcRenderer.invoke('library:removeLibrarySource', sourceId),
         getPlaylistBindings: (playlistId: string) => ipcRenderer.invoke('library:getPlaylistBindings', playlistId),
         bindDirectoryToPlaylist: (playlistId: string, path: string) =>

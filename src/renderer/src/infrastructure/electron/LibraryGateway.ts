@@ -7,6 +7,7 @@ import type {
     FavoritesChangedData,
     LibraryImportResult,
     LibraryIndexRebuildResult,
+    LibrarySource,
     PlaylistSourceBinding
 } from '@api/types/electron';
 
@@ -35,6 +36,14 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
 
     getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]> {
         return this.call('getPlaylistBindings', playlistId);
+    }
+
+    registerLibraryDirectory(directoryPath: string): Promise<Result & {source?: LibrarySource}> {
+        return this.call('registerLibraryDirectory', directoryPath);
+    }
+
+    removeLibraryDirectory(directoryPath: string): Promise<Result & {removedTrackCount?: number}> {
+        return this.call('removeLibraryDirectory', directoryPath);
     }
 
     bindDirectoryToPlaylist(

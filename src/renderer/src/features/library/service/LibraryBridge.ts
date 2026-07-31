@@ -132,9 +132,14 @@ export class LibraryBridge {
             return {
                 success: false,
                 state: 'failed',
+                configuredSourceCount: 0,
+                scannedSourceCount: 0,
+                directorySourceCount: 0,
+                fileSourceCount: 0,
                 configuredFolderCount: 0,
                 scannedFolderCount: 0,
                 rebuiltTrackCount: 0,
+                failedSources: [],
                 failedFolders: [],
                 error: error instanceof Error ? error.message : String(error)
             };

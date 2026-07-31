@@ -50,11 +50,11 @@ class CacheSettingsService {
 
     async rebuildLibraryIndex(): Promise<CacheActionDisplay> {
         const result = await cacheMaintenanceService.rebuildLibraryIndex();
-        if (result.state === 'no_folders') {
+        if (result.state === 'no_sources') {
             return {
                 success: true,
                 message: '音乐库索引已清除',
-                description: '未配置音乐文件夹，当前音乐库为空；歌单、收藏、忽略列表和原始音乐文件均已保留。'
+                description: '未配置持续文件夹或精确文件来源，当前音乐库为空；歌单、收藏、忽略列表和原始音乐文件均已保留。'
             };
         }
 
@@ -62,7 +62,7 @@ class CacheSettingsService {
             return {
                 success: true,
                 message: `音乐库索引已部分重建，恢复 ${result.rebuiltTrackCount} 首歌曲`,
-                description: `${result.scannedFolderCount}/${result.configuredFolderCount} 个音乐文件夹扫描成功；失败目录：${result.failedFolders.join('、')}`
+                description: `${result.scannedSourceCount}/${result.configuredSourceCount} 个音乐库来源扫描成功；失败来源：${result.failedSources.join('、')}`
             };
         }
 
@@ -72,7 +72,7 @@ class CacheSettingsService {
                 ? `音乐库索引已重建，共恢复 ${result.rebuiltTrackCount} 首歌曲`
                 : result.error || '重建音乐库索引失败',
             description: result.success
-                ? `已扫描 ${result.scannedFolderCount} 个音乐文件夹；歌单、收藏、忽略列表和原始音乐文件均已保留。`
+                ? `已扫描 ${result.directorySourceCount} 个持续文件夹和 ${result.fileSourceCount} 个精确文件来源；歌单、收藏、忽略列表和原始音乐文件均已保留。`
                 : undefined
         };
     }

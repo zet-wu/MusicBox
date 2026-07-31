@@ -4,6 +4,7 @@ import type {
     EmbeddedTrackCover,
     LibraryImportResult,
     LibraryIndexRebuildResult,
+    LibrarySource,
     PlaylistSourceBinding
 } from '@api/types/electron';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
@@ -137,9 +138,14 @@ export class LibraryDataService {
             {
                 success: false,
                 state: 'failed',
+                configuredSourceCount: 0,
+                scannedSourceCount: 0,
+                directorySourceCount: 0,
+                fileSourceCount: 0,
                 configuredFolderCount: 0,
                 scannedFolderCount: 0,
                 rebuiltTrackCount: 0,
+                failedSources: [],
                 failedFolders: [],
                 error: '重建音乐库索引失败'
             }
@@ -254,6 +260,28 @@ export class LibraryDataService {
             () => libraryGateway.getPlaylistBindings(playlistId),
             'library.getPlaylistBindings',
             []
+        );
+    }
+
+    async registerLibraryDirectory(
+        directoryPath: string
+    ): Promise<Result & {source?: LibrarySource}> {
+        this.assertNonEmptyString(directoryPath, 'directoryPath');
+        return await this.callGateway(
+            () => libraryGateway.registerLibraryDirectory(directoryPath),
+            'library.registerLibraryDirectory',
+            {success: false, error: '登记音乐文件夹来源失败'}
+        );
+    }
+
+    async removeLibraryDirectory(
+        directoryPath: string
+    ): Promise<Result & {removedTrackCount?: number}> {
+        this.assertNonEmptyString(directoryPath, 'directoryPath');
+        return await this.callGateway(
+            () => libraryGateway.removeLibraryDirectory(directoryPath),
+            'library.removeLibraryDirectory',
+            {success: false, error: '移除音乐文件夹来源失败'}
         );
     }
 

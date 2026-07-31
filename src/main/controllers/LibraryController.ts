@@ -27,10 +27,15 @@ const BATCH_SIZE = 10;
 
 export interface LibraryIndexRebuildResult extends LibraryIndexClearSummary {
     success: boolean;
-    state: 'rebuilt' | 'no_folders' | 'partial' | 'failed';
+    state: 'rebuilt' | 'no_sources' | 'partial' | 'failed';
+    configuredSourceCount: number;
+    scannedSourceCount: number;
+    directorySourceCount: number;
+    fileSourceCount: number;
     configuredFolderCount: number;
     scannedFolderCount: number;
     rebuiltTrackCount: number;
+    failedSources: string[];
     failedFolders: string[];
     error?: string;
 }
@@ -756,51 +761,110 @@ export class LibraryController extends BaseController {
         };
 
         try {
+            await this.ensureLibrarySourcesLoaded();
+            const sources = this.librarySourceManager.getSources();
             summary = await this.libraryCacheManager.clearLibraryIndex();
             this.windowManager.sendToMainWindow('library:updated', []);
+            this.emitPlaylistsUpdated();
             console.log(`✅ 音乐库索引已清除，共移除 ${summary.clearedTrackCount} 首歌曲`);
 
-            const musicFolders = await this.loadMusicFolders();
-            if (musicFolders.length === 0) {
+            if (sources.length === 0) {
                 return {
                     success: true,
-                    state: 'no_folders',
+                    state: 'no_sources',
+                    configuredSourceCount: 0,
+                    scannedSourceCount: 0,
+                    directorySourceCount: 0,
+                    fileSourceCount: 0,
                     configuredFolderCount: 0,
                     scannedFolderCount: 0,
                     rebuiltTrackCount: 0,
+                    failedSources: [],
                     failedFolders: [],
                     ...summary
                 };
             }
 
-            const scanResult = await this.scanDirectories(musicFolders);
+            const scanResult = await this.scanAllLibrarySources();
             const rebuiltTrackCount = this.libraryCacheManager.getAllTracks().length;
-            const state = scanResult.failedFolders.length === 0
+            const state = scanResult.failedSources.length === 0
                 ? 'rebuilt'
-                : scanResult.scannedFolderCount > 0 ? 'partial' : 'failed';
+                : scanResult.scannedSourceCount > 0 ? 'partial' : 'failed';
 
             return {
                 success: state !== 'failed',
                 state,
-                configuredFolderCount: musicFolders.length,
+                configuredFolderCount: scanResult.directorySourceCount,
                 rebuiltTrackCount,
                 ...scanResult,
                 ...summary,
-                error: state === 'failed' ? '所有音乐文件夹扫描失败' : undefined
+                error: state === 'failed' ? '所有音乐库来源扫描失败' : undefined
             };
         } catch (error: any) {
             console.error('❌ 重建音乐库索引失败:', error);
             return {
                 success: false,
                 state: 'failed',
+                configuredSourceCount: 0,
+                scannedSourceCount: 0,
+                directorySourceCount: 0,
+                fileSourceCount: 0,
                 configuredFolderCount: 0,
                 scannedFolderCount: 0,
                 rebuiltTrackCount: this.libraryCacheManager.getAllTracks().length,
+                failedSources: [],
                 failedFolders: [],
                 ...summary,
                 error: error.message
             };
         }
+    }
+
+    async scanAllLibrarySources(): Promise<{
+        configuredSourceCount: number;
+        scannedSourceCount: number;
+        directorySourceCount: number;
+        fileSourceCount: number;
+        scannedFolderCount: number;
+        failedSources: string[];
+        failedFolders: string[];
+    }> {
+        await this.ensureLibrarySourcesLoaded();
+        const sources = this.librarySourceManager.getSources();
+        const failedSources: string[] = [];
+        const failedFolders: string[] = [];
+        let scannedSourceCount = 0;
+        let scannedFolderCount = 0;
+
+        for (const source of sources) {
+            try {
+                if (source.type === 'directory') {
+                    const success = await this.scanDirectorySource(source.path, source.id);
+                    if (!success) throw new Error('目录扫描失败');
+                    scannedFolderCount++;
+                } else {
+                    await this.importLibraryFile(source.path, false);
+                }
+                scannedSourceCount++;
+            } catch (error: any) {
+                failedSources.push(source.path);
+                if (source.type === 'directory') failedFolders.push(source.path);
+                console.warn(`⚠️ 扫描音乐库来源失败 ${source.path}:`, error.message);
+            }
+        }
+
+        this.windowManager.sendToMainWindow('library:updated', this.libraryCacheManager.getTracks());
+        this.emitPlaylistsUpdated();
+        this.emitSourcesUpdated();
+        return {
+            configuredSourceCount: sources.length,
+            scannedSourceCount,
+            directorySourceCount: sources.filter(source => source.type === 'directory').length,
+            fileSourceCount: sources.filter(source => source.type === 'file').length,
+            scannedFolderCount,
+            failedSources,
+            failedFolders
+        };
     }
 
     @IpcHandle('library:getTracksByDrive')
@@ -932,6 +996,37 @@ export class LibraryController extends BaseController {
     async getLibrarySources(): Promise<any[]> {
         await this.ensureLibrarySourcesLoaded();
         return this.librarySourceManager.getSources();
+    }
+
+    @IpcHandle('library:registerLibraryDirectory')
+    async registerLibraryDirectory(
+        directoryPath: string
+    ): Promise<{success: boolean; source?: any; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const {source} = await this.librarySourceManager.ensureSource(
+                'directory',
+                directoryPath,
+                'settings'
+            );
+            this.emitSourcesUpdated();
+            return {success: true, source};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('library:removeLibraryDirectory')
+    async removeLibraryDirectory(
+        directoryPath: string
+    ): Promise<{success: boolean; removedTrackCount?: number; error?: string}> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const sourceId = this.librarySourceManager.createSourceId('directory', directoryPath);
+            return await this.removeLibrarySource(sourceId);
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
     }
 
     @IpcHandle('library:getPlaylistBindings')
@@ -1096,8 +1191,8 @@ export class LibraryController extends BaseController {
             }
             for (const filePath of Array.from(new Set(filePaths || []))) {
                 try {
-                    const track = await this.importLibraryFile(filePath);
-                    tracks.push(track);
+                    const track = await this.importLibraryFile(filePath, true);
+                    if (track) tracks.push(track);
                 } catch (error: any) {
                     failedPaths.push(filePath);
                     console.warn(`⚠️ 导入音乐文件失败 ${filePath}:`, error.message);
@@ -1129,7 +1224,10 @@ export class LibraryController extends BaseController {
         }
     }
 
-    private async importLibraryFile(filePath: string): Promise<CachedTrack> {
+    private async importLibraryFile(
+        filePath: string,
+        restoreIgnored: boolean
+    ): Promise<CachedTrack | null> {
         const extension = path.extname(filePath).toLowerCase();
         if (!AUDIO_EXTENSIONS.includes(extension)) throw new Error('不支持的音频格式');
 
@@ -1143,7 +1241,17 @@ export class LibraryController extends BaseController {
         if (isDirectory) throw new Error('所选路径是文件夹');
 
         const {source} = await this.librarySourceManager.ensureSource('file', filePath, 'file_import');
-        const restoredFromIgnoreList = this.libraryCacheManager.removeFromIgnoreList(filePath);
+        const restoredFromIgnoreList = restoreIgnored
+            ? this.libraryCacheManager.removeFromIgnoreList(filePath)
+            : false;
+        if (!restoreIgnored && this.libraryCacheManager.isFileIgnored(filePath)) {
+            await this.librarySourceManager.updateSourceScan(
+                source.id,
+                this.createKnownFiles([filePath]),
+                true
+            );
+            return null;
+        }
 
         const existing = this.libraryCacheManager.getTrackByPath(filePath);
         if (existing) {

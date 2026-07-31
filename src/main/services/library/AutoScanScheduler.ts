@@ -6,10 +6,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {app} from 'electron';
 
-type ScanHandler = (folders: string[]) => Promise<void>;
+type ScanHandler = () => Promise<void>;
 
 interface ScanSettings {
     musicFolders: string[];
+    sourceCount: number;
     autoScanEnabled: boolean;
     scanFrequency: 'on_startup' | 'daily' | 'weekly' | string;
     lastScanTime: number;
@@ -23,7 +24,11 @@ export class AutoScanScheduler {
     private settingsLoader: (() => Promise<ScanSettings>) | null = null;
     private settingsFilePath: string;
 
-    constructor() {
+    constructor(settingsFilePath?: string) {
+        if (settingsFilePath) {
+            this.settingsFilePath = settingsFilePath;
+            return;
+        }
         try {
             const userDataPath = app.getPath('userData');
             this.settingsFilePath = path.join(userDataPath, 'music-folders-settings.json');
@@ -50,7 +55,7 @@ export class AutoScanScheduler {
             return;
         }
 
-        if (!this.settings!.musicFolders?.length) return;
+        if (this.settings!.sourceCount === 0) return;
 
         console.log(`🎵 AutoScanScheduler: 启动调度器，扫描频率: ${this.settings!.scanFrequency}`);
 
@@ -96,8 +101,8 @@ export class AutoScanScheduler {
         const startTime = Date.now();
 
         try {
-            console.log(`🔍 AutoScanScheduler: 开始自动扫描 ${this.settings!.musicFolders.length} 个文件夹`);
-            await this.scanHandler!(this.settings!.musicFolders);
+            console.log(`🔍 AutoScanScheduler: 开始自动扫描 ${this.settings!.sourceCount} 个音乐库来源`);
+            await this.scanHandler!();
             const duration = Date.now() - startTime;
             console.log(`✅ AutoScanScheduler: 自动扫描完成，耗时 ${(duration / 1000).toFixed(2)} 秒`);
             await this.updateLastScanTime(Date.now());
@@ -143,7 +148,7 @@ export class AutoScanScheduler {
 
     async triggerManualScan(): Promise<void> {
         await this.loadSettings();
-        if (!this.settings!.musicFolders?.length) throw new Error('没有配置音乐文件夹');
+        if (this.settings!.sourceCount === 0) throw new Error('没有配置音乐库来源');
         await this.executeScan();
     }
 }

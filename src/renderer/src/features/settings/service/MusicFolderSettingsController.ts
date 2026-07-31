@@ -34,7 +34,7 @@ class MusicFolderSettingsController {
     async removeMusicFolder(folderPath: string): Promise<string[] | null> {
         const confirmed = await appConfirmationService.confirm({
             title: '移除文件夹',
-            message: `确定要移除文件夹吗？\n\n${folderPath}\n\n移除后该文件夹中的音乐将不会被自动扫描。`,
+            message: `确定要移除文件夹吗？\n\n${folderPath}\n\n移除后，仅由该来源覆盖的歌曲会立即从音乐库和歌单引用中移除，但不会删除任何原始音频文件。`,
             confirmText: '移除',
             type: 'warning'
         });

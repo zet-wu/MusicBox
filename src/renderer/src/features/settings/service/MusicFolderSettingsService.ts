@@ -1,4 +1,4 @@
-import {settingsShellService} from "@/features/appShell/service";
+import {settingsShellService} from "@/features/appShell/service/SettingsShellService";
 import {libraryDataService} from "@/features/library/service/LibraryDataService";
 
 export interface AutoScanSettingsView {
@@ -27,7 +27,7 @@ export interface MusicFoldersUpdateResult {
     error?: string;
 }
 
-class MusicFolderSettingsService {
+export class MusicFolderSettingsService {
     async getMusicFolders(): Promise<string[]> {
         return settingsShellService.getMusicFolders();
     }
@@ -48,12 +48,27 @@ class MusicFolderSettingsService {
 
     async addMusicFolder(folderPath: string): Promise<MusicFoldersUpdateResult> {
         const result = await settingsShellService.addMusicFolder(folderPath) as SettingsUpdateResult;
+        if (result.success) {
+            const sourceResult = await libraryDataService.registerLibraryDirectory(folderPath);
+            if (!sourceResult.success) {
+                await settingsShellService.removeMusicFolder(folderPath);
+                return {
+                    success: false,
+                    folders: await this.getMusicFolders(),
+                    error: sourceResult.error || '登记音乐文件夹来源失败'
+                };
+            }
+        }
         return this.normalizeFoldersResult(result);
     }
 
     async removeMusicFolder(folderPath: string): Promise<MusicFoldersUpdateResult> {
-        const result = await settingsShellService.removeMusicFolder(folderPath) as SettingsUpdateResult;
-        return this.normalizeFoldersResult(result);
+        const result = await libraryDataService.removeLibraryDirectory(folderPath);
+        return {
+            success: result.success,
+            folders: await this.getMusicFolders(),
+            error: result.error
+        };
     }
 
     async updateAutoScanEnabled(enabled: boolean): Promise<SettingsUpdateResult> {

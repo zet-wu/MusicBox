@@ -81,14 +81,19 @@ export interface PlaylistDetailResult {
 
 export interface LibraryIndexRebuildResult {
     success: boolean;
-    state: 'rebuilt' | 'no_folders' | 'partial' | 'failed';
+    state: 'rebuilt' | 'no_sources' | 'partial' | 'failed';
     clearedTrackCount?: number;
     preservedPlaylistCount?: number;
     preservedPlaylistReferenceCount?: number;
     preservedIgnoredFileCount?: number;
+    configuredSourceCount: number;
+    scannedSourceCount: number;
+    directorySourceCount: number;
+    fileSourceCount: number;
     configuredFolderCount: number;
     scannedFolderCount: number;
     rebuiltTrackCount: number;
+    failedSources: string[];
     failedFolders: string[];
     error?: string;
 }
@@ -108,6 +113,8 @@ export interface ElectronLibraryAPI {
     importLibraryDirectory(path: string): Promise<LibraryImportResult>;
     importLibraryFiles(paths: string[], targetPlaylistId?: string): Promise<LibraryImportResult>;
     getLibrarySources(): Promise<LibrarySource[]>;
+    registerLibraryDirectory(path: string): Promise<Result & {source?: LibrarySource}>;
+    removeLibraryDirectory(path: string): Promise<Result & {removedTrackCount?: number}>;
     removeLibrarySource(sourceId: string): Promise<Result & {removedTrackCount?: number}>;
     getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]>;
     bindDirectoryToPlaylist(playlistId: string, path: string): Promise<Result & {binding?: PlaylistSourceBinding}>;

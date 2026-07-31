@@ -13,12 +13,14 @@ import {registerAudioStreamProtocol} from '../services/audio/AudioStreamProtocol
 
 interface LibraryScanner {
     scanDirectories(directoryPaths: string[]): Promise<{scannedFolderCount: number; failedFolders: string[]}>;
+    scanAllLibrarySources(): Promise<{failedSources: string[]}>;
 }
 
 interface MusicFolderSettingsProvider {
     getMusicFolders(): Promise<string[]>;
     getAutoScanSettings(): Promise<{
         musicFolders: string[];
+        sourceCount?: number;
         autoScanEnabled: boolean;
         scanFrequency: string;
         lastScanTime: number;
@@ -155,20 +157,27 @@ export class Application {
     private async startAutoScanner(): Promise<void> {
         try {
             const scheduler = await this.container.get<any>('autoScanScheduler');
-            const settingsLoader = async () => this.musicFolderSettingsProvider?.getAutoScanSettings() || {
-                musicFolders: [],
-                autoScanEnabled: false,
-                scanFrequency: 'on_startup',
-                lastScanTime: 0
+            const settingsLoader = async () => {
+                const settings = await this.musicFolderSettingsProvider?.getAutoScanSettings() || {
+                    musicFolders: [],
+                    autoScanEnabled: false,
+                    scanFrequency: 'on_startup',
+                    lastScanTime: 0
+                };
+                const sourceManager = await this.container.get<any>('librarySourceManager');
+                return {
+                    ...settings,
+                    sourceCount: sourceManager.getSources().length
+                };
             };
 
-            const scanHandler = async (folders: string[]) => {
+            const scanHandler = async () => {
                 if (!this.libraryScanner) {
                     throw new Error('音乐库扫描器尚未初始化');
                 }
-                const result = await this.libraryScanner.scanDirectories(folders);
-                if (result.failedFolders.length > 0) {
-                    throw new Error(`扫描失败: ${result.failedFolders.join(', ')}`);
+                const result = await this.libraryScanner.scanAllLibrarySources();
+                if (result.failedSources.length > 0) {
+                    throw new Error(`扫描失败: ${result.failedSources.join(', ')}`);
                 }
             };
 
