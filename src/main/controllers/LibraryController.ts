@@ -1116,6 +1116,17 @@ export class LibraryController extends BaseController {
             scannedDirectories: this.libraryCacheManager.getScannedDirectories(),
             tracks: this.libraryCacheManager.getAllTracks()
         });
+        const removedOrphanBindings = await this.librarySourceManager.removeOrphanedPlaylistBindings(
+            this.libraryCacheManager.getAllPlaylists().map(playlist => playlist.id)
+        );
+        if (removedOrphanBindings.length > 0) {
+            const orphanPlaylistCount = new Set(
+                removedOrphanBindings.map(binding => binding.playlistId)
+            ).size;
+            console.warn(
+                `🧹 已清理 ${removedOrphanBindings.length} 条孤儿歌单绑定，涉及 ${orphanPlaylistCount} 个已丢失歌单`
+            );
+        }
         if (result.migrated || this.libraryCacheManager.needsPlaylistMembershipMigration()) {
             await this.libraryCacheManager.saveCache();
         }

@@ -299,6 +299,21 @@ export class LibrarySourceManager {
         return removedCount;
     }
 
+    async removeOrphanedPlaylistBindings(validPlaylistIds: Iterable<string>): Promise<PlaylistSourceBinding[]> {
+        this.assertLoaded();
+        const validIds = new Set(validPlaylistIds);
+        const removedBindings = this.data.playlistBindings.filter(
+            binding => !validIds.has(binding.playlistId)
+        );
+        if (removedBindings.length === 0) return [];
+
+        this.data.playlistBindings = this.data.playlistBindings.filter(
+            binding => validIds.has(binding.playlistId)
+        );
+        await this.save();
+        return removedBindings.map(binding => this.cloneBinding(binding));
+    }
+
     async removeSource(sourceId: string): Promise<RemovedLibrarySource> {
         this.assertLoaded();
         const index = this.data.sources.findIndex(item => item.id === sourceId);
