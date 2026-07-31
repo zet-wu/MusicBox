@@ -89,6 +89,9 @@ export class ComponentEventBinder {
                 showCreatePlaylistDialog: (track) => {
                     this.ui.dialogs.showCreatePlaylistDialog(track);
                 },
+                showPlaylistBindingDialog: (playlist) => (
+                    this.ui.dialogs.showPlaylistBindingDialog(playlist)
+                ),
                 showContextMenu: (x, y, track, index, selectedTracks, selectedTrackItems) => {
                     this.ui.content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
                 }

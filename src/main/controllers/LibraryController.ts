@@ -1218,60 +1218,6 @@ export class LibraryController extends BaseController {
         }
     }
 
-    @IpcHandle('library:scanDirectoryForFiles')
-    async scanDirectoryForFiles(directoryPath: string): Promise<{ success: boolean; files?: any[]; error?: string }> {
-        try {
-            const audioExtensions = ['.mp3', '.flac', '.wav', '.ogg', '.m4a', '.aac', '.wma', '.ape'];
-            const audioFiles: any[] = [];
-            const BATCH_SIZE = 20;
-            const collectFiles = async (dir: string): Promise<{ path: string; stat: any; name: string }[]> => {
-                const files: any[] = [];
-                try {
-                    const items = await fs.promises.readdir(dir);
-                    const itemPaths = items.map(item => path.join(dir, item));
-                    const stats = await Promise.all(itemPaths.map(p => fs.promises.stat(p).catch(() => null)));
-                    for (let i = 0; i < items.length; i++) {
-                        const stat = stats[i];
-                        if (!stat) continue;
-                        if (stat.isDirectory()) files.push(...await collectFiles(itemPaths[i]));
-                        else if (audioExtensions.includes(path.extname(items[i]).toLowerCase()))
-                            files.push({path: itemPaths[i], stat, name: items[i]});
-                    }
-                } catch (e: any) {
-                    console.error(`扫描目录错误 ${dir}:`, e.message);
-                }
-                return files;
-            };
-            const files = await collectFiles(directoryPath);
-            for (let i = 0; i < files.length; i += BATCH_SIZE) {
-                const batch = files.slice(i, i + BATCH_SIZE);
-                const results = await Promise.all(batch.map(async ({path: fp, stat, name}) => {
-                    try {
-                        const metadata = await this.parseMetadata(fp, null, {skipCover: true, skipLyrics: true});
-                        const ext = path.extname(name);
-                        return {
-                            filePath: fp, fileName: name, title: metadata.title || path.basename(name, ext),
-                            artist: metadata.artist || '未知艺术家', album: metadata.album || '未知专辑',
-                            duration: metadata.duration, bitrate: metadata.bitrate, sampleRate: metadata.sampleRate,
-                            year: metadata.year, genre: metadata.genre, track: (metadata as any).track,
-                            disc: (metadata as any).disc, fileSize: stat.size, embeddedLyrics: metadata.embeddedLyrics
-                        };
-                    } catch {
-                        return {
-                            filePath: fp, fileName: name, title: path.basename(name, path.extname(name)),
-                            artist: '未知艺术家', album: '未知专辑', duration: 0, fileSize: stat.size
-                        };
-                    }
-                }));
-                audioFiles.push(...results);
-            }
-            return {success: true, files: audioFiles};
-        } catch (error: any) {
-            console.error('❌ 扫描文件夹失败:', error);
-            return {success: false, error: error.message, files: []};
-        }
-    }
-
     @IpcHandle('library:addTrackToLibrary')
     async addTrackToLibrary(audioFile: any): Promise<{
         success: boolean;

@@ -6,7 +6,8 @@ import type {
     EmbeddedTrackCover,
     FavoritesChangedData,
     LibraryImportResult,
-    LibraryIndexRebuildResult
+    LibraryIndexRebuildResult,
+    PlaylistSourceBinding
 } from '@api/types/electron';
 
 export interface PlaylistResult {
@@ -30,6 +31,29 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
 
     importLibraryFiles(paths: string[], targetPlaylistId?: string): Promise<LibraryImportResult> {
         return this.call('importLibraryFiles', paths, targetPlaylistId);
+    }
+
+    getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]> {
+        return this.call('getPlaylistBindings', playlistId);
+    }
+
+    bindDirectoryToPlaylist(
+        playlistId: string,
+        directoryPath: string
+    ): Promise<Result & {binding?: PlaylistSourceBinding}> {
+        return this.call('bindDirectoryToPlaylist', playlistId, directoryPath);
+    }
+
+    unbindDirectoryFromPlaylist(bindingId: string, mode: 'keep' | 'remove'): Promise<Result> {
+        return this.call('unbindDirectoryFromPlaylist', bindingId, mode);
+    }
+
+    rescanPlaylistBinding(bindingId: string): Promise<Result> {
+        return this.call('rescanPlaylistBinding', bindingId);
+    }
+
+    restorePlaylistBindingExclusions(bindingId: string): Promise<Result & {restoredCount?: number}> {
+        return this.call('restorePlaylistBindingExclusions', bindingId);
     }
 
     getTracksByDrive(driveId: string): Promise<Track[]> {
@@ -110,10 +134,6 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
 
     scanSingleFile(networkPath: string): Promise<{success: boolean; track?: Track; error?: string; isNew?: boolean}> {
         return this.call('scanSingleFile', networkPath);
-    }
-
-    scanDirectoryForFiles(path: string): Promise<{success: boolean; files: unknown[]; error?: string}> {
-        return this.call('scanDirectoryForFiles', path);
     }
 
     removeFromPlaylist(playlistId: string, trackIds: string | string[]): Promise<Result> {

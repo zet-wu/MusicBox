@@ -72,6 +72,7 @@ export interface MusicBoxCompositionHost {
     handlePlaylistTrackRemoved(track: Track, index: number): Promise<void>;
     handlePlaylistTrackSelected(track: Track, index: number): void;
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
+    handlePlaylistBindingsChanged(): Promise<void>;
     handleSearchCleared(): void;
     handleSearchResults(results: Track[]): void;
     handleTrackAddedToPlaylist(playlist?: Playlist, track?: Track): Promise<void>;
@@ -323,6 +324,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
             playTrackFromPlaylist: (track, index, tracks, mode) => app.playTrackFromPlaylist(track, index, tracks, mode),
             handlePlaylistUpdated: (playlist) => app.handlePlaylistUpdated(playlist),
+            handlePlaylistBindingsChanged: () => app.handlePlaylistBindingsChanged(),
             handlePlaylistCoverUpdated: (playlist) => app.handlePlaylistCoverUpdated(playlist)
         },
         pluginBootstrap: {

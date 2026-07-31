@@ -23,7 +23,6 @@ import {
 } from "@/features/playlists/domain/CollectionCapabilities";
 import {playlistDataService} from "@/features/playlists/service/PlaylistDataService";
 import {playlistFileImportService} from "@/features/playlists/service/PlaylistFileImportService";
-import {playlistFolderImportService} from "@/features/playlists/service/PlaylistFolderImportService";
 import {playlistPlaybackActionService} from "@/features/playlists/service/PlaylistPlaybackActionService";
 import {playlistTrackMutationService} from "@/features/playlists/service/PlaylistTrackMutationService";
 import type {Unsubscribe} from "@api/types/common";
@@ -369,7 +368,7 @@ class PlaylistDetailPage extends Component {
                             <svg class="icon" viewBox="0 0 24 24">
                                 <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4M14,12H12V14H10V12H8V10H10V8H12V10H14V12Z"/>
                             </svg>
-                            <span>从文件夹添加</span>
+                            <span>管理绑定文件夹</span>
                         </button>
                         ` : ''}
                         ${capabilities.canClear ? `
@@ -508,7 +507,7 @@ class PlaylistDetailPage extends Component {
                 await this.addFromFiles();
                 break;
             case 'playlist-add-from-folder':
-                await this.addFromFolder();
+                this.manageFolderBindings();
                 break;
             case 'select-all-tracks':
                 this.toggleSelectAllTracks();
@@ -980,17 +979,11 @@ class PlaylistDetailPage extends Component {
         }
     }
 
-    // 从文件夹添加音乐
-    async addFromFolder(): Promise<void> {
+    manageFolderBindings(): void {
         if (!this.currentPlaylist || !getCollectionCapabilities(this.getCollectionType()).canAddSongs) {
             return;
         }
-
-        const result = await playlistFolderImportService.addFromFolder(this.currentPlaylist.id);
-        if (result.changed) {
-            await this.loadPlaylistTracks();
-            this.emit('playlistUpdated', this.currentPlaylist);
-        }
+        this.emit('manageFolderBindings', this.currentPlaylist);
     }
 
     async clearPlaylist(): Promise<void> {

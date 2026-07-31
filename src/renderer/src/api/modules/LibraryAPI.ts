@@ -86,10 +86,6 @@ export class LibraryAPI extends BaseAPI {
         return await libraryDataService.scanSingleFile(networkPath);
     }
 
-    async scanDirectoryForFiles(path: string): Promise<{success: boolean; files: unknown[]; error?: string}> {
-        return await libraryDataService.scanDirectoryForFiles(path);
-    }
-
     async addTrackToLibrary(audioFile: Partial<Track> | unknown): Promise<{success: boolean; track?: Track; error?: string; isNew?: boolean}> {
         return await libraryDataService.addTrackToLibrary(audioFile);
     }

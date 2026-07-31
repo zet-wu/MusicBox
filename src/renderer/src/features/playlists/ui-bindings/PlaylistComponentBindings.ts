@@ -9,12 +9,14 @@ interface PlaylistBindingComponents {
     createPlaylistDialog: ComponentEventSource;
     addToPlaylistDialog: ComponentEventSource;
     renamePlaylistDialog: ComponentEventSource;
+    playlistBindingDialog: ComponentEventSource;
     editTrackInfoDialog: ComponentEventSource;
     playlistDetailPage: ComponentEventSource;
 }
 
 interface PlaylistBindingUI {
     showCreatePlaylistDialog(tracks?: Track | Track[]): void;
+    showPlaylistBindingDialog(playlist: Playlist): Promise<void>;
     showContextMenu(
         x: number,
         y: number,
@@ -41,6 +43,7 @@ export interface PlaylistComponentBindingHost {
         mode?: 'shuffle' | 'sequence'
     ): Promise<void>;
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
+    handlePlaylistBindingsChanged(): Promise<void>;
     handlePlaylistCoverUpdated(playlist: Playlist): Promise<void>;
 }
 
@@ -92,6 +95,10 @@ export function bindPlaylistComponentEvents({
         notify(data);
     });
 
+    components.playlistBindingDialog.on('bindingsChanged', async () => {
+        await app.handlePlaylistBindingsChanged();
+    });
+
     components.editTrackInfoDialog.on('trackUpdated', async (data: unknown) => {
         await app.handleTrackInfoUpdated(data);
     });
@@ -132,6 +139,10 @@ export function bindPlaylistComponentEvents({
 
     components.playlistDetailPage.on('playlistUpdated', async (playlist: Playlist) => {
         await app.handlePlaylistUpdated(playlist);
+    });
+
+    components.playlistDetailPage.on('manageFolderBindings', async (playlist: Playlist) => {
+        await ui.showPlaylistBindingDialog(playlist);
     });
 
     components.playlistDetailPage.on('playlistCoverUpdated', async (playlist: Playlist) => {

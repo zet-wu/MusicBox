@@ -246,7 +246,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.invoke('library:restorePlaylistBindingExclusions', bindingId),
         scanNetworkDrive: (driveId: string, relativePath: string) => ipcRenderer.invoke('library:scanNetworkDrive', driveId, relativePath),
         scanSingleFile: (networkPath: string) => ipcRenderer.invoke('library:scanSingleFile', networkPath),
-        scanDirectoryForFiles: (path: string) => ipcRenderer.invoke('library:scanDirectoryForFiles', path),
         addTrackToLibrary: (audioFile: any) => ipcRenderer.invoke('library:addTrackToLibrary', audioFile),
 
         // Get library data

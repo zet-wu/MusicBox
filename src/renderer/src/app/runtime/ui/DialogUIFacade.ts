@@ -26,6 +26,10 @@ export class DialogUIFacade {
         this.app.components.renamePlaylistDialog?.show(playlist);
     }
 
+    async showPlaylistBindingDialog(playlist: Playlist): Promise<void> {
+        await this.app.components.playlistBindingDialog?.show(playlist);
+    }
+
     async showEditTrackInfoDialog(track: Track): Promise<void> {
         await this.app.components.editTrackInfoDialog?.show(track);
     }

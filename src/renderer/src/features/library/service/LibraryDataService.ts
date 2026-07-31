@@ -1,6 +1,11 @@
 import {libraryGateway} from '@/infrastructure/electron';
 import type {Result} from '@api/types/common';
-import type {EmbeddedTrackCover, LibraryImportResult, LibraryIndexRebuildResult} from '@api/types/electron';
+import type {
+    EmbeddedTrackCover,
+    LibraryImportResult,
+    LibraryIndexRebuildResult,
+    PlaylistSourceBinding
+} from '@api/types/electron';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from '@api/types/library';
 
 export type PlaylistMutationResult = {
@@ -14,12 +19,6 @@ export type LibraryTrackMutationResult = {
     track?: Track;
     error?: string;
     isNew?: boolean;
-};
-
-export type LibraryScanDirectoryResult = {
-    success: boolean;
-    files: unknown[];
-    error?: string;
 };
 
 export type PlaylistDetailResult = {
@@ -249,6 +248,60 @@ export class LibraryDataService {
         );
     }
 
+    async getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]> {
+        this.assertNonEmptyString(playlistId, 'playlistId');
+        return await this.callGateway(
+            () => libraryGateway.getPlaylistBindings(playlistId),
+            'library.getPlaylistBindings',
+            []
+        );
+    }
+
+    async bindDirectoryToPlaylist(
+        playlistId: string,
+        directoryPath: string
+    ): Promise<Result & {binding?: PlaylistSourceBinding}> {
+        this.assertNonEmptyString(playlistId, 'playlistId');
+        this.assertNonEmptyString(directoryPath, 'directoryPath');
+        return await this.callGateway(
+            () => libraryGateway.bindDirectoryToPlaylist(playlistId, directoryPath),
+            'library.bindDirectoryToPlaylist',
+            {success: false, error: '绑定文件夹失败'}
+        );
+    }
+
+    async unbindDirectoryFromPlaylist(
+        bindingId: string,
+        mode: 'keep' | 'remove'
+    ): Promise<Result> {
+        this.assertNonEmptyString(bindingId, 'bindingId');
+        return await this.callGateway(
+            () => libraryGateway.unbindDirectoryFromPlaylist(bindingId, mode),
+            'library.unbindDirectoryFromPlaylist',
+            {success: false, error: '解绑文件夹失败'}
+        );
+    }
+
+    async rescanPlaylistBinding(bindingId: string): Promise<Result> {
+        this.assertNonEmptyString(bindingId, 'bindingId');
+        return await this.callGateway(
+            () => libraryGateway.rescanPlaylistBinding(bindingId),
+            'library.rescanPlaylistBinding',
+            {success: false, error: '重新扫描绑定文件夹失败'}
+        );
+    }
+
+    async restorePlaylistBindingExclusions(
+        bindingId: string
+    ): Promise<Result & {restoredCount?: number}> {
+        this.assertNonEmptyString(bindingId, 'bindingId');
+        return await this.callGateway(
+            () => libraryGateway.restorePlaylistBindingExclusions(bindingId),
+            'library.restorePlaylistBindingExclusions',
+            {success: false, error: '恢复排除歌曲失败'}
+        );
+    }
+
     async scanNetworkDrive(driveId: string | number, relativePath = '/'): Promise<boolean> {
         return await this.callGateway(
             () => libraryGateway.scanNetworkDrive(driveId, relativePath),
@@ -264,16 +317,6 @@ export class LibraryDataService {
             () => libraryGateway.scanSingleFile(networkPath),
             'library.scanSingleFile',
             {success: false, error: '扫描单个文件失败'}
-        );
-    }
-
-    async scanDirectoryForFiles(path: string): Promise<LibraryScanDirectoryResult> {
-        this.assertNonEmptyString(path, 'path');
-
-        return await this.callGateway(
-            () => libraryGateway.scanDirectoryForFiles(path),
-            'library.scanDirectoryForFiles',
-            {success: false, files: [], error: '扫描目录失败'}
         );
     }
 

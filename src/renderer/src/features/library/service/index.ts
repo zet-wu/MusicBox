@@ -3,7 +3,6 @@ export {LibraryDataService, libraryDataService} from './LibraryDataService';
 export {HomeLibraryActionService, homeLibraryActionService} from './HomeLibraryActionService';
 export type {HomeLibraryActionResult} from './HomeLibraryActionService';
 export type {
-    LibraryScanDirectoryResult,
     LibraryTrackMutationResult,
     PlaylistCoverDataResult,
     PlaylistDetailResult,

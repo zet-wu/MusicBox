@@ -116,7 +116,6 @@ export interface ElectronLibraryAPI {
     restorePlaylistBindingExclusions(bindingId: string): Promise<Result & {restoredCount?: number}>;
     scanNetworkDrive(driveId: string | number, relativePath: string): Promise<boolean>;
     scanSingleFile(networkPath: string): Promise<unknown>;
-    scanDirectoryForFiles(path: string): Promise<{success: boolean; files: unknown[]; error?: string}>;
     addTrackToLibrary(audioFile: Partial<Track> | unknown): Promise<{success: boolean; track?: Track; error?: string; isNew?: boolean}>;
     getTracks(options?: GetTracksOptions): Promise<Track[]>;
     getPlaylists(): Promise<Playlist[]>;

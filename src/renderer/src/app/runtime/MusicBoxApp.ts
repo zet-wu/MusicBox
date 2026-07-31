@@ -397,6 +397,10 @@ export class MusicBoxApp extends EventEmitter {
         await this.playlistController.handlePlaylistUpdated();
     }
 
+    async handlePlaylistBindingsChanged(): Promise<void> {
+        await this.playlistController.handlePlaylistBindingsChanged();
+    }
+
     // 处理歌单重命名成功
     async handlePlaylistRenamed(playlist?: Playlist): Promise<void> {
         await this.playlistController.handlePlaylistRenamed(playlist);

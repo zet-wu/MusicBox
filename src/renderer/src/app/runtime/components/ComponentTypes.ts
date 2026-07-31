@@ -12,6 +12,7 @@ import type {AddToPlaylistDialog} from '@ui/dialogs/AddToPlaylistDialog';
 import type {ConfirmDialog} from '@ui/dialogs/ConfirmDialog';
 import type {CreatePlaylistDialog} from '@ui/dialogs/CreatePlaylistDialog';
 import type {EditTrackInfoDialog} from '@ui/dialogs/EditTrackInfoDialog';
+import type {PlaylistBindingDialog} from '@ui/dialogs/PlaylistBindingDialog';
 import type {RenamePlaylistDialog} from '@ui/dialogs/RenamePlaylistDialog';
 import type {NetworkDiskModal} from '@ui/modals/NetworkDiskModal';
 import type {PluginManagerModal} from '@ui/modals/PluginManagerModal';
@@ -41,6 +42,7 @@ export interface ComponentRegistryMap {
     createPlaylistDialog: CreatePlaylistDialog;
     addToPlaylistDialog: AddToPlaylistDialog;
     renamePlaylistDialog: RenamePlaylistDialog;
+    playlistBindingDialog: PlaylistBindingDialog;
     editTrackInfoDialog: EditTrackInfoDialog;
     playlistDetailPage: PlaylistDetailPage;
     networkDriveDetailPage: NetworkDriveDetailPage;

@@ -112,10 +112,6 @@ class LibraryController {
         return await libraryService.scanSingleFile(networkPath);
     }
 
-    async scanDirectoryForFiles(path: string): Promise<{success: boolean; files: unknown[]; error?: string}> {
-        return await libraryService.scanDirectoryForFiles(path);
-    }
-
     async getTracksByDrive(driveId: string): Promise<Track[]> {
         return await libraryService.getTracksByDrive(driveId);
     }

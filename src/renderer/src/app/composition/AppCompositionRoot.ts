@@ -199,6 +199,7 @@ export function createAppComposition({
         ui: {
             showAddToPlaylistDialog: (tracks) => ui.dialogs.showAddToPlaylistDialog(tracks),
             showPlaylistDetail: (playlist) => ui.content.showPlaylistDetail(playlist),
+            reloadPlaylistDetailTracks: () => ui.content.reloadPlaylistDetailTracks(),
             updatePlaylistDetailInfo: (playlist) => ui.content.updatePlaylistDetailInfo(playlist),
             updateNavigationPlaylistInfo: (playlist) => ui.content.updateNavigationPlaylistInfo(playlist),
             refreshNavigationPlaylists: () => ui.content.refreshNavigationPlaylists()

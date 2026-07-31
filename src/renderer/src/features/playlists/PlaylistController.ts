@@ -19,6 +19,7 @@ export interface PlaylistAppHost {
 interface PlaylistUI {
     showAddToPlaylistDialog(tracks: Track[]): Promise<void>;
     showPlaylistDetail(playlist: Playlist): Promise<void>;
+    reloadPlaylistDetailTracks(): Promise<void>;
     updatePlaylistDetailInfo(playlist: Playlist): boolean;
     updateNavigationPlaylistInfo(playlist: Playlist): void;
     refreshNavigationPlaylists(): Promise<void>;
@@ -121,6 +122,13 @@ export class PlaylistController {
     }
 
     async handlePlaylistUpdated(): Promise<void> {
+        await this.refreshNavigationPlaylists();
+    }
+
+    async handlePlaylistBindingsChanged(): Promise<void> {
+        if (this.app.currentView === 'playlist-detail') {
+            await this.ui.reloadPlaylistDetailTracks();
+        }
         await this.refreshNavigationPlaylists();
     }
 
