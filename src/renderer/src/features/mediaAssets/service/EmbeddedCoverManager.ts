@@ -4,6 +4,7 @@
  */
 
 import {libraryDataService} from "@/features/library/service/LibraryDataService";
+import {LRUCache} from "lru-cache";
 
 interface EmbeddedCoverResult {
     success: boolean;
@@ -43,16 +44,23 @@ interface CoverConversionResult {
 }
 
 class EmbeddedCoverManager {
-    private readonly cache: Map<string, EmbeddedCoverResult>;
-    private readonly maxCacheSize: number;
+    private readonly cache: LRUCache<string, EmbeddedCoverResult>;
     private readonly objectUrls: Set<string>;
     private readonly urlReferences: Map<string, number>;
     private readonly pendingReleases: Map<string, ReturnType<typeof setTimeout>>;
     private readonly processingFiles: Set<string>;
 
     constructor() {
-        this.cache = new Map();
-        this.maxCacheSize = 5;
+        this.cache = new LRUCache<string, EmbeddedCoverResult>({
+            max: 128,
+            maxSize: 64 * 1024 * 1024,
+            sizeCalculation: (result) => result.success ? Math.max(result.size || 1, 1) : 1,
+            dispose: (result) => {
+                if (result.url?.startsWith('blob:')) {
+                    this.releaseUrlReference(result.url);
+                }
+            }
+        });
         this.objectUrls = new Set(); // 跟踪创建的Object URLs
         this.urlReferences = new Map(); // URL引用计数
         this.pendingReleases = new Map(); // 待释放的URL
@@ -322,23 +330,11 @@ class EmbeddedCoverManager {
      * @param {Object} data - 缓存数据
      */
     setCache(key: string, data: EmbeddedCoverResult): void {
-        if (this.cache.size >= this.maxCacheSize) {
-            const firstKey = this.cache.keys().next().value;
-            const oldData = firstKey ? this.cache.get(firstKey) : null;
-
-            // 清理旧的Object URL - 使用引用计数安全释放
-            if (oldData && oldData.url && oldData.url.startsWith('blob:')) {
-                this.releaseUrlReference(oldData.url);
-            }
-
-            if (firstKey) {
-                this.cache.delete(firstKey);
-            }
-        }
-
         this.cache.set(key, {
             ...data,
             cachedAt: Date.now()
+        }, {
+            ttl: data.success ? 30 * 60 * 1000 : 2 * 60 * 1000
         });
     }
 
@@ -346,6 +342,8 @@ class EmbeddedCoverManager {
      * 清空缓存
      */
     clearCache(): void {
+        this.cache.clear();
+
         // 清理所有Object URLs
         this.objectUrls.forEach(url => {
             URL.revokeObjectURL(url);
@@ -359,7 +357,6 @@ class EmbeddedCoverManager {
             clearTimeout(timeoutId);
         });
         this.pendingReleases.clear();
-        this.cache.clear();
     }
 
     /**
@@ -424,12 +421,6 @@ class EmbeddedCoverManager {
 
         const cacheKey = this.generateCacheKey(filePath);
         if (this.cache.has(cacheKey)) {
-            const cachedResult = this.cache.get(cacheKey);
-            if (cachedResult?.success && cachedResult.url && cachedResult.url.startsWith('blob:')) {
-                // 使用安全的引用计数释放
-                this.releaseUrlReference(cachedResult.url);
-            }
-
             this.cache.delete(cacheKey);
             console.log(`🧹 EmbeddedCoverManager: 清理文件缓存 - ${filePath}`);
             return true;

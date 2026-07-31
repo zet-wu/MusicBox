@@ -5,6 +5,7 @@
 
 import {mediaAssetsService} from "./MediaAssetsService";
 import type {Track} from "@api/types/track";
+import {LRUCache} from "lru-cache";
 
 export interface LocalCoverResult {
     success: boolean;
@@ -19,13 +20,14 @@ type CoverImageFormat = 'jpg' | 'jpeg' | 'png' | 'webp' | 'gif' | string;
 
 class LocalCoverManager {
     private coverDirectory: string | null;
-    private readonly cache: Map<string, string>;
-    private readonly maxCacheSize: number;
+    private readonly cache: LRUCache<string, string>;
 
     constructor() {
         this.coverDirectory = null;
-        this.cache = new Map();
-        this.maxCacheSize = 5;
+        this.cache = new LRUCache<string, string>({
+            max: 256,
+            ttl: 30 * 60 * 1000
+        });
     }
 
     /**
@@ -251,12 +253,6 @@ class LocalCoverManager {
      * @param {string} filePath - 文件路径
      */
     addToCache(key: string, filePath: string): void {
-        if (this.cache.size >= this.maxCacheSize) {
-            const firstKey = this.cache.keys().next().value;
-            if (firstKey) {
-                this.cache.delete(firstKey);
-            }
-        }
         this.cache.set(key, filePath);
     }
 
