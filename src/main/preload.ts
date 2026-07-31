@@ -422,6 +422,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
 
+    // WASAPI系统媒体键后备
+    systemMediaKeys: {
+        setEnabled: (enabled: boolean) => ipcRenderer.invoke('systemMediaKeys:setEnabled', enabled),
+        onTriggered: (callback: (...args: any[]) => void) => {
+            ipcRenderer.on('system-media-key-triggered', callback);
+            return () => ipcRenderer.removeListener('system-media-key-triggered', callback);
+        }
+    },
+
     // 窗口控制
     window: {
         minimize: () => ipcRenderer.invoke('window:minimize'),

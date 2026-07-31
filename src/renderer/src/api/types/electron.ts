@@ -410,6 +410,15 @@ export interface ElectronGlobalShortcutsAPI {
     onTriggered(callback: (...args: unknown[]) => void): Unsubscribe;
 }
 
+export type SystemMediaKeyAction = 'playPause' | 'previousTrack' | 'nextTrack';
+
+export interface ElectronSystemMediaKeysAPI {
+    setEnabled(enabled: boolean): Promise<boolean>;
+    onTriggered(
+        callback: (event: unknown, action: SystemMediaKeyAction) => void
+    ): Unsubscribe;
+}
+
 export type ExtensionStorageScope = 'global' | 'workspace';
 
 export interface ElectronExtensionsAPI {

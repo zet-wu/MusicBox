@@ -10,6 +10,17 @@ interface ShortcutConfig {
     enabled: boolean;
 }
 
+type SystemMediaKeyAction = 'playPause' | 'previousTrack' | 'nextTrack';
+
+const SYSTEM_MEDIA_KEYS: ReadonlyArray<{
+    accelerator: string;
+    action: SystemMediaKeyAction;
+}> = [
+    {accelerator: 'MediaPlayPause', action: 'playPause'},
+    {accelerator: 'MediaPreviousTrack', action: 'previousTrack'},
+    {accelerator: 'MediaNextTrack', action: 'nextTrack'}
+];
+
 function convertToElectronShortcut(key: string): string {
     return key
         .replace(/Ctrl/g, 'CommandOrControl')
@@ -25,6 +36,7 @@ function convertToElectronShortcut(key: string): string {
 export class GlobalShortcutsController extends BaseController {
     private enabled = false;
     private registered = new Map<string, string>(); // id -> electronKey
+    private systemMediaKeys = new Set<string>();
     private willQuitBound = false;
 
     constructor(private windowManager: WindowManager) {
@@ -35,20 +47,32 @@ export class GlobalShortcutsController extends BaseController {
         super.register();
         if (!this.willQuitBound) {
             this.willQuitBound = true;
-            app.on('will-quit', () => this.unregisterAll());
+            app.on('will-quit', () => {
+                this.unregisterConfiguredShortcuts();
+                this.unregisterSystemMediaKeys();
+            });
         }
     }
 
-    private unregisterAll(quiet = false): void {
+    private unregisterConfiguredShortcuts(quiet = false): void {
         if (!quiet) console.log('🎹 取消注册所有全局快捷键');
-        globalShortcut.unregisterAll();
+        this.registered.forEach((accelerator) => {
+            globalShortcut.unregister(accelerator);
+        });
         this.registered.clear();
+    }
+
+    private unregisterSystemMediaKeys(): void {
+        this.systemMediaKeys.forEach((accelerator) => {
+            globalShortcut.unregister(accelerator);
+        });
+        this.systemMediaKeys.clear();
     }
 
     @IpcHandle('globalShortcuts:register')
     registerShortcuts(shortcuts: Record<string, ShortcutConfig>): boolean {
         try {
-            this.unregisterAll(true);
+            this.unregisterConfiguredShortcuts(true);
             if (!shortcuts || typeof shortcuts !== 'object') return false;
 
             for (const [id, shortcut] of Object.entries(shortcuts)) {
@@ -77,7 +101,7 @@ export class GlobalShortcutsController extends BaseController {
     @IpcHandle('globalShortcuts:unregister')
     unregisterAll2(): boolean {
         try {
-            this.unregisterAll();
+            this.unregisterConfiguredShortcuts();
             return true;
         } catch (error) {
             console.error('❌ 取消注册全局快捷键失败:', error);
@@ -89,7 +113,7 @@ export class GlobalShortcutsController extends BaseController {
     setEnabled(enabled: boolean): boolean {
         try {
             this.enabled = enabled;
-            if (!enabled) this.unregisterAll();
+            if (!enabled) this.unregisterConfiguredShortcuts();
             return true;
         } catch (error) {
             console.error('❌ 设置全局快捷键状态失败:', error);
@@ -100,5 +124,28 @@ export class GlobalShortcutsController extends BaseController {
     @IpcHandle('globalShortcuts:isEnabled')
     isEnabled(): boolean {
         return this.enabled;
+    }
+
+    @IpcHandle('systemMediaKeys:setEnabled')
+    setSystemMediaKeysEnabled(enabled: boolean): boolean {
+        this.unregisterSystemMediaKeys();
+        if (!enabled || process.platform !== 'win32') {
+            return !enabled;
+        }
+
+        let allRegistered = true;
+        SYSTEM_MEDIA_KEYS.forEach(({accelerator, action}) => {
+            const registered = globalShortcut.register(accelerator, () => {
+                this.windowManager.sendToMainWindow('system-media-key-triggered', action);
+            });
+            if (registered) {
+                this.systemMediaKeys.add(accelerator);
+            } else {
+                allRegistered = false;
+                console.warn(`⚠️ 系统媒体键注册失败: ${accelerator}`);
+            }
+        });
+
+        return allRegistered;
     }
 }

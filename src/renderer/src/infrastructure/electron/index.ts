@@ -1,6 +1,7 @@
 export {libraryGateway} from './LibraryGateway';
 export {windowGateway} from './WindowGateway';
 export {globalShortcutsGateway} from './GlobalShortcutsGateway';
+export {systemMediaKeysGateway} from './SystemMediaKeysGateway';
 export {networkDriveGateway} from './NetworkDriveGateway';
 export {mediaGateway} from './MediaGateway';
 export {fileGateway} from './FileGateway';

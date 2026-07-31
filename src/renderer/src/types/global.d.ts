@@ -10,6 +10,7 @@ import type {
     ElectronEqualizerPresetsAPI,
     ElectronExtensionsAPI,
     ElectronGlobalShortcutsAPI,
+    ElectronSystemMediaKeysAPI,
     ElectronLibraryAPI,
     ElectronLyricsAPI,
     ElectronMediaAPI,
@@ -164,6 +165,7 @@ interface ElectronAPI {
     library: ElectronLibraryAPI;
 
     globalShortcuts: ElectronGlobalShortcutsAPI;
+    systemMediaKeys: ElectronSystemMediaKeysAPI;
 
     // 窗口
     window: ElectronWindowAPI;
