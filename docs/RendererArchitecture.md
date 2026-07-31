@@ -164,7 +164,7 @@ npm run lint
 - `service/PlaybackService.ts`：播放服务 facade。
 - `service/RecentPlaybackHistoryService.ts`：统一持久化最近播放和累计统计。
 - `service/AudioEngineAdapter.ts`：Web Audio / WASAPI 切换适配。
-- `service/audioEngine/webAudio/`：Web Audio 实现。
+- `service/audioEngine/webAudio/`：Web Audio 实现，由 transport controller 区分外部暂停同步与自然结束通知。
 - `service/audioEngine/wasapi/WasapiEngine.ts`：WASAPI renderer adapter。
 - `ui-bindings/`：播放器、列表等 UI 事件绑定。
 
