@@ -396,13 +396,17 @@ export class LibraryController extends BaseController {
         }
     }
 
-    private async scanDirectorySource(directoryPath: string, sourceId: string): Promise<boolean> {
+    private async scanDirectorySource(
+        directoryPath: string,
+        sourceId: string,
+        publishUpdates = true
+    ): Promise<boolean> {
         try {
             const scanStartTime = Date.now();
             const isNetwork = this.networkFileAdapter.isNetworkPath(directoryPath);
 
             if (isNetwork) {
-                return this.scanNetworkDirectory(directoryPath, scanStartTime, sourceId);
+                return this.scanNetworkDirectory(directoryPath, scanStartTime, sourceId, publishUpdates);
             }
 
             const tracks: any[] = [];
@@ -487,11 +491,13 @@ export class LibraryController extends BaseController {
                 this.createKnownFiles(files.map(file => file.path)),
                 true
             );
-            await this.synchronizeBindingsForSource(sourceId);
+            await this.synchronizeBindingsForSource(sourceId, publishUpdates);
 
-            const allTracks = this.libraryCacheManager.getTracks();
-            const win = this.windowManager.getMainWindow();
-            if (win) win.webContents.send('library:updated', allTracks);
+            if (publishUpdates) {
+                const allTracks = this.libraryCacheManager.getTracks();
+                const win = this.windowManager.getMainWindow();
+                if (win) win.webContents.send('library:updated', allTracks);
+            }
             return true;
         } catch (error: any) {
             console.error('❌ 扫描目录失败:', error);
@@ -502,7 +508,8 @@ export class LibraryController extends BaseController {
     private async scanNetworkDirectory(
         networkPath: string,
         scanStartTime: number,
-        sourceId: string
+        sourceId: string,
+        publishUpdates: boolean
     ): Promise<boolean> {
         const tracks: any[] = [];
         const tracksToCache: any[] = [];
@@ -589,12 +596,14 @@ export class LibraryController extends BaseController {
             this.createKnownFiles(files.map(file => file.path)),
             true
         );
-        await this.synchronizeBindingsForSource(sourceId);
+        await this.synchronizeBindingsForSource(sourceId, publishUpdates);
 
-        const allTracks = this.libraryCacheManager.getTracks();
         console.log(`✅ 网络扫描完成，找到 ${tracks.length} 个音频文件`);
-        const win = this.windowManager.getMainWindow();
-        if (win) win.webContents.send('library:updated', allTracks);
+        if (publishUpdates) {
+            const allTracks = this.libraryCacheManager.getTracks();
+            const win = this.windowManager.getMainWindow();
+            if (win) win.webContents.send('library:updated', allTracks);
+        }
         return true;
     }
 
@@ -879,7 +888,7 @@ export class LibraryController extends BaseController {
         for (const source of sources) {
             try {
                 if (source.type === 'directory') {
-                    const success = await this.scanDirectorySource(source.path, source.id);
+                    const success = await this.scanDirectorySource(source.path, source.id, false);
                     if (!success) throw new Error('目录扫描失败');
                     scannedFolderCount++;
                 } else {
@@ -1147,7 +1156,7 @@ export class LibraryController extends BaseController {
         return this.libraryCacheManager.getTracks().filter(track => trackIds.has(track.fileId));
     }
 
-    private async synchronizeBindingsForSource(sourceId: string): Promise<void> {
+    private async synchronizeBindingsForSource(sourceId: string, publishUpdates = true): Promise<void> {
         const bindings = await this.librarySourceManager.synchronizeSourceBindings(sourceId);
         const {activeBindings, orphanBindings} = partitionPlaylistBindings(
             bindings,
@@ -1168,7 +1177,7 @@ export class LibraryController extends BaseController {
             for (const addition of additions) {
                 await this.maybeSetAutomaticPlaylistCover(addition.playlistId, addition.trackIds);
             }
-            this.emitPlaylistsUpdated();
+            if (publishUpdates) this.emitPlaylistsUpdated();
         }
     }
 
