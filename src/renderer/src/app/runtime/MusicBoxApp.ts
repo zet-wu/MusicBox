@@ -17,6 +17,7 @@ import {AppShellView} from '@/app/shell';
 import {createAppComposition} from '@/app/composition';
 import {FileImportController, LibraryAppController} from '@/features/library/ui-bindings';
 import {PlaylistController} from '@/features/playlists/PlaylistController';
+import {PlaybackHistoryController} from '@/features/playback/PlaybackHistoryController';
 import {PlaybackAppController} from '@/features/playback/ui-bindings/PlaybackAppController';
 
 import {cacheManager} from "@/shared/cache";
@@ -58,6 +59,7 @@ export class MusicBoxApp extends EventEmitter {
     private readonly ui: AppUIPorts;
     private readonly desktopLyricsButtonSync: DesktopLyricsButtonSync;
     private readonly playbackQueueSyncService: PlaybackQueueSyncService;
+    private readonly playbackHistoryController: PlaybackHistoryController;
     private readonly lifecycleController: AppLifecycleController;
     private readonly networkDriveRouteController: NetworkDriveRouteController;
     private readonly notifier: AppNotifier;
@@ -86,6 +88,7 @@ export class MusicBoxApp extends EventEmitter {
         this.libraryController = composition.libraryController;
         this.desktopLyricsButtonSync = composition.desktopLyricsButtonSync;
         this.playbackQueueSyncService = composition.playbackQueueSyncService;
+        this.playbackHistoryController = composition.playbackHistoryController;
         this.playbackController = composition.playbackController;
         this.playlistController = composition.playlistController;
         this.networkDriveRouteController = composition.networkDriveRouteController;
@@ -418,6 +421,7 @@ export class MusicBoxApp extends EventEmitter {
         this.domEventBinder.dispose();
         this.apiEventBinder.dispose();
         this.playbackQueueSyncService.dispose();
+        this.playbackHistoryController.dispose();
 
         this.componentRegistry.destroyAllComponents();
     }

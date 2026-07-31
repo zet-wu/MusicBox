@@ -34,8 +34,7 @@ const EMPTY_PLAY_STATS: PlayStats = {
     uniqueAlbums: 0,
     totalPlayedSongs: 0,
     totalPlayedDuration: 0,
-    mostPlayedTracks: [],
-    totalPlayCount: 0
+    mostPlayedTracks: []
 };
 
 class StatisticsPage extends Component {
@@ -100,21 +99,10 @@ class StatisticsPage extends Component {
             this.tracks = tracks || [];
         });
 
-        // 监听播放历史更新
-        this.addAPIEventListenerManaged('trackChanged', (track: Track | null) => {
-            this.updatePlayHistory(track as RecentTrack | null);
-        });
     }
 
     loadPlayHistory(): void {
         this.recentTracks = recentPlaybackHistoryService.loadHistory(50);
-    }
-
-    updatePlayHistory(track: RecentTrack | null): void {
-        if (!track || !track.filePath) return;
-        this.loadPlayHistory();
-        recentPlaybackHistoryService.updatePlayCount(track);
-        this.calculatePlayStats();
     }
 
     calculatePlayStats(): void {

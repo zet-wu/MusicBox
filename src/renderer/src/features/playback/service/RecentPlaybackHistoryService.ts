@@ -1,13 +1,30 @@
-import {cacheManager} from "@/shared/cache";
 import {appConfirmationService} from "@/features/appShell/service";
+import {getTrackPath} from "@/features/playback/domain";
+import {cacheManager} from "@/shared/cache";
+import type {PlaybackStartedEvent} from "@api/types/events";
 import type {Track} from "@api/types/library";
+
+const PLAYBACK_HISTORY_STORAGE_KEY = 'musicbox-playback-history-v1';
+const PLAYBACK_HISTORY_VERSION = 1;
+const RECENT_TRACK_LIMIT = 100;
 
 export interface RecentTrack extends Track {
     playTime?: number;
-    cover?: string | null;
 }
 
-export type PlayCountStats = Record<string, number>;
+export interface TrackPlayAggregate {
+    track: RecentTrack;
+    playCount: number;
+    lastPlayedAt: number;
+}
+
+export type PlayCountStats = Record<string, TrackPlayAggregate>;
+
+export interface PlaybackHistoryState {
+    version: number;
+    recent: RecentTrack[];
+    aggregates: PlayCountStats;
+}
 
 export interface MostPlayedTrack {
     title: string;
@@ -25,162 +42,141 @@ export interface PlayStats {
     totalPlayedSongs: number;
     totalPlayedDuration: number;
     mostPlayedTracks: MostPlayedTrack[];
-    totalPlayCount: number;
 }
 
+type HistoryChangedListener = () => void;
+
 export class RecentPlaybackHistoryService {
+    private readonly listeners = new Set<HistoryChangedListener>();
+    private lastRecordedSessionId: string | null = null;
+
     loadHistory(limit?: number): RecentTrack[] {
-        try {
-            const history = cacheManager.getLocalCache<RecentTrack[]>('musicbox-play-history');
-            const tracks = Array.isArray(history) ? history : [];
-            return typeof limit === 'number' ? tracks.slice(0, limit) : tracks;
-        } catch (error) {
-            console.error('加载播放历史失败:', error);
-            return [];
-        }
+        const tracks = this.loadState().recent;
+        return typeof limit === 'number' ? tracks.slice(0, limit) : tracks;
     }
 
-    recordTrack(track: RecentTrack | null, limit = 100): RecentTrack[] {
-        if (!track || !track.filePath) {
-            return this.loadHistory();
+    recordPlaybackStarted(event: PlaybackStartedEvent): void {
+        if (
+            !event.track?.filePath
+            || !event.sessionId
+            || event.sessionId === this.lastRecordedSessionId
+        ) {
+            return;
         }
 
-        let history = this.loadHistory();
-        history = history.filter(item => item.filePath !== track.filePath);
-        history.unshift({
-            ...track,
-            playTime: Date.now()
-        });
-        history = history.slice(0, limit);
-        cacheManager.setLocalCache('musicbox-play-history', history);
-        return history;
+        const state = this.loadState();
+        const track = this.createTrackSnapshot(event.track, event.startedAt);
+        const trackKey = this.getTrackKey(track);
+        const existingAggregate = state.aggregates[trackKey];
+
+        state.recent = [
+            track,
+            ...state.recent.filter(item => this.getTrackKey(item) !== trackKey)
+        ].slice(0, RECENT_TRACK_LIMIT);
+        state.aggregates[trackKey] = {
+            track,
+            playCount: (existingAggregate?.playCount || 0) + 1,
+            lastPlayedAt: event.startedAt
+        };
+
+        this.lastRecordedSessionId = event.sessionId;
+        this.saveState(state);
     }
 
     clearHistory(): RecentTrack[] {
-        try {
-            cacheManager.removeLocalCache('musicbox-play-history');
-        } catch (error) {
-            console.error('❌ RecentPlaybackHistoryService: 清空播放历史失败:', error);
-        }
+        const state = this.loadState();
+        state.recent = [];
+        this.saveState(state);
         return [];
     }
 
-    removeHistoryItem(trackPath: string): RecentTrack[] {
-        try {
-            const history = this.loadHistory().filter(item => item.filePath !== trackPath);
-            cacheManager.setLocalCache('musicbox-play-history', history);
-            return history;
-        } catch (error) {
-            console.error('❌ RecentPlaybackHistoryService: 移除历史记录失败:', error);
-            return this.loadHistory();
-        }
+    clearPlayStatistics(): void {
+        const state = this.loadState();
+        state.aggregates = {};
+        this.saveState(state);
     }
 
-    updatePlayCount(track: Track | null): void {
-        if (!track || !track.filePath) return;
-
-        try {
-            const playCountStats = this.loadPlayCountStats();
-            const trackKey = this.getTrackKey(track);
-            playCountStats[trackKey] = (playCountStats[trackKey] || 0) + 1;
-            cacheManager.setLocalCache('musicbox-play-count-stats', playCountStats);
-            console.log(`📊 RecentPlaybackHistoryService: 更新播放次数 - ${track.title}: ${playCountStats[trackKey]} 次`);
-        } catch (error) {
-            console.error('❌ RecentPlaybackHistoryService: 更新播放次数失败:', error);
-        }
+    removeHistoryItem(trackPath: string): RecentTrack[] {
+        const state = this.loadState();
+        state.recent = state.recent.filter(item => getTrackPath(item) !== this.normalizePath(trackPath));
+        this.saveState(state);
+        return state.recent;
     }
 
     loadPlayCountStats(): PlayCountStats {
-        try {
-            return cacheManager.getLocalCache<PlayCountStats>('musicbox-play-count-stats') || {};
-        } catch (error) {
-            console.error('❌ RecentPlaybackHistoryService: 加载播放次数统计失败:', error);
-            return {};
-        }
+        return this.loadState().aggregates;
     }
 
     calculatePlayStats(tracks: Track[], recentTracks: RecentTrack[]): PlayStats {
         const playCountStats = this.loadPlayCountStats();
-        const totalPlayedSongs = recentTracks.length;
-        const totalPlayedDuration = recentTracks.reduce((sum, track) => sum + (track.duration || 0), 0);
-        const mostPlayedTracks = this.getMostPlayedTracks(playCountStats, 5);
-        const totalPlayCount = Object.values(playCountStats).reduce((sum, count) => sum + count, 0);
+        const totalPlayCount = Object.values(playCountStats)
+            .reduce((sum, aggregate) => sum + aggregate.playCount, 0);
 
         return {
             totalTracks: tracks.length,
             totalDuration: tracks.reduce((sum, track) => sum + (track.duration || 0), 0),
-            favoriteArtist: this.getMostPlayedArtist(recentTracks),
+            favoriteArtist: this.getMostPlayedArtist(playCountStats),
             uniqueArtists: this.getUniqueArtists(tracks).length,
             uniqueAlbums: this.getUniqueAlbums(tracks).length,
-            totalPlayedSongs,
-            totalPlayedDuration,
-            mostPlayedTracks,
-            totalPlayCount
+            totalPlayedSongs: totalPlayCount,
+            totalPlayedDuration: recentTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+            mostPlayedTracks: this.getMostPlayedTracks(playCountStats, 5)
         };
     }
 
-    getTrackKey(track: Track): string {
-        return `${track.title || 'Unknown'}_${track.artist || 'Unknown'}_${track.album || 'Unknown'}`;
-    }
-
     getMostPlayedTracks(playCountStats: PlayCountStats, limit = 10): MostPlayedTrack[] {
-        return Object.entries(playCountStats)
-            .sort(([, a], [, b]) => b - a)
+        return Object.values(playCountStats)
+            .sort((left, right) => (
+                right.playCount - left.playCount
+                || right.lastPlayedAt - left.lastPlayedAt
+            ))
             .slice(0, limit)
-            .map(([trackKey, playCount]) => {
-                const [title, artist, album] = trackKey.split('_');
-                return {
-                    title: title || 'Unknown',
-                    artist: artist || 'Unknown',
-                    album: album || 'Unknown',
-                    playCount
-                };
-            });
+            .map(({track, playCount}) => ({
+                title: track.title || 'Unknown',
+                artist: track.artist || 'Unknown',
+                album: track.album || 'Unknown',
+                playCount
+            }));
     }
 
-    getMostPlayedArtist(recentTracks: RecentTrack[]): string {
+    getMostPlayedArtist(playCountStats: PlayCountStats): string {
         const artistCounts: Record<string, number> = {};
-        recentTracks.forEach(track => {
+        Object.values(playCountStats).forEach(({track, playCount}) => {
             if (track.artist) {
-                artistCounts[track.artist] = (artistCounts[track.artist] || 0) + 1;
+                artistCounts[track.artist] = (artistCounts[track.artist] || 0) + playCount;
             }
         });
 
-        let favoriteArtist = '暂无';
-        let maxCount = 0;
-        for (const [artist, count] of Object.entries(artistCounts)) {
-            if (count > maxCount) {
-                maxCount = count;
-                favoriteArtist = artist;
-            }
-        }
-        return favoriteArtist;
+        return Object.entries(artistCounts)
+            .sort(([, left], [, right]) => right - left)[0]?.[0] || '暂无';
     }
 
     getUniqueArtists(tracks: Track[]): string[] {
-        const artists = new Set<string>();
-        tracks.forEach(track => {
-            if (track.artist) {
-                artists.add(track.artist);
-            }
-        });
-        return Array.from(artists);
+        return Array.from(new Set(tracks.map(track => track.artist).filter(Boolean)));
     }
 
     getUniqueAlbums(tracks: Track[]): string[] {
-        const albums = new Set<string>();
-        tracks.forEach(track => {
-            if (track.album) {
-                albums.add(track.album);
-            }
-        });
-        return Array.from(albums);
+        return Array.from(new Set(tracks.map(track => track.album).filter(Boolean) as string[]));
+    }
+
+    subscribe(listener: HistoryChangedListener): () => void {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
     }
 
     async confirmClearHistory(): Promise<boolean> {
         return await appConfirmationService.confirm({
-            title: '清空播放历史',
-            message: '确定要清空播放历史吗？此操作无法撤销。',
+            title: '清空最近播放记录',
+            message: '确定要清空最近播放记录吗？累计播放统计不会受到影响。',
+            confirmText: '清空',
+            type: 'warning'
+        });
+    }
+
+    async confirmClearPlayStatistics(): Promise<boolean> {
+        return await appConfirmationService.confirm({
+            title: '清空播放统计',
+            message: '确定要清空累计播放次数吗？最近播放记录不会受到影响。',
             confirmText: '清空',
             type: 'warning'
         });
@@ -188,11 +184,75 @@ export class RecentPlaybackHistoryService {
 
     async confirmRemoveHistoryItem(trackTitle: string): Promise<boolean> {
         return await appConfirmationService.confirm({
-            title: '移除播放历史',
-            message: `确定要从历史中移除 "${trackTitle}" 吗？`,
+            title: '移除最近播放记录',
+            message: `确定要从最近播放中移除 "${trackTitle}" 吗？`,
             confirmText: '移除',
             type: 'warning'
         });
+    }
+
+    private loadState(): PlaybackHistoryState {
+        try {
+            const state = cacheManager.getLocalCache<PlaybackHistoryState>(PLAYBACK_HISTORY_STORAGE_KEY);
+            if (
+                state?.version === PLAYBACK_HISTORY_VERSION
+                && Array.isArray(state.recent)
+                && state.aggregates
+                && typeof state.aggregates === 'object'
+            ) {
+                return {
+                    version: PLAYBACK_HISTORY_VERSION,
+                    recent: state.recent,
+                    aggregates: state.aggregates
+                };
+            }
+        } catch (error) {
+            console.error('❌ RecentPlaybackHistoryService: 加载播放历史失败:', error);
+        }
+
+        return this.createEmptyState();
+    }
+
+    private saveState(state: PlaybackHistoryState): void {
+        cacheManager.setLocalCache(PLAYBACK_HISTORY_STORAGE_KEY, state);
+        this.listeners.forEach(listener => listener());
+    }
+
+    private createEmptyState(): PlaybackHistoryState {
+        return {
+            version: PLAYBACK_HISTORY_VERSION,
+            recent: [],
+            aggregates: {}
+        };
+    }
+
+    private createTrackSnapshot(track: Track, playTime: number): RecentTrack {
+        return {
+            id: track.id,
+            fileId: track.fileId,
+            filePath: track.filePath,
+            path: track.path,
+            title: track.title || 'Unknown',
+            artist: track.artist || 'Unknown',
+            album: track.album,
+            albumArtist: track.albumArtist,
+            duration: track.duration,
+            fileName: track.fileName,
+            format: track.format,
+            playTime
+        };
+    }
+
+    private getTrackKey(track: Track): string {
+        if (track.fileId) {
+            return `file-id:${track.fileId}`;
+        }
+
+        return `path:${getTrackPath(track) || track.filePath}`;
+    }
+
+    private normalizePath(trackPath: string): string {
+        return trackPath.trim().replace(/\\/g, '/');
     }
 }
 

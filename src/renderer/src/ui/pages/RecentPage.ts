@@ -62,19 +62,10 @@ class RecentPage extends Component {
         this.container = this.element;
     }
 
-    setupAPIListeners(): void {
-        // 监听播放历史更新
-        this.addAPIEventListenerManaged('trackChanged', (track: Track | null) => {
-            this.updatePlayHistory(track as RecentTrack | null);
-        });
-    }
+    setupAPIListeners(): void {}
 
     loadPlayHistory(): void {
         this.recentTracks = recentPlaybackHistoryService.loadHistory() as RecentTrack[];
-    }
-
-    updatePlayHistory(track: RecentTrack | null): void {
-        this.recentTracks = recentPlaybackHistoryService.recordTrack(track) as RecentTrack[];
     }
 
     // 清空播放历史

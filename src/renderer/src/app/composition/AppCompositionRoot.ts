@@ -21,6 +21,7 @@ import {
 } from '@/features/library/ui-bindings';
 import {libraryDataService} from '@/features/library/service/LibraryDataService';
 import {PlaylistController} from '@/features/playlists/PlaylistController';
+import {PlaybackHistoryController} from '@/features/playback/PlaybackHistoryController';
 import {playbackController} from '@/features/playback/PlaybackController';
 import {PlaybackAppController} from '@/features/playback/ui-bindings/PlaybackAppController';
 import {playbackService} from '@/features/playback/service/PlaybackService';
@@ -49,6 +50,7 @@ export interface AppComposition {
     libraryController: LibraryAppController;
     networkDriveRouteController: NetworkDriveRouteController;
     playbackQueueSyncService: PlaybackQueueSyncService;
+    playbackHistoryController: PlaybackHistoryController;
     notifier: AppNotifier;
     playbackController: PlaybackAppController;
     playlistController: PlaylistController;
@@ -107,6 +109,8 @@ export function createAppComposition({
         queue: ui.queue
     });
     playbackQueueSyncService.start();
+    const playbackHistoryController = new PlaybackHistoryController();
+    playbackHistoryController.start();
 
     const shortcutController = new ShortcutController({
         app: hostPorts.shortcuts,
@@ -238,6 +242,7 @@ export function createAppComposition({
         libraryController,
         networkDriveRouteController,
         playbackQueueSyncService,
+        playbackHistoryController,
         notifier,
         playbackController: playbackAppController,
         playlistController,
