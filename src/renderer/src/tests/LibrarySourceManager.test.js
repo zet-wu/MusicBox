@@ -9,7 +9,10 @@ vi.mock('electron', () => ({
     }
 }));
 
-import {LibrarySourceManager} from '../../../main/services/library/LibrarySourceManager';
+import {
+    LibrarySourceManager,
+    partitionPlaylistBindings
+} from '../../../main/services/library/LibrarySourceManager';
 
 const temporaryDirectories = [];
 
@@ -23,6 +26,18 @@ afterEach(async () => {
     await Promise.all(temporaryDirectories.splice(0).map(directory => (
         fs.promises.rm(directory, {recursive: true, force: true, maxRetries: 3, retryDelay: 50})
     )));
+});
+
+describe('歌单绑定有效性', () => {
+    it('区分当前歌单绑定和已丢失歌单的孤儿绑定', () => {
+        const active = {id: 'active', playlistId: 'playlist-new', sourceId: 'source'};
+        const orphan = {id: 'orphan', playlistId: 'playlist-lost', sourceId: 'source'};
+
+        expect(partitionPlaylistBindings([active, orphan], ['playlist-new'])).toEqual({
+            activeBindings: [active],
+            orphanBindings: [orphan]
+        });
+    });
 });
 
 describe('LibrarySourceManager 旧数据迁移', () => {
