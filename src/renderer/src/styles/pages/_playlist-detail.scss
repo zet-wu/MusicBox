@@ -154,6 +154,35 @@
   }
 }
 
+.readonly-track-collection {
+  .playlist-hero {
+    position: relative;
+  }
+
+  .collection-back-btn {
+    position: absolute;
+    z-index: 3;
+    top: 20px;
+    left: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, .28);
+    color: #fff;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+
+    svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+  }
+}
+
 // Enhanced Action Buttons - Consistent with App Style
 .playlist-actions {
   display: flex;
