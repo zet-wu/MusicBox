@@ -116,7 +116,7 @@ export class SystemMediaSessionController {
         this.nativeMediaKeysUnsubscribe = null;
         this.audioEngineUnsubscribe?.();
         this.audioEngineUnsubscribe = null;
-        void this.nativeMediaKeys?.setEnabled(false);
+        void this.setAudioEngineType(null);
         this.clearPositionTimer();
         this.metadataGeneration++;
 
@@ -137,7 +137,11 @@ export class SystemMediaSessionController {
             return;
         }
 
-        await this.nativeMediaKeys.setEnabled(engineType === 'wasapi');
+        try {
+            await this.nativeMediaKeys.setEnabled(engineType === 'wasapi');
+        } catch (error) {
+            console.warn('⚠️ SystemMediaSessionController: 更新WASAPI媒体键后备失败', error);
+        }
     }
 
     handleAction(action: MediaSessionAction, details?: MediaSessionActionDetails): void {

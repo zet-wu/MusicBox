@@ -79,12 +79,10 @@ export class GlobalShortcutsController extends BaseController {
                 if (!shortcut.enabled || !shortcut.key) continue;
                 const electronKey = convertToElectronShortcut(shortcut.key);
                 try {
-                    let registered = false;
-                    globalShortcut.register(electronKey, () => {
+                    const registered = globalShortcut.register(electronKey, () => {
                         console.log(`🎹 全局快捷键触发: ${shortcut.name} (${electronKey})`);
                         this.windowManager.sendToMainWindow('global-shortcut-triggered', id);
                     });
-                    registered = globalShortcut.isRegistered(electronKey);
                     if (registered) this.registered.set(id, electronKey);
                     else console.warn(`⚠️ 快捷键注册失败: ${shortcut.name} (${electronKey})`);
                 } catch (error) {
@@ -135,14 +133,20 @@ export class GlobalShortcutsController extends BaseController {
 
         let allRegistered = true;
         SYSTEM_MEDIA_KEYS.forEach(({accelerator, action}) => {
-            const registered = globalShortcut.register(accelerator, () => {
-                this.windowManager.sendToMainWindow('system-media-key-triggered', action);
-            });
-            if (registered) {
-                this.systemMediaKeys.add(accelerator);
-            } else {
+            try {
+                const registered = globalShortcut.register(accelerator, () => {
+                    this.windowManager.sendToMainWindow('system-media-key-triggered', action);
+                });
+                if (registered) {
+                    this.systemMediaKeys.add(accelerator);
+                    return;
+                }
+
                 allRegistered = false;
                 console.warn(`⚠️ 系统媒体键注册失败: ${accelerator}`);
+            } catch (error) {
+                allRegistered = false;
+                console.error(`❌ 系统媒体键注册异常: ${accelerator}`, error);
             }
         });
 
