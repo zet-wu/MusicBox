@@ -5,6 +5,10 @@
 import {Component} from "@ui/base/Component";
 import type {Track} from "@api/types/library";
 
+export interface ContextMenuDisplayOptions {
+    collectionActionsOnly?: boolean;
+}
+
 class ContextMenu extends Component {
     declare element: HTMLElement;
     private isVisible: boolean;
@@ -43,7 +47,8 @@ class ContextMenu extends Component {
         track: Track,
         index: number,
         selectedTracks: Set<number> | null = null,
-        selectedTrackItems: Track[] = [track]
+        selectedTrackItems: Track[] = [track],
+        options: ContextMenuDisplayOptions = {}
     ): void {
         if (!this.listenersSetup) {
             this.setupElements();
@@ -59,13 +64,14 @@ class ContextMenu extends Component {
 
         // 多选模式：隐藏单曲操作，显示批量删除
         const isMulti = selectedTracks && selectedTracks.size > 1;
-        this.playItem.style.display = isMulti ? 'none' : '';
+        const collectionActionsOnly = options.collectionActionsOnly === true;
+        this.playItem.style.display = isMulti || collectionActionsOnly ? 'none' : '';
         this.playNextItem.style.display = '';
         this.addToPlaylistItem.style.display = '';
         this.addToCustomPlaylistItem.style.display = '';
-        this.editInfoItem.style.display = isMulti ? 'none' : '';
-        this.deleteItem.style.display = isMulti ? 'none' : '';
-        this.batchDeleteItem.style.display = isMulti ? '' : 'none';
+        this.editInfoItem.style.display = isMulti || collectionActionsOnly ? 'none' : '';
+        this.deleteItem.style.display = isMulti || collectionActionsOnly ? 'none' : '';
+        this.batchDeleteItem.style.display = isMulti && !collectionActionsOnly ? '' : 'none';
         if (isMulti) {
             this.batchDeleteLabel.textContent = `批量删除 (${selectedTracks.size} 首)`;
         }

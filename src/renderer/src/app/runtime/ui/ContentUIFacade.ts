@@ -39,6 +39,19 @@ export class ContentUIFacade {
         this.app.components.contextMenu?.show(x, y, track, index, selectedTracks, selectedTrackItems);
     }
 
+    showCollectionContextMenu(x: number, y: number, tracks: Track[]): void {
+        if (tracks.length === 0) return;
+        this.app.components.contextMenu?.show(
+            x,
+            y,
+            tracks[0],
+            0,
+            null,
+            tracks,
+            {collectionActionsOnly: true}
+        );
+    }
+
     async showPlaylistDetail(playlist: Playlist): Promise<void> {
         await this.app.components.playlistDetailPage?.show(playlist);
     }
