@@ -105,6 +105,7 @@ class AlbumsPage extends Component {
             this.coverGeneration++;
             this._coverQueue.length = 0;
             this._coverRequests.clear();
+            this._coverFailures.clear();
             if (!enabled) {
                 const selectedAlbumKey = this.selectedAlbum?.key;
                 this.processAlbums();
@@ -215,7 +216,6 @@ class AlbumsPage extends Component {
 
     // 将缺失封面的专辑加入获取队列
     scheduleCoversForMissing(): void {
-        if (!trackCoverNetworkPreferenceService.isEnabled()) return;
         if (!this.albums || this.albums.length === 0) return;
         const container = this.container as HTMLElement | null;
         const tiles = container?.querySelectorAll<HTMLElement>('.albumsx-tile');
@@ -266,9 +266,6 @@ class AlbumsPage extends Component {
 
     // 获取专辑封面
     async _fetchAlbumCover(album: AlbumItem): Promise<void> {
-        if (!trackCoverNetworkPreferenceService.isEnabled()) {
-            return;
-        }
         const generation = this.coverGeneration;
         try {
             const artist = this._sanitize(album.artist);
@@ -279,10 +276,14 @@ class AlbumsPage extends Component {
             }
             // 显示加载态
             this._setAlbumCardLoading(album.key, true);
-            const result = await libraryPageDataService.findAlbumCover(artist, name);
+            const result = await libraryPageDataService.findCollectionCover(
+                album.tracks,
+                artist,
+                name,
+                trackCoverNetworkPreferenceService.isEnabled()
+            );
             if (
                 generation === this.coverGeneration
-                && trackCoverNetworkPreferenceService.isEnabled()
                 && result
                 && result.success
                 && result.imageUrl
@@ -433,7 +434,9 @@ class AlbumsPage extends Component {
             metadata: [
                 album.year ? String(album.year) : '年份未知'
             ],
-            tracks
+            tracks,
+            coverArtist: tracks[0]?.albumArtist || tracks[0]?.artist || album.artist,
+            coverAlbum: album.name
         });
         return;
     }

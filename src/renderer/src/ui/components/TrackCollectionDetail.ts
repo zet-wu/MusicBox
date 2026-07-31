@@ -2,8 +2,14 @@ import type {Track} from "@api/types/library";
 import type {PlaylistDoubleClickMode} from "@api/types/settings";
 import type {Unsubscribe} from "@api/types/common";
 import {favoriteService} from "@/features/library/service/FavoriteService";
+import {libraryPageDataService} from "@/features/library/service/LibraryPageDataService";
+import {CoverLoadQueue} from "@/features/mediaAssets/service/CoverLoadQueue";
+import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
 import {playlistPlaybackActionService} from "@/features/playlists/service/PlaylistPlaybackActionService";
-import {trackCoverDisplayPreferenceService} from "@/features/settings/service";
+import {
+    trackCoverDisplayPreferenceService,
+    trackCoverNetworkPreferenceService
+} from "@/features/settings/service";
 import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
 import type {VirtualItem} from "@tanstack/virtual-core";
 
@@ -14,6 +20,16 @@ export interface TrackCollectionDetailModel {
     backLabel: string;
     metadata: string[];
     tracks: Track[];
+    coverArtist?: string;
+    coverAlbum?: string;
+}
+
+interface LoadedCover {
+    success?: boolean;
+    imageUrl?: string;
+    type?: string;
+    filePath?: string;
+    error?: string;
 }
 
 export interface TrackCollectionDetailCallbacks {
@@ -41,6 +57,9 @@ export class TrackCollectionDetail {
     private virtualizer: ElementVirtualizer | null = null;
     private showCovers = trackCoverDisplayPreferenceService.isEnabled();
     private readonly coverPreferenceUnsubscribe: Unsubscribe;
+    private readonly networkPreferenceUnsubscribe: Unsubscribe;
+    private readonly coverLoadQueue = new CoverLoadQueue(4);
+    private viewGeneration = 0;
 
     constructor(
         private readonly container: HTMLElement,
@@ -48,6 +67,11 @@ export class TrackCollectionDetail {
     ) {
         this.coverPreferenceUnsubscribe = trackCoverDisplayPreferenceService.onChanged((enabled) => {
             this.showCovers = enabled;
+            if (this.model) {
+                this.render();
+            }
+        });
+        this.networkPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged(() => {
             if (this.model) {
                 this.render();
             }
@@ -61,6 +85,8 @@ export class TrackCollectionDetail {
     }
 
     hide(): void {
+        this.viewGeneration++;
+        this.coverLoadQueue.beginBatch();
         this.destroyVirtualizer();
         this.model = null;
         this.selectedTracks.clear();
@@ -70,6 +96,8 @@ export class TrackCollectionDetail {
     destroy(): void {
         this.hide();
         this.coverPreferenceUnsubscribe();
+        this.networkPreferenceUnsubscribe();
+        this.coverLoadQueue.destroy();
     }
 
     private render(): void {
@@ -77,6 +105,8 @@ export class TrackCollectionDetail {
             return;
         }
 
+        const generation = ++this.viewGeneration;
+        this.coverLoadQueue.beginBatch();
         this.destroyVirtualizer();
         const totalDuration = this.model.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
         const trackCount = this.model.tracks.length;
@@ -91,7 +121,8 @@ export class TrackCollectionDetail {
                     <div class="hero-content">
                         <div class="playlist-cover-container">
                             <div class="playlist-cover">
-                                <img src="${this.model.cover || 'assets/images/default-cover.svg'}"
+                                <img class="collection-cover-image"
+                                     src="${this.model.cover || 'assets/images/default-cover.svg'}"
                                      alt="${this.escapeHtml(this.model.title)}">
                                 <div class="cover-shadow"></div>
                             </div>
@@ -149,6 +180,7 @@ export class TrackCollectionDetail {
 
         this.bindEvents();
         this.mountVirtualizer();
+        this.loadCollectionCover(generation);
     }
 
     private renderTrackListShell(): string {
@@ -255,7 +287,7 @@ export class TrackCollectionDetail {
                     </div>
                 </div>
                 ${this.showCovers ? `<div class="track-cell cell-cover">
-                    <img class="track-cover" src="${track.cover || 'assets/images/default-cover.svg'}" alt="封面" loading="lazy">
+                    <img class="track-cover" src="${this.getTrackCover(track, item.index)}" alt="封面" loading="lazy">
                 </div>` : ''}
                 <div class="track-cell cell-title">
                     <div class="track-main-info">
@@ -403,6 +435,95 @@ export class TrackCollectionDetail {
 
     private getTrackIdentity(track: Track): string {
         return String(track.fileId || track.id || track.filePath || '');
+    }
+
+    private getTrackCover(track: Track, index: number): string {
+        if (track.cover && typeof track.cover === 'string') {
+            return track.cover;
+        }
+        this.loadTrackCover(track, index, this.viewGeneration);
+        return 'assets/images/default-cover.svg';
+    }
+
+    private loadTrackCover(track: Track, index: number, generation: number): void {
+        const key = track.filePath || this.getTrackIdentity(track);
+        if (!key) return;
+
+        this.coverLoadQueue.schedule(`track:${key}`, async (signal) => {
+            const result = await coverLookupService.getCover(
+                track.title,
+                track.artist,
+                track.album,
+                track.filePath,
+                false,
+                {
+                    allowNetwork: trackCoverNetworkPreferenceService.isEnabled(),
+                    signal
+                }
+            ) as LoadedCover;
+            if (
+                signal.aborted
+                || generation !== this.viewGeneration
+                || !this.model
+                || this.model.tracks[index] !== track
+                || !result.success
+                || !result.imageUrl
+            ) {
+                return;
+            }
+
+            track.cover = this.normalizeCoverUrl(result);
+            const row = this.container.querySelector<HTMLElement>(`.track-row[data-track-index="${index}"]`);
+            const image = row?.querySelector<HTMLImageElement>('.track-cover');
+            if (image) {
+                image.src = track.cover;
+            }
+        });
+    }
+
+    private loadCollectionCover(generation: number): void {
+        if (!this.model || this.model.cover || this.model.tracks.length === 0) {
+            return;
+        }
+        const model = this.model;
+        this.coverLoadQueue.schedule(`collection:${generation}`, async (signal) => {
+            const firstTrack = model.tracks[0];
+            const result = await libraryPageDataService.findCollectionCover(
+                model.tracks,
+                model.coverArtist || firstTrack.artist || '',
+                model.coverAlbum ?? firstTrack.album ?? '',
+                trackCoverNetworkPreferenceService.isEnabled(),
+                signal
+            );
+            if (
+                signal.aborted
+                || generation !== this.viewGeneration
+                || this.model !== model
+                || !result.success
+                || !result.imageUrl
+            ) {
+                return;
+            }
+            model.cover = result.imageUrl;
+            const image = this.container.querySelector<HTMLImageElement>('.collection-cover-image');
+            if (image) {
+                image.src = result.imageUrl;
+            }
+        });
+    }
+
+    private normalizeCoverUrl(result: LoadedCover): string {
+        if (result.type !== 'local-file' || !result.filePath) {
+            return result.imageUrl || 'assets/images/default-cover.svg';
+        }
+        if (result.imageUrl?.startsWith('file://')) {
+            return result.imageUrl;
+        }
+        let filePath = result.filePath.replace(/\\/g, '/');
+        if (!filePath.startsWith('/')) {
+            filePath = `/${filePath}`;
+        }
+        return `file://${filePath}`;
     }
 
     private destroyVirtualizer(): void {

@@ -84,6 +84,43 @@ export class LibraryPageDataService {
         return await coverLookupService.getCover('', artistName.trim(), albumName.trim(), null, false) as CoverLookupResult;
     }
 
+    async findCollectionCover(
+        tracks: Track[],
+        artistName: string,
+        albumName: string,
+        allowNetwork: boolean,
+        signal?: AbortSignal
+    ): Promise<CoverLookupResult> {
+        for (const track of tracks) {
+            signal?.throwIfAborted();
+            if (!track.filePath) continue;
+            const result = await coverLookupService.getCover(
+                track.title,
+                track.artist,
+                track.album,
+                track.filePath,
+                false,
+                {allowNetwork: false, signal}
+            ) as CoverLookupResult;
+            if (result.success && result.imageUrl) {
+                track.cover = result.imageUrl;
+                return result;
+            }
+        }
+
+        if (!allowNetwork) {
+            return {success: false, error: '自动联网获取封面已关闭'};
+        }
+        return await coverLookupService.getCover(
+            '',
+            artistName.trim(),
+            albumName.trim(),
+            null,
+            false,
+            {allowNetwork: true, signal}
+        ) as CoverLookupResult;
+    }
+
     buildArtists(tracks: Track[]): LibraryArtistInfo[] {
         const artistMap = new Map<string, LibraryArtistInfo>();
         tracks.forEach((track) => {

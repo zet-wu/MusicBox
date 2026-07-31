@@ -1,6 +1,7 @@
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {Track} from '../api/types/library';
 import {libraryPageDataService} from '../features/library/service/LibraryPageDataService';
+import {coverLookupService} from '../features/mediaAssets/service/CoverLookupService';
 import {settingsStore} from '../features/settings/service/SettingsStore';
 
 const createTrack = (overrides: Partial<Track>): Track => ({
@@ -9,6 +10,10 @@ const createTrack = (overrides: Partial<Track>): Track => ({
     album: '专辑',
     filePath: `C:/music/${Math.random()}.flac`,
     ...overrides
+});
+
+afterEach(() => {
+    vi.restoreAllMocks();
 });
 
 describe('专辑分组', () => {
@@ -68,5 +73,57 @@ describe('媒体库页面设置', () => {
 
         expect(settings.splitAlbumsByArtist).toBe(true);
         expect(settings.artistViewMode).toBe('list');
+    });
+});
+
+describe('集合封面', () => {
+    it('关闭联网时仍优先读取音乐文件内嵌封面', async () => {
+        const track = createTrack({filePath: 'C:/music/embedded.flac'});
+        const getCover = vi.spyOn(coverLookupService, 'getCover').mockResolvedValue({
+            success: true,
+            imageUrl: 'blob:embedded-cover'
+        });
+
+        const result = await libraryPageDataService.findCollectionCover(
+            [track],
+            track.artist,
+            track.album || '',
+            false
+        );
+
+        expect(result.imageUrl).toBe('blob:embedded-cover');
+        expect(track.cover).toBe('blob:embedded-cover');
+        expect(getCover).toHaveBeenCalledWith(
+            track.title,
+            track.artist,
+            track.album,
+            track.filePath,
+            false,
+            expect.objectContaining({allowNetwork: false})
+        );
+    });
+
+    it('本地封面缺失且允许联网时才执行集合级联网回退', async () => {
+        const track = createTrack({filePath: 'C:/music/no-cover.flac'});
+        const getCover = vi.spyOn(coverLookupService, 'getCover')
+            .mockResolvedValueOnce({success: false})
+            .mockResolvedValueOnce({success: true, imageUrl: 'https://example.test/cover.jpg'});
+
+        const result = await libraryPageDataService.findCollectionCover(
+            [track],
+            '艺术家',
+            '专辑',
+            true
+        );
+
+        expect(result.imageUrl).toBe('https://example.test/cover.jpg');
+        expect(getCover).toHaveBeenLastCalledWith(
+            '',
+            '艺术家',
+            '专辑',
+            null,
+            false,
+            expect.objectContaining({allowNetwork: true})
+        );
     });
 });

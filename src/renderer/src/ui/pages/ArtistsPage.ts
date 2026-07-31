@@ -92,6 +92,7 @@ class ArtistsPage extends Component {
             this.coverGeneration++;
             this._coverFetchingInProgress = false;
             this._coverLoading.clear();
+            this._coverFailures.clear();
             if (!enabled) {
                 const selectedArtistName = this.selectedArtist?.name;
                 this.processArtists();
@@ -546,9 +547,6 @@ class ArtistsPage extends Component {
 
     // 获取艺术家封面
     async _fetchArtistCover(artist: ArtistInfo): Promise<void> {
-        if (!trackCoverNetworkPreferenceService.isEnabled()) {
-            return;
-        }
         const generation = this.coverGeneration;
         try {
             const artistName = this._sanitize(artist.name);
@@ -568,10 +566,14 @@ class ArtistsPage extends Component {
 
             // 调用API获取艺术家封面
             // 只传艺术家名称，不传专辑名
-            const result = await libraryPageDataService.findArtistCover(artistName) as CoverResult;
+            const result = await libraryPageDataService.findCollectionCover(
+                artist.tracks,
+                artistName,
+                '',
+                trackCoverNetworkPreferenceService.isEnabled()
+            ) as CoverResult;
             if (
                 generation === this.coverGeneration
-                && trackCoverNetworkPreferenceService.isEnabled()
                 && result
                 && result.success
                 && result.imageUrl
@@ -641,9 +643,6 @@ class ArtistsPage extends Component {
 
     // 启动封面获取流程
     _startCoverFetching(candidates: ArtistInfo[] = this.filteredArtists): void {
-        if (!trackCoverNetworkPreferenceService.isEnabled()) {
-            return;
-        }
         // 防止重复启动封面获取
         if (this._coverFetchingInProgress) {
             return;
@@ -925,7 +924,9 @@ class ArtistsPage extends Component {
             cover: artist.cover,
             backLabel: '返回星河',
             metadata: [`${artist.albums.size} 张专辑`],
-            tracks: [...artist.tracks]
+            tracks: [...artist.tracks],
+            coverArtist: artist.name,
+            coverAlbum: ''
         });
         return;
     }
