@@ -522,6 +522,12 @@ class AlbumsPage extends Component {
             // 双击进入详情
             // 飞入动画
             tile.addEventListener('dblclick', () => this.animateToDetail(tile, album));
+            tile.addEventListener('contextmenu', (event: MouseEvent) => {
+                event.preventDefault();
+                if (album.tracks.length > 0) {
+                    this.emit('collectionRightClick', album.tracks, event.clientX, event.clientY);
+                }
+            });
 
             // 方向性高光，指针事件
             if (art) this.attachGlossHandlers(art);

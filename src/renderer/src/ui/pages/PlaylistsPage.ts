@@ -22,6 +22,7 @@ export class PlaylistsPage extends Component {
     private sortBy: PlaylistSortKey;
     private sortDirection: SortDirection;
     private searchQuery: string;
+    private contextMenuRequestId: number;
     public isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -33,6 +34,7 @@ export class PlaylistsPage extends Component {
         this.sortBy = 'name';
         this.sortDirection = 'asc';
         this.searchQuery = '';
+        this.contextMenuRequestId = 0;
         this.isVisible = false;
     }
 
@@ -44,6 +46,7 @@ export class PlaylistsPage extends Component {
     }
 
     hide(): void {
+        this.contextMenuRequestId++;
         this.isVisible = false;
         if (this.container) {
             this.container.innerHTML = '';
@@ -189,7 +192,22 @@ export class PlaylistsPage extends Component {
                 const playlist = this.playlists.find(candidate => candidate.id === item.dataset.playlistId);
                 if (playlist) this.emit('playlistSelected', playlist);
             });
+            item.addEventListener('contextmenu', (event: MouseEvent) => {
+                event.preventDefault();
+                const playlist = this.playlists.find(candidate => candidate.id === item.dataset.playlistId);
+                if (playlist) void this.showPlaylistContextMenu(playlist, event.clientX, event.clientY);
+            });
         });
+    }
+
+    private async showPlaylistContextMenu(playlist: Playlist, x: number, y: number): Promise<void> {
+        const requestId = ++this.contextMenuRequestId;
+        const result = await libraryDataService.getPlaylistDetail(playlist.id);
+        if (requestId !== this.contextMenuRequestId || !this.isVisible || !result.success) return;
+        const tracks = result.tracks || [];
+        if (tracks.length > 0) {
+            this.emit('collectionRightClick', tracks, x, y);
+        }
     }
 
     private sortPlaylists(): void {

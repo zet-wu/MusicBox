@@ -734,6 +734,18 @@ class ArtistsPage extends Component {
             this.showArtistDetailWithTransition(artist, item);
         });
 
+        body.addEventListener('contextmenu', (event: MouseEvent) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.artist-library-item');
+            const index = Number.parseInt(item?.dataset.artistIndex || '', 10);
+            const artist = Number.isInteger(index) ? this.filteredArtists[index] : null;
+            if (!artist || !item) return;
+            event.preventDefault();
+            if (artist.tracks.length > 0) {
+                this.emit('collectionRightClick', artist.tracks, event.clientX, event.clientY);
+            }
+        });
+
         this.artistVirtualizer = new ElementVirtualizer({
             count: rowCount,
             estimateSize: () => this.viewMode === 'grid' ? coverSize + 94 : 82,

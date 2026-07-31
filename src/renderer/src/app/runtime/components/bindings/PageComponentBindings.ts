@@ -115,6 +115,9 @@ export class PageComponentBindings {
                     ) => {
                         content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
                     });
+                    components.artistsPage.on('collectionRightClick', (tracks: Track[], x: number, y: number) => {
+                        content.showCollectionContextMenu(x, y, tracks);
+                    });
                 }
                 break;
 
@@ -149,12 +152,18 @@ export class PageComponentBindings {
                     ) => {
                         content.showContextMenu(x, y, track, index, selectedTracks, selectedTrackItems);
                     });
+                    components.albumsPage.on('collectionRightClick', (tracks: Track[], x: number, y: number) => {
+                        content.showCollectionContextMenu(x, y, tracks);
+                    });
                 }
                 break;
 
             case 'playlistsPage':
                 components.playlistsPage?.on('playlistSelected', async (playlist: Playlist) => {
                     await app.handlePlaylistSelected(playlist);
+                });
+                components.playlistsPage?.on('collectionRightClick', (tracks: Track[], x: number, y: number) => {
+                    content.showCollectionContextMenu(x, y, tracks);
                 });
                 break;
 
