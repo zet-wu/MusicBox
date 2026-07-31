@@ -20,6 +20,7 @@ export interface GeneralSettingsElements {
     artistsPageToggle: HTMLInputElement | null;
     albumsPageToggle: HTMLInputElement | null;
     showTrackCoversToggle: HTMLInputElement | null;
+    autoFetchMissingTrackCoversToggle: HTMLInputElement | null;
     gaplessPlaybackToggle: HTMLInputElement | null;
     networkDriveToggle: HTMLInputElement | null;
     networkDriveConfig: HTMLElement | null;
@@ -86,6 +87,13 @@ class GeneralSettingsController {
         this.bindCheckedSetting(elements.artistsPageToggle, 'artistsPage', callbacks, scope, 'artistsPageEnabled');
         this.bindCheckedSetting(elements.albumsPageToggle, 'albumsPage', callbacks, scope, 'albumsPageEnabled');
         this.bindCheckedSetting(elements.showTrackCoversToggle, 'showTrackCovers', callbacks, scope, 'showTrackCoversEnabled');
+        this.bindCheckedSetting(
+            elements.autoFetchMissingTrackCoversToggle,
+            'autoFetchMissingTrackCovers',
+            callbacks,
+            scope,
+            'autoFetchMissingTrackCoversChanged'
+        );
         this.bindCheckedSetting(elements.gaplessPlaybackToggle, 'gaplessPlayback', callbacks, scope, 'gaplessPlaybackEnabled');
         this.bindNetworkDriveToggle(elements, callbacks, scope);
         this.bindNetworkDriveModal(elements, scope);

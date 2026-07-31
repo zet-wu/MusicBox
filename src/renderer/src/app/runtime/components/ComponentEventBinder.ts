@@ -6,6 +6,7 @@ import {playbackUiStateService} from "@/features/playback/service/PlaybackUiStat
 import {playbackService} from "@/features/playback/service/PlaybackService";
 import {playlistInfoAlignmentPreferenceService} from "@/features/settings/service";
 import {trackCoverDisplayPreferenceService} from "@/features/settings/service";
+import {trackCoverNetworkPreferenceService} from "@/features/settings/service";
 import {settingsExtensionNavigationService} from "@/features/settings/service";
 import {
     type ComponentBindingContext,
@@ -108,6 +109,9 @@ export class ComponentEventBinder {
                 },
                 setTrackCoverDisplayPreference: (enabled) => {
                     trackCoverDisplayPreferenceService.setEnabled(enabled);
+                },
+                setTrackCoverNetworkPreference: (enabled) => {
+                    trackCoverNetworkPreferenceService.setEnabled(enabled);
                 },
                 setPlaylistInfoAlignment: (alignment) => {
                     playlistInfoAlignmentPreferenceService.setAlignment(alignment);

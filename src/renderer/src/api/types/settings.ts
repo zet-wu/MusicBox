@@ -22,6 +22,7 @@ export interface MusicBoxSettings {
     artistsPage?: boolean;
     albumsPage?: boolean;
     showTrackCovers?: boolean;
+    autoFetchMissingTrackCovers?: boolean;
     gaplessPlayback?: boolean;
     playlistDoubleClickMode?: PlaylistDoubleClickMode;
     playlistInfoAlignment?: PlaylistInfoAlignment;

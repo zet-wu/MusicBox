@@ -5,6 +5,7 @@
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
 import {localCoverManager} from "@/features/mediaAssets/service/LocalCoverManager";
 import {recentPlaybackHistoryService} from "@/features/playback/service/RecentPlaybackHistoryService";
+import {trackCoverNetworkPreferenceService} from "@/features/settings/service";
 import {formatTime} from "@utils/index.js";
 import {Component} from "@ui/base/Component";
 import type {Track} from "@api/types/library";
@@ -258,7 +259,12 @@ class RecentPage extends Component {
             // 使用requestIdleCallback优化性能，在浏览器空闲时加载封面
             const loadCover = async () => {
                 const coverResult = await coverLookupService.getCover(
-                    track.title, track.artist, track.album, track.filePath
+                    track.title,
+                    track.artist,
+                    track.album,
+                    track.filePath,
+                    false,
+                    {allowNetwork: trackCoverNetworkPreferenceService.isEnabled()}
                 );
 
                 if (coverResult.success && coverResult.imageUrl && typeof coverResult.imageUrl === 'string') {

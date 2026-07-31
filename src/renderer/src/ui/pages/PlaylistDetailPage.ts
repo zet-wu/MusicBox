@@ -9,10 +9,12 @@ import {
     favoriteService
 } from "@/features/library/service/FavoriteService";
 import {libraryDataService} from "@/features/library/service/LibraryDataService";
+import {CoverLoadQueue} from "@/features/mediaAssets/service/CoverLoadQueue";
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
 import {
     playlistInfoAlignmentPreferenceService,
-    trackCoverDisplayPreferenceService
+    trackCoverDisplayPreferenceService,
+    trackCoverNetworkPreferenceService
 } from "@/features/settings/service";
 import {playlistCoverActionService} from "@/features/playlists/service/PlaylistCoverActionService";
 import {
@@ -70,8 +72,9 @@ class PlaylistDetailPage extends Component {
     private coverDisplayPreferenceUnsubscribe: Unsubscribe | null = null;
     private playlistInfoAlignmentUnsubscribe: Unsubscribe | null = null;
     private favoriteUnsubscribe: Unsubscribe | null = null;
+    private networkCoverPreferenceUnsubscribe: Unsubscribe | null = null;
     private trackVirtualizer: ElementVirtualizer | null = null;
-    private readonly loadingTrackCovers = new Set<string>();
+    private readonly coverLoadQueue = new CoverLoadQueue(4);
 
     constructor(container: string | Element | null) {
         super(container);
@@ -92,6 +95,11 @@ class PlaylistDetailPage extends Component {
 
         this.setupElements();
         this.setupSettingsListener();
+        this.networkCoverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged(() => {
+            if (this.isVisible) {
+                this.render();
+            }
+        });
         this.favoriteUnsubscribe = favoriteService.onChanged(({trackIds}) => {
             if (!this.isVisible) {
                 return;
@@ -153,6 +161,7 @@ class PlaylistDetailPage extends Component {
 
     hide(): void {
         this.isVisible = false;
+        this.coverLoadQueue.beginBatch();
         this.destroyTrackVirtualizer();
         this.currentPlaylist = null;
         this.tracks = [];
@@ -167,6 +176,7 @@ class PlaylistDetailPage extends Component {
     }
 
     destroy(): void {
+        this.coverLoadQueue.destroy();
         this.destroyTrackVirtualizer();
         if (this.coverDisplayPreferenceUnsubscribe) {
             this.coverDisplayPreferenceUnsubscribe();
@@ -179,6 +189,10 @@ class PlaylistDetailPage extends Component {
         if (this.favoriteUnsubscribe) {
             this.favoriteUnsubscribe();
             this.favoriteUnsubscribe = null;
+        }
+        if (this.networkCoverPreferenceUnsubscribe) {
+            this.networkCoverPreferenceUnsubscribe();
+            this.networkCoverPreferenceUnsubscribe = null;
         }
         this.hideCoverContextMenu();
         super.destroy();
@@ -262,6 +276,7 @@ class PlaylistDetailPage extends Component {
     render(): void {
         if (!this.currentPlaylist || !this.container) return;
 
+        this.coverLoadQueue.beginBatch();
         const capabilities = getCollectionCapabilities(this.getCollectionType());
         const createdDate = new Date(this.currentPlaylist.createdAt || Date.now());
         // 使用实际加载的tracks数量，确保UI状态与数据一致
@@ -801,7 +816,7 @@ class PlaylistDetailPage extends Component {
                             </div>
                             ${this.showCovers ? `
                             <div class="track-cell cell-cover">
-                                <img class="track-cover" src="${this.getTrackCover(track)}" alt="封面" loading="lazy" onerror="this.src='assets/images/default-cover.svg'">
+                                <img class="track-cover" src="${this.getTrackCover(track, index)}" alt="封面" loading="lazy" onerror="this.src='assets/images/default-cover.svg'">
                             </div>
                             ` : ''}
                             <div class="track-cell cell-title">
@@ -1109,33 +1124,42 @@ class PlaylistDetailPage extends Component {
         return div.innerHTML;
     }
 
-    getTrackCover(track: PlaylistDetailTrack): string {
+    getTrackCover(track: PlaylistDetailTrack, index: number): string {
         // 优先使用已缓存的封面
         if (track.cover && typeof track.cover === 'string') {
             return track.cover;
         }
 
         // 异步获取封面，先返回默认封面
-        this.loadTrackCoverAsync(track);
+        this.loadTrackCoverAsync(track, index);
         return 'assets/images/default-cover.svg';
     }
 
-    async loadTrackCoverAsync(track: PlaylistDetailTrack): Promise<void> {
+    loadTrackCoverAsync(track: PlaylistDetailTrack, index: number): void {
         const coverKey = track.filePath || this.getTrackIdentity(track);
-        if (!coverKey || this.loadingTrackCovers.has(coverKey)) {
+        if (!coverKey) {
             return;
         }
-        this.loadingTrackCovers.add(coverKey);
 
-        try {
-            // 使用requestIdleCallback优化性能，在浏览器空闲时加载封面
-            const loadCover = async () => {
+        this.coverLoadQueue.schedule(coverKey, async (signal) => {
+            try {
                 const coverResult = await coverLookupService.getCover(
-                    track.title, track.artist, track.album, track.filePath
+                    track.title,
+                    track.artist,
+                    track.album,
+                    track.filePath,
+                    false,
+                    {
+                        allowNetwork: trackCoverNetworkPreferenceService.isEnabled(),
+                        signal
+                    }
                 ) as CoverResult;
 
+                if (signal.aborted || !this.isVisible || this.tracks[index] !== track) {
+                    return;
+                }
+
                 if (coverResult.success && coverResult.imageUrl && typeof coverResult.imageUrl === 'string') {
-                    // // 确保路径格式正确，处理路径
                     let coverUrl = coverResult.imageUrl;
 
                     // 处理本地文件路径格式
@@ -1154,31 +1178,24 @@ class PlaylistDetailPage extends Component {
 
                     // 使用requestAnimationFrame确保DOM更新在下一帧进行
                     this.requestAnimationFrameManaged(() => {
-                        if (!this.container) return;
-                        const trackRows = this.container.querySelectorAll('.track-row');
-                        trackRows.forEach((row, index) => {
-                            const trackRow = row as HTMLElement;
-                            if (parseInt(trackRow.dataset.trackIndex || '0') === index && this.tracks[index] === track) {
-                                const coverImg = trackRow.querySelector<HTMLImageElement>('.track-cover');
-                                if (coverImg) {
-                                    coverImg.src = track.cover || 'assets/images/default-cover.svg';
-                                }
-                            }
-                        });
+                        if (!this.container || signal.aborted || this.tracks[index] !== track) return;
+                        const trackRow = this.container.querySelector<HTMLElement>(
+                            `.track-row[data-track-index="${index}"]`
+                        );
+                        const coverImg = trackRow?.querySelector<HTMLImageElement>('.track-cover');
+                        if (coverImg) {
+                            coverImg.src = track.cover || 'assets/images/default-cover.svg';
+                        }
                     });
-                } else {
+                } else if (coverResult.error !== '列表自动联网获取封面已关闭') {
                     console.warn(`⚠️ PlaylistDetailPage: 封面加载失败 - ${track.title}:`, coverResult.error || '未知错误');
                 }
-                this.loadingTrackCovers.delete(coverKey);
-            };
-
-            this.requestIdleCallbackManaged(() => {
-                void loadCover();
-            });
-        } catch (error) {
-            this.loadingTrackCovers.delete(coverKey);
-            console.warn('PlaylistDetailPage: 加载封面失败:', error);
-        }
+            } catch (error) {
+                if (!signal.aborted) {
+                    console.warn('PlaylistDetailPage: 加载封面失败:', error);
+                }
+            }
+        });
     }
 
     // 渲染歌单封面

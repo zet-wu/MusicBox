@@ -116,6 +116,7 @@ class Settings extends Component {
         this.artistsPageToggle = this.element.querySelector('#artists-page-toggle');
         this.albumsPageToggle = this.element.querySelector('#albums-page-toggle');
         this.showTrackCoversToggle = this.element.querySelector('#show-track-covers-toggle');
+        this.autoFetchMissingTrackCoversToggle = this.element.querySelector('#auto-fetch-missing-track-covers-toggle');
         this.gaplessPlaybackToggle = this.element.querySelector('#gapless-playback-toggle');
         this.exclusiveModeToggle = this.element.querySelector('#exclusive-mode-toggle');
         this.exclusiveModeItem = this.element.querySelector('#exclusive-mode-item');
@@ -396,6 +397,7 @@ class Settings extends Component {
         this.artistsPageToggle.checked = initialValues.artistsPage;
         this.albumsPageToggle.checked = initialValues.albumsPage;
         this.showTrackCoversToggle.checked = initialValues.showTrackCovers;
+        this.autoFetchMissingTrackCoversToggle.checked = initialValues.autoFetchMissingTrackCovers;
         this.gaplessPlaybackToggle.checked = initialValues.gaplessPlayback;
 
         // 初始化音乐文件夹和自动扫描设置
@@ -686,6 +688,7 @@ class Settings extends Component {
             artistsPageToggle: this.artistsPageToggle,
             albumsPageToggle: this.albumsPageToggle,
             showTrackCoversToggle: this.showTrackCoversToggle,
+            autoFetchMissingTrackCoversToggle: this.autoFetchMissingTrackCoversToggle,
             gaplessPlaybackToggle: this.gaplessPlaybackToggle,
             networkDriveToggle: this.networkDriveToggle,
             networkDriveConfig: this.networkDriveConfig,

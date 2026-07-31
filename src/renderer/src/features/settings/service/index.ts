@@ -35,3 +35,4 @@ export * from './ShortcutSettingsService';
 export * from './TraySettingsController';
 export * from './TraySettingsService';
 export * from './TrackCoverDisplayPreferenceService';
+export * from './TrackCoverNetworkPreferenceService';

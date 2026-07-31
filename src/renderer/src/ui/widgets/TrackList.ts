@@ -6,7 +6,10 @@ import {formatTime, sanitizeHTML} from "@utils/index.js";
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
 import {coverUpdateManager} from "@/features/mediaAssets/service/CoverUpdateManager";
 import type {CoverUpdateData} from "@/features/mediaAssets/service/CoverUpdateManager";
-import {trackCoverDisplayPreferenceService} from "@/features/settings/service";
+import {
+    trackCoverDisplayPreferenceService,
+    trackCoverNetworkPreferenceService
+} from "@/features/settings/service";
 import {Component} from "@ui/base/Component";
 import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/track";
@@ -245,7 +248,12 @@ class TrackList extends Component {
             const loadCover = async (): Promise<void> => {
                 try {
                     const coverResult = await coverLookupService.getCover(
-                        track.title, track.artist, track.album, track.filePath
+                        track.title,
+                        track.artist,
+                        track.album,
+                        track.filePath,
+                        false,
+                        {allowNetwork: trackCoverNetworkPreferenceService.isEnabled()}
                     );
 
                     if (coverResult.success && coverResult.imageUrl && typeof coverResult.imageUrl === 'string') {

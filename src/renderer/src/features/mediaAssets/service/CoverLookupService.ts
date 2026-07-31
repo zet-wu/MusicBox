@@ -12,9 +12,11 @@ export class CoverLookupService {
         artist: string,
         album = '',
         filePath: string | null = null,
-        forceRefresh = false
+        forceRefresh = false,
+        options: {allowNetwork?: boolean; signal?: AbortSignal} = {}
     ): Promise<CoverResult> {
         try {
+            options.signal?.throwIfAborted();
             if (forceRefresh && filePath) {
                 embeddedCoverManager.clearCacheForFile(filePath);
                 localCoverManager.clearCacheForTrack(title, artist, album);
@@ -22,17 +24,24 @@ export class CoverLookupService {
 
             if (filePath) {
                 const embeddedCover = await this.getEmbeddedCover(filePath);
+                options.signal?.throwIfAborted();
                 if (embeddedCover.success) {
                     return embeddedCover;
                 }
             }
 
             const localCover = await this.getLocalCover(title, artist, album);
+            options.signal?.throwIfAborted();
             if (localCover.success) {
                 return localCover;
             }
 
-            const networkCover = await this.getNetworkCover(title, artist, album);
+            if (options.allowNetwork === false) {
+                return {success: false, error: '列表自动联网获取封面已关闭'};
+            }
+
+            const networkCover = await this.getNetworkCover(title, artist, album, options.signal);
+            options.signal?.throwIfAborted();
             if (networkCover.success) {
                 const cachedCover = await this.saveCoverToLocalCache(title, artist, album, networkCover.imageData);
                 if (cachedCover) {
@@ -92,7 +101,7 @@ export class CoverLookupService {
         return {success: false, error: '获取本地缓存封面失败'};
     }
 
-    async getNetworkCover(title: string, artist: string, album = ''): Promise<CoverResult> {
+    async getNetworkCover(title: string, artist: string, album = '', signal?: AbortSignal): Promise<CoverResult> {
         try {
             const params = new URLSearchParams();
             if (title) params.append('title', title);
@@ -100,7 +109,7 @@ export class CoverLookupService {
             if (album) params.append('album', album);
 
             const url = `https://api.lrc.cx/cover?${params.toString()}`;
-            const response = await networkRequestClient.fetchWithRetry(url);
+            const response = await networkRequestClient.fetchWithRetry(url, {signal});
             const contentType = response.headers.get('content-type');
 
             if (contentType && contentType.startsWith('image/')) {

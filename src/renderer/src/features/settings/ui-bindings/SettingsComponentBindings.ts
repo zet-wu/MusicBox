@@ -37,6 +37,7 @@ interface SettingsBindingIntegrations {
     onNavigateToSettingsSection(handler: (sectionName: string) => void): void;
     setGaplessPlayback(enabled: boolean): void;
     setTrackCoverDisplayPreference(enabled: boolean): void;
+    setTrackCoverNetworkPreference(enabled: boolean): void;
     setPlaylistInfoAlignment(alignment: PlaylistInfoAlignment): void;
 }
 
@@ -119,6 +120,10 @@ export function bindSettingsComponentEvents({
         if (enabled && app.isInitialized) {
             await app.preloadTrackCovers();
         }
+    });
+
+    components.settings.on('autoFetchMissingTrackCoversChanged', (enabled: boolean) => {
+        integrations.setTrackCoverNetworkPreference(enabled);
     });
 
     components.settings.on('playlistInfoAlignmentChanged', (alignment: PlaylistInfoAlignment) => {

@@ -16,6 +16,7 @@ export interface SettingsInitialValues {
     artistsPage: boolean;
     albumsPage: boolean;
     showTrackCovers: boolean;
+    autoFetchMissingTrackCovers: boolean;
     gaplessPlayback: boolean;
     systemTray: boolean;
     trayCloseBehavior: string;
@@ -71,6 +72,7 @@ class SettingsStore {
             artistsPage: this.getBoolean(settings, 'artistsPage', true),
             albumsPage: this.getBoolean(settings, 'albumsPage', true),
             showTrackCovers: this.getBoolean(settings, 'showTrackCovers', true),
+            autoFetchMissingTrackCovers: this.getBoolean(settings, 'autoFetchMissingTrackCovers', false),
             gaplessPlayback: this.getBoolean(settings, 'gaplessPlayback', false),
             systemTray: this.getBoolean(settings, 'systemTray', true),
             trayCloseBehavior: this.getString(settings, 'trayCloseBehavior', 'exit'),

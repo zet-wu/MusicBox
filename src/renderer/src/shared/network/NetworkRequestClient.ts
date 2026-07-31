@@ -53,13 +53,20 @@ export class NetworkRequestClient {
 
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), timeout);
+                const callerSignal = fetchOptions.signal;
+                const abortFromCaller = () => controller.abort(callerSignal?.reason);
+                callerSignal?.addEventListener('abort', abortFromCaller, {once: true});
 
-                const response = await fetch(url, {
-                    ...fetchOptions,
-                    signal: controller.signal
-                });
-
-                clearTimeout(timeoutId);
+                let response: Response;
+                try {
+                    response = await fetch(url, {
+                        ...fetchOptions,
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                    callerSignal?.removeEventListener('abort', abortFromCaller);
+                }
 
                 if (!response.ok) {
                     throw new NetworkRequestError(
@@ -73,6 +80,9 @@ export class NetworkRequestClient {
                 console.log(`🌐 Network: 网络请求成功: ${url}`);
                 return response;
             } catch (error) {
+                if (options.signal?.aborted) {
+                    throw error;
+                }
                 const message = error instanceof Error ? error.message : String(error);
                 console.warn(`⚠️ Network: 网络请求失败 (尝试 ${attempt}/${maxRetries}): ${message}`);
 
