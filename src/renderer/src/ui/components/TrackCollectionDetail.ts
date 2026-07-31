@@ -112,12 +112,14 @@ export class TrackCollectionDetail {
         const trackCount = this.model.tracks.length;
         this.container.innerHTML = `
             <div class="page-content playlist-page readonly-track-collection">
-                <div class="playlist-hero">
-                    <div class="hero-background"><div class="gradient-overlay"></div></div>
+                <div class="collection-detail-nav">
                     <button class="modern-back-btn collection-back-btn" type="button">
                         <svg viewBox="0 0 24 24"><path d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z"/></svg>
                         <span>${this.escapeHtml(this.model.backLabel)}</span>
                     </button>
+                </div>
+                <div class="playlist-hero">
+                    <div class="hero-background"><div class="gradient-overlay"></div></div>
                     <div class="hero-content">
                         <div class="playlist-cover-container">
                             <div class="playlist-cover">
