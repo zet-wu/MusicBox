@@ -1,9 +1,11 @@
 import type {LibraryDirectoryOverview} from '@api/types/electron';
 import type {FolderSourceViewMode} from '@api/types/settings';
 import type {Unsubscribe} from '@api/types/common';
+import type {Track} from '@api/types/track';
 import {librarySourceManagementService} from '@/features/library/service';
 import {folderSourceViewModePreferenceService} from '@/features/settings/service';
 import {Component} from '@ui/base/Component';
+import {TrackCollectionDetail} from '@ui/components/TrackCollectionDetail';
 
 type FolderViewSize = 's' | 'm' | 'l';
 type FolderSortKey = 'name' | 'tracks' | 'bindings' | 'lastScan';
@@ -14,6 +16,7 @@ const FOLDER_ICON_SIZES: Record<FolderViewSize, number> = {
     m: 150,
     l: 200
 };
+const FOLDER_COLLECTION_COVER = new URL('../../assets/icons/folder.svg', import.meta.url).href;
 
 export class FolderSourcesPage extends Component {
     private readonly container: HTMLElement | null;
@@ -25,15 +28,39 @@ export class FolderSourcesPage extends Component {
     private searchQuery = '';
     private sourceMenu: HTMLElement | null = null;
     private activeSource: LibraryDirectoryOverview | null = null;
+    private selectedSource: LibraryDirectoryOverview | null = null;
+    private detailTracks: Track[] = [];
     private removeSourcesUpdatedListener: Unsubscribe;
     private loading = false;
     private refreshGeneration = 0;
+    private detailGeneration = 0;
+    private readonly trackCollectionDetail: TrackCollectionDetail;
     public isVisible = false;
 
     constructor(container: string | Element | null) {
         super(container);
         this.container = this.element as HTMLElement | null;
         this.viewMode = folderSourceViewModePreferenceService.getMode();
+        this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
+            onBack: () => this.showDirectoryList(),
+            onTrackPlayed: (track, index, tracks, mode) => {
+                this.emit('trackPlayed', track, index, tracks, mode);
+            },
+            onPlayAll: tracks => this.emit('playAllTracks', tracks),
+            onAppendAll: tracks => this.emit('appendAllTracks', tracks),
+            onTrackRightClick: (track, index, x, y, selectedTracks, selectedTrackItems) => {
+                this.emit(
+                    'trackRightClick',
+                    track,
+                    index,
+                    x,
+                    y,
+                    selectedTracks,
+                    selectedTrackItems,
+                    this.detailTracks
+                );
+            }
+        });
         this.removeSourcesUpdatedListener = librarySourceManagementService.onSourcesUpdated(() => {
             if (this.isVisible && !this.loading) void this.refresh();
         });
@@ -54,14 +81,19 @@ export class FolderSourcesPage extends Component {
 
     hide(): void {
         this.refreshGeneration++;
+        this.detailGeneration++;
         this.loading = false;
         this.isVisible = false;
+        this.selectedSource = null;
+        this.detailTracks = [];
+        this.trackCollectionDetail.hide();
         this.hideContextMenu();
         if (this.container) this.container.innerHTML = '';
     }
 
     destroy(): void {
         this.removeSourcesUpdatedListener();
+        this.trackCollectionDetail.destroy();
         this.sourceMenu?.remove();
         this.sourceMenu = null;
         super.destroy();
@@ -75,7 +107,16 @@ export class FolderSourcesPage extends Component {
             if (!this.isVisible || refreshGeneration !== this.refreshGeneration) return;
             this.directories = directories;
             this.sortDirectories();
-            this.render();
+            if (this.selectedSource) {
+                const selectedSource = this.findSource(this.selectedSource.id);
+                if (selectedSource) {
+                    await this.showSourceDetail(selectedSource);
+                } else {
+                    this.showDirectoryList();
+                }
+            } else {
+                this.render();
+            }
         } finally {
             if (refreshGeneration === this.refreshGeneration) this.loading = false;
         }
@@ -83,6 +124,7 @@ export class FolderSourcesPage extends Component {
 
     render(): void {
         if (!this.container) return;
+        this.trackCollectionDetail.hide();
         const iconSize = FOLDER_ICON_SIZES[this.viewSize];
         this.container.innerHTML = `
             <div class="albumsx foldersx page">
@@ -223,7 +265,7 @@ export class FolderSourcesPage extends Component {
         this.container.querySelectorAll<HTMLElement>('.folder-source-item').forEach(item => {
             item.addEventListener('dblclick', () => {
                 const source = this.findSource(item.dataset.sourceId);
-                if (source) void librarySourceManagementService.open(source);
+                if (source) void this.showSourceDetail(source);
             });
             item.addEventListener('contextmenu', event => {
                 event.preventDefault();
@@ -231,6 +273,12 @@ export class FolderSourcesPage extends Component {
                 if (source) this.showContextMenu(source, event.clientX, event.clientY);
             });
             item.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const source = this.findSource(item.dataset.sourceId);
+                    if (source) void this.showSourceDetail(source);
+                    return;
+                }
                 if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
                 event.preventDefault();
                 const source = this.findSource(item.dataset.sourceId);
@@ -293,6 +341,66 @@ export class FolderSourcesPage extends Component {
 
     private async handleRemove(source: LibraryDirectoryOverview): Promise<void> {
         if (await librarySourceManagementService.remove(source)) await this.refresh();
+    }
+
+    private async showSourceDetail(source: LibraryDirectoryOverview): Promise<void> {
+        if (!this.container || !this.isVisible) return;
+        const detailGeneration = ++this.detailGeneration;
+        this.selectedSource = source;
+        this.detailTracks = [];
+        this.renderDetailLoading(source);
+
+        const tracks = await librarySourceManagementService.getTracks(source.id);
+        if (
+            !this.isVisible
+            || detailGeneration !== this.detailGeneration
+            || this.selectedSource?.id !== source.id
+        ) return;
+
+        this.detailTracks = tracks;
+        this.trackCollectionDetail.show({
+            title: this.getDisplayName(source.path),
+            description: source.path,
+            cover: FOLDER_COLLECTION_COVER,
+            backLabel: '返回文件夹',
+            metadata: [
+                `${source.bindings.length} 个绑定歌单`,
+                source.lastScanAt
+                    ? `扫描于 ${new Date(source.lastScanAt).toLocaleString('zh-CN')}`
+                    : '尚未完成扫描'
+            ],
+            tracks
+        });
+    }
+
+    private renderDetailLoading(source: LibraryDirectoryOverview): void {
+        if (!this.container) return;
+        this.trackCollectionDetail.hide();
+        this.container.innerHTML = `
+            <div class="page-content playlist-page readonly-track-collection foldersx folder-source-detail-loading">
+                <div class="collection-detail-nav">
+                    <button class="modern-back-btn collection-back-btn" type="button">
+                        <svg viewBox="0 0 24 24"><path d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z"/></svg>
+                        <span>返回文件夹</span>
+                    </button>
+                </div>
+                <div class="albumsx-empty">
+                    <div class="folder-loading"></div>
+                    <p>正在加载 ${this.escapeHtml(this.getDisplayName(source.path))} 中的歌曲...</p>
+                </div>
+            </div>
+        `;
+        this.container.querySelector('.collection-back-btn')?.addEventListener('click', () => {
+            this.showDirectoryList();
+        });
+    }
+
+    private showDirectoryList(): void {
+        this.detailGeneration++;
+        this.selectedSource = null;
+        this.detailTracks = [];
+        this.trackCollectionDetail.hide();
+        if (this.isVisible) this.render();
     }
 
     private sortDirectories(): void {

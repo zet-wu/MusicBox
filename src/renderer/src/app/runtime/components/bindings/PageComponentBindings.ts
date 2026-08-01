@@ -185,6 +185,39 @@ export class PageComponentBindings {
                 components.folderSourcesPage?.on('manageBindings', async (source: LibraryDirectoryOverview) => {
                     await this.context.dialogs.showFolderPlaylistBindingDialog(source);
                 });
+                components.folderSourcesPage?.on('trackPlayed', async (
+                    track: Track,
+                    index: number,
+                    tracks: Track[],
+                    mode: 'shuffle' | 'sequence'
+                ) => {
+                    await app.playTrackFromPlaylist(track, index, tracks, mode);
+                });
+                components.folderSourcesPage?.on('playAllTracks', async (tracks: Track[]) => {
+                    await app.handlePlayAllTracks(tracks);
+                });
+                components.folderSourcesPage?.on('appendAllTracks', async (tracks: Track[]) => {
+                    await app.addTracksToQueue(tracks);
+                });
+                components.folderSourcesPage?.on('trackRightClick', (
+                    track: Track,
+                    index: number,
+                    x: number,
+                    y: number,
+                    selectedTracks: Set<number>,
+                    selectedTrackItems: Track[],
+                    sourceTracks: Track[]
+                ) => {
+                    content.showContextMenu(
+                        x,
+                        y,
+                        track,
+                        index,
+                        selectedTracks,
+                        selectedTrackItems,
+                        sourceTracks
+                    );
+                });
                 break;
 
             case 'statisticsPage':
