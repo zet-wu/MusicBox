@@ -85,9 +85,34 @@
         justify-content: stretch;
     }
 
-    .folder-binding-search,
+    .playlist-binding-list {
+        max-height: none;
+        overflow: visible;
+    }
+
+    .folder-binding-search {
+        width: 100%;
+    }
+
     .folder-binding-search input {
         width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-body-bg);
+        color: var(--color-text);
+        font-size: 14px;
+        transition: border-color 160ms ease, box-shadow 160ms ease;
+
+        &::placeholder {
+            color: var(--color-text-secondary);
+        }
+
+        &:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
+        }
     }
 
     .folder-binding-playlist {
