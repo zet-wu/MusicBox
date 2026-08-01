@@ -1,5 +1,6 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {LibraryDirectoryOverview} from '../api/types/electron';
+import type {Track} from '../api/types/track';
 import {appConfirmationService} from '../features/appShell/service/AppConfirmationService';
 import {appNotificationService} from '../features/appShell/service/AppNotificationService';
 import {libraryDataService} from '../features/library/service/LibraryDataService';
@@ -75,5 +76,15 @@ describe('LibrarySourceManagementService', () => {
 
         expect(await service.bindToPlaylist(source.id, 'playlist-2')).toBe(true);
         expect(bind).toHaveBeenCalledWith('playlist-2', source.id);
+    });
+
+    it('按来源 ID 获取详情歌曲', async () => {
+        const tracks = [{fileId: 'track-1', title: '歌曲一'} as Track];
+        const getTracks = vi.spyOn(libraryDataService, 'getTracksByLibrarySource')
+            .mockResolvedValue(tracks);
+        const service = new LibrarySourceManagementService();
+
+        await expect(service.getTracks(source.id)).resolves.toEqual(tracks);
+        expect(getTracks).toHaveBeenCalledWith(source.id);
     });
 });

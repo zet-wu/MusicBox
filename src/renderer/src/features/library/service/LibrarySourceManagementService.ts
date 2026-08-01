@@ -1,4 +1,5 @@
 import type {LibraryDirectoryOverview} from '@api/types/electron';
+import type {Track} from '@api/types/track';
 import type {Unsubscribe} from '@api/types/common';
 import {appConfirmationService} from '@/features/appShell/service/AppConfirmationService';
 import {appNotificationService} from '@/features/appShell/service/AppNotificationService';
@@ -9,6 +10,10 @@ import {libraryDataService} from './LibraryDataService';
 export class LibrarySourceManagementService {
     getDirectories(): Promise<LibraryDirectoryOverview[]> {
         return libraryDataService.getLibraryDirectoryOverviews();
+    }
+
+    getTracks(sourceId: string): Promise<Track[]> {
+        return libraryDataService.getTracksByLibrarySource(sourceId);
     }
 
     onSourcesUpdated(handler: () => void): Unsubscribe {

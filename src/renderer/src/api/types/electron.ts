@@ -119,6 +119,7 @@ export interface ElectronLibraryAPI {
     importLibraryFiles(paths: string[], targetPlaylistId?: string): Promise<LibraryImportResult>;
     getLibrarySources(): Promise<LibrarySource[]>;
     getLibraryDirectoryOverviews(): Promise<LibraryDirectoryOverview[]>;
+    getTracksByLibrarySource(sourceId: string): Promise<Track[]>;
     registerLibraryDirectory(path: string): Promise<Result & {source?: LibrarySource}>;
     removeLibraryDirectory(path: string): Promise<Result & {removedTrackCount?: number}>;
     removeLibrarySource(sourceId: string): Promise<Result & {removedTrackCount?: number}>;

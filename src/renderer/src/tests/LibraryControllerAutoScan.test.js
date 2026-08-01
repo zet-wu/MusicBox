@@ -96,3 +96,61 @@ describe('LibraryController 批量扫描通知', () => {
         expect(sendToMainWindow.mock.calls.filter(([event]) => event === 'library:sourcesUpdated')).toHaveLength(1);
     });
 });
+
+function createSourceQueryController({source, tracks}) {
+    const sourceManager = {
+        getSource: vi.fn(() => source),
+        getSources: vi.fn(() => source ? [source] : []),
+        loadAndMigrate: vi.fn(async () => ({migrated: false})),
+        removeOrphanedPlaylistBindings: vi.fn(async () => [])
+    };
+    const cacheManager = {
+        getMusicFolders: vi.fn(() => []),
+        getScannedDirectories: vi.fn(() => []),
+        getAllTracks: vi.fn(() => tracks),
+        getAllPlaylists: vi.fn(() => []),
+        needsPlaylistMembershipMigration: vi.fn(() => false),
+        saveCache: vi.fn(async () => undefined),
+        getTracks: vi.fn(() => tracks)
+    };
+    return new LibraryController(
+        cacheManager,
+        {},
+        {},
+        {isNetworkPath: () => false},
+        {sendToMainWindow: vi.fn()},
+        {},
+        {},
+        vi.fn(),
+        async () => [],
+        sourceManager,
+        vi.fn(),
+        async () => false,
+        {}
+    );
+}
+
+describe('LibraryController 来源歌曲查询', () => {
+    it('只返回来源 knownFiles 中仍存在于索引的歌曲', async () => {
+        const source = {
+            id: 'source-1',
+            type: 'directory',
+            knownFiles: [
+                {trackId: 'track-1'},
+                {trackId: 'missing'},
+                {}
+            ]
+        };
+        const expected = {fileId: 'track-1', title: '来源歌曲'};
+        const unrelated = {fileId: 'track-2', title: '其他歌曲'};
+        const controller = createSourceQueryController({source, tracks: [expected, unrelated]});
+
+        await expect(controller.getTracksByLibrarySource(source.id)).resolves.toEqual([expected]);
+    });
+
+    it('来源不存在时返回空列表', async () => {
+        const controller = createSourceQueryController({source: undefined, tracks: []});
+
+        await expect(controller.getTracksByLibrarySource('missing')).resolves.toEqual([]);
+    });
+});

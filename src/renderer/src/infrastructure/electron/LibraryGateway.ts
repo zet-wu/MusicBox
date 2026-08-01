@@ -40,6 +40,10 @@ class LibraryGateway extends ElectronNamespaceAdapter<'library'> {
         return this.call('getLibraryDirectoryOverviews');
     }
 
+    getTracksByLibrarySource(sourceId: string): Promise<Track[]> {
+        return this.call('getTracksByLibrarySource', sourceId);
+    }
+
     getPlaylistBindings(playlistId: string): Promise<PlaylistSourceBinding[]> {
         return this.call('getPlaylistBindings', playlistId);
     }

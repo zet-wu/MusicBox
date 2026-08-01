@@ -1267,6 +1267,22 @@ export class LibraryController extends BaseController {
             }));
     }
 
+    @IpcHandle('library:getTracksByLibrarySource')
+    async getTracksByLibrarySource(sourceId: string): Promise<CachedTrack[]> {
+        try {
+            await this.ensureLibrarySourcesLoaded();
+            const source = this.librarySourceManager.getSource(sourceId);
+            if (!source) {
+                console.warn(`⚠️ LibraryController: 音乐库来源不存在: ${sourceId}`);
+                return [];
+            }
+            return this.getTracksForSource(source.id);
+        } catch (error: any) {
+            console.error('❌ 获取音乐库来源歌曲失败:', error);
+            return [];
+        }
+    }
+
     @IpcHandle('library:rescanLibrarySource')
     async rescanLibrarySource(sourceId: string): Promise<{success: boolean; error?: string}> {
         try {

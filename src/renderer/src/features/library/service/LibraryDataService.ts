@@ -53,6 +53,15 @@ export class LibraryDataService {
         );
     }
 
+    async getTracksByLibrarySource(sourceId: string): Promise<Track[]> {
+        this.assertNonEmptyString(sourceId, 'sourceId');
+        return await this.callGateway(
+            () => libraryGateway.getTracksByLibrarySource(sourceId),
+            'library.getTracksByLibrarySource',
+            []
+        );
+    }
+
     async loadCachedTracks(): Promise<Track[]> {
         return await this.callGateway(
             () => libraryGateway.loadCachedTracks(),
