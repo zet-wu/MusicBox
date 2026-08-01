@@ -1,6 +1,6 @@
 {
   "name": "musicbox",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "A visually stunning, plugin-based, and highly customizable local music player.",
   "main": "dist/main/main.js",
   "author": {
@@ -24,6 +24,8 @@
     "build:main": "electron-builder",
     "build:renderer": "cd src/renderer && npm run build",
     "build:win": "npm run build:python && npm run build:renderer && npm run build:ts && electron-builder --win",
+    "build:win:x64": "npm run build:python && npm run build:renderer && npm run build:ts && electron-builder --win --x64",
+    "build:win:arm64": "npm run build:python && npm run build:renderer && npm run build:ts && electron-builder --win --arm64",
     "build:mac": "npm run build:python && npm run build:renderer && npm run build:ts && electron-builder --mac",
     "build:linux": "npm run build:python && npm run build:renderer && npm run build:ts && electron-builder --linux",
     "build:icons": "electron-icon-builder --input=./docs/images/logo.png --output=build --flatten",

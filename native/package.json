@@ -5,6 +5,8 @@
   "main": "NativeAudio.node",
   "scripts": {
     "build": "cargo-cp-artifact -nc ../dist/main/NativeAudio.node -- cargo build --message-format=json-render-diagnostics --release",
+    "build:x64": "cargo-cp-artifact -nc ../dist/main/NativeAudio.node -- cargo build --message-format=json-render-diagnostics --release --target x86_64-pc-windows-msvc",
+    "build:arm64": "cargo-cp-artifact -nc ../dist/main/NativeAudio.node -- cargo build --message-format=json-render-diagnostics --release --target aarch64-pc-windows-msvc",
     "build-debug": "cargo-cp-artifact -nc NativeAudio.node -- cargo build --message-format=json-render-diagnostics"
   },
   "napi": {
@@ -13,6 +15,7 @@
       "defaults": true,
       "additional": [
         "x86_64-pc-windows-msvc",
+        "aarch64-pc-windows-msvc",
         "i686-pc-windows-msvc"
       ]
     }

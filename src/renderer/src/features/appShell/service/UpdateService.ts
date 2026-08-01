@@ -28,7 +28,7 @@ interface PackageInfo {
 }
 
 class UpdateService {
-    private readonly githubRepo = 'asxez/MusicBox';
+    private readonly githubRepo = 'zet-wu/MusicBox';
     private readonly githubApiUrl = `https://api.github.com/repos/${this.githubRepo}/releases/latest`;
     private readonly releasesUrl = `https://github.com/${this.githubRepo}/releases`;
 
