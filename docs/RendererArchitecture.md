@@ -86,7 +86,9 @@ extensions -> public Extension API
 
 当新功能需要跨模块协作时，应优先在组合根注入一个明确端口，而不是在模块内部读取全局对象。
 
-目录来源管理由 `FolderSourcesPage` 经 library feature service 调用类型化 Electron gateway；文件夹卡片只消费目录概览，不直接接触完整来源文件清单。文件夹与歌单的反向绑定使用独立弹窗，并通过页面组件绑定层接入 Dialog facade，避免页面直接访问全局应用对象。
+目录来源管理由 `FolderSourcesPage` 经 library feature service 调用类型化 Electron gateway；文件夹卡片只消费目录概览，不直接接触完整来源文件清单。双击卡片后，页面按来源 ID 延迟查询歌曲，并在 `folders` 路由内部复用 `TrackCollectionDetail` 展示详情，因此选择、播放、收藏和上下文菜单与艺术家、专辑详情保持一致，同时由页面 generation 防止过期查询回写。
+
+文件夹与歌单的反向绑定使用独立弹窗，并通过页面组件绑定层接入 Dialog facade，避免页面直接访问全局应用对象。“从文件夹创建歌单”同样复用标准 `CreatePlaylistDialog`，通过类型化 options 传递预填名称和来源上下文；创建动作服务先创建歌单，再调用现有来源绑定 API。普通创建和从歌曲创建歌单继续走同一弹窗，但不会携带来源上下文。
 
 ## 运行时 facade
 
