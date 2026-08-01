@@ -5,6 +5,7 @@ export interface CreatePlaylistActionResult {
     success: boolean;
     playlist?: Playlist;
     error?: string;
+    bindingError?: string;
 }
 
 export interface RenamePlaylistActionResult {
@@ -51,7 +52,8 @@ export class PlaylistDialogActionService {
     async createPlaylist(
         name: string,
         description: string,
-        tracksToAdd: Track[] = []
+        tracksToAdd: Track[] = [],
+        bindSourceId?: string
     ): Promise<CreatePlaylistActionResult> {
         const result = await libraryDataService.createPlaylist(name, description);
         if (!result.success || !result.playlist) {
@@ -59,12 +61,26 @@ export class PlaylistDialogActionService {
         }
 
         const trackIds = tracksToAdd.flatMap(track => track.fileId ? [track.fileId] : []);
-        if (trackIds.length > 0) {
+        if (!bindSourceId && trackIds.length > 0) {
             try {
                 await libraryDataService.addToPlaylist(result.playlist.id, trackIds);
                 console.log(`✅ PlaylistDialogActionService: ${trackIds.length} 首歌曲已添加到新歌单`);
             } catch (error) {
                 console.warn('⚠️ PlaylistDialogActionService: 添加歌曲到新歌单失败', error);
+            }
+        }
+
+        if (bindSourceId) {
+            const bindingResult = await libraryDataService.bindLibrarySourceToPlaylist(
+                result.playlist.id,
+                bindSourceId
+            );
+            if (!bindingResult.success) {
+                return {
+                    success: false,
+                    playlist: result.playlist,
+                    bindingError: bindingResult.error || '绑定歌单失败'
+                };
             }
         }
 

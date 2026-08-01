@@ -96,7 +96,7 @@ export class ComponentEventBinder {
             notify: this.context.notify,
             ui: {
                 showCreatePlaylistDialog: (track) => {
-                    this.ui.dialogs.showCreatePlaylistDialog(track);
+                    this.ui.dialogs.showCreatePlaylistDialog({tracksToAdd: track});
                 },
                 showPlaylistBindingDialog: (playlist) => (
                     this.ui.dialogs.showPlaylistBindingDialog(playlist)

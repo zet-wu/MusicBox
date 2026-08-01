@@ -309,6 +309,7 @@ export class FolderSourcesPage extends Component {
         menu.innerHTML = `
             <button class="context-menu-item" data-folder-action="open"><span>在文件管理器中打开</span></button>
             <button class="context-menu-item" data-folder-action="rescan"><span>重新扫描</span></button>
+            <button class="context-menu-item" data-folder-action="create-playlist"><span>从文件夹创建歌单</span></button>
             <button class="context-menu-item" data-folder-action="bindings"><span>管理绑定歌单</span></button>
             <div class="context-menu-divider"></div>
             <button class="context-menu-item danger" data-folder-action="remove"><span>移除音乐源</span></button>
@@ -323,6 +324,7 @@ export class FolderSourcesPage extends Component {
             if (!source || !action) return;
             if (action === 'open') void librarySourceManagementService.open(source);
             if (action === 'rescan') void this.handleRescan(source);
+            if (action === 'create-playlist') this.emit('createPlaylist', source, this.getDisplayName(source.path));
             if (action === 'bindings') this.emit('manageBindings', source);
             if (action === 'remove') void this.handleRemove(source);
         });

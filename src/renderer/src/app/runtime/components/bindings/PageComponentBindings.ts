@@ -185,6 +185,15 @@ export class PageComponentBindings {
                 components.folderSourcesPage?.on('manageBindings', async (source: LibraryDirectoryOverview) => {
                     await this.context.dialogs.showFolderPlaylistBindingDialog(source);
                 });
+                components.folderSourcesPage?.on(
+                    'createPlaylist',
+                    (source: LibraryDirectoryOverview, initialName: string) => {
+                        this.context.dialogs.showCreatePlaylistDialog({
+                            initialName,
+                            bindSource: {id: source.id, name: initialName}
+                        });
+                    }
+                );
                 components.folderSourcesPage?.on('trackPlayed', async (
                     track: Track,
                     index: number,

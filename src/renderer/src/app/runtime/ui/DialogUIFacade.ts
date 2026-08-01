@@ -3,6 +3,7 @@ import type {Track} from '@api/types/track';
 import type {LibraryDirectoryOverview} from '@api/types/electron';
 import type {ConfirmOptions} from '@/shared/types/AppContracts';
 import type {AppComponentPort} from '../AppRuntimePorts';
+import type {CreatePlaylistDialogOptions} from '@ui/dialogs/CreatePlaylistDialog';
 
 export class DialogUIFacade {
     constructor(private readonly app: AppComponentPort) {}
@@ -15,8 +16,8 @@ export class DialogUIFacade {
         this.app.components.settings?.switchToSection(sectionName);
     }
 
-    showCreatePlaylistDialog(tracks?: Track | Track[]): void {
-        this.app.components.createPlaylistDialog?.show(tracks);
+    showCreatePlaylistDialog(options: CreatePlaylistDialogOptions = {}): void {
+        this.app.components.createPlaylistDialog?.show(options);
     }
 
     async showAddToPlaylistDialog(tracks: Track[]): Promise<void> {

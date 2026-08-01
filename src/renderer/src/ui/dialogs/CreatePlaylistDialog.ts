@@ -10,11 +10,22 @@ interface PlaylistResult {
     success: boolean;
     playlist?: Playlist;
     error?: string;
+    bindingError?: string;
+}
+
+export interface CreatePlaylistDialogOptions {
+    tracksToAdd?: Track | Track[] | null;
+    initialName?: string;
+    bindSource?: {
+        id: string;
+        name: string;
+    };
 }
 
 class CreatePlaylistDialog extends Component {
     private isVisible: boolean;
     private currentTracksToAdd: Track[];
+    private bindSource: CreatePlaylistDialogOptions['bindSource'] | null;
     private listenersSetup: boolean;
     private overlay!: HTMLElement;
     public dialog!: HTMLElement;
@@ -29,23 +40,26 @@ class CreatePlaylistDialog extends Component {
         super(null, false);
         this.isVisible = false;
         this.currentTracksToAdd = []; // 用于记录要添加到新歌单的歌曲
+        this.bindSource = null;
         this.listenersSetup = false; // 事件监听器是否已设置
     }
 
-    show(tracksToAdd: Track | Track[] | null = null): void {
+    show(options: CreatePlaylistDialogOptions = {}): void {
         if (!this.listenersSetup) {
             this.setupElements();
             this.setupEventListeners();
             this.listenersSetup = true;
         }
         this.isVisible = true;
+        const tracksToAdd = options.tracksToAdd;
         this.currentTracksToAdd = tracksToAdd
             ? (Array.isArray(tracksToAdd) ? [...tracksToAdd] : [tracksToAdd])
             : [];
+        this.bindSource = options.bindSource ? {...options.bindSource} : null;
         this.overlay.style.display = 'flex';
 
         // 重置表单
-        this.nameInput.value = '';
+        this.nameInput.value = options.initialName || '';
         this.descriptionInput.value = '';
         this.hideError();
         this.validateInput();
@@ -53,6 +67,7 @@ class CreatePlaylistDialog extends Component {
         // 聚焦到输入框
         setTimeout(() => {
             this.nameInput.focus();
+            if (options.initialName) this.nameInput.select();
         }, 100);
     }
 
@@ -60,6 +75,7 @@ class CreatePlaylistDialog extends Component {
         this.isVisible = false;
         this.overlay.style.display = 'none';
         this.currentTracksToAdd = [];
+        this.bindSource = null;
     }
 
     destroy(): void {
@@ -136,6 +152,7 @@ class CreatePlaylistDialog extends Component {
 
         const name = this.nameInput.value.trim();
         const description = this.descriptionInput.value.trim();
+        const bindSource = this.bindSource;
 
         try {
             // 显示加载状态
@@ -144,13 +161,25 @@ class CreatePlaylistDialog extends Component {
             const result = await playlistDialogActionService.createPlaylist(
                 name,
                 description,
-                this.currentTracksToAdd
+                this.currentTracksToAdd,
+                bindSource?.id
             ) as PlaylistResult;
             if (result.success && result.playlist) {
                 // 触发歌单创建事件
                 this.emit('playlistCreated', result.playlist);
                 this.hide();
-                this.emit('notification', {type: 'info', message: `歌单 "${name}" 创建成功`});
+                const message = bindSource
+                    ? `歌单 "${name}" 已创建并绑定到文件夹`
+                    : `歌单 "${name}" 创建成功`;
+                this.emit('notification', {type: 'success', message});
+            } else if (result.playlist && result.bindingError) {
+                // 歌单已经创建，绑定失败时保留歌单并刷新导航。
+                this.emit('playlistCreated', result.playlist);
+                this.hide();
+                this.emit('notification', {
+                    type: 'error',
+                    message: `歌单 "${name}" 已创建，但文件夹绑定失败：${result.bindingError}`
+                });
             } else {
                 this.showError(result.error || '创建歌单失败');
             }
