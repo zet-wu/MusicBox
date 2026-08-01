@@ -16,7 +16,6 @@ const FOLDER_ICON_SIZES: Record<FolderViewSize, number> = {
     m: 150,
     l: 200
 };
-const FOLDER_COLLECTION_COVER = new URL('../../assets/icons/folder.svg', import.meta.url).href;
 
 export class FolderSourcesPage extends Component {
     private readonly container: HTMLElement | null;
@@ -363,7 +362,7 @@ export class FolderSourcesPage extends Component {
         this.trackCollectionDetail.show({
             title: this.getDisplayName(source.path),
             description: source.path,
-            cover: FOLDER_COLLECTION_COVER,
+            cover: null,
             backLabel: '返回文件夹',
             metadata: [
                 `${source.bindings.length} 个绑定歌单`,
