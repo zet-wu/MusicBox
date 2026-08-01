@@ -1,6 +1,6 @@
 {
   "name": "musicbox",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "A visually stunning, plugin-based, and highly customizable local music player.",
   "main": "dist/main/main.js",
   "author": {
