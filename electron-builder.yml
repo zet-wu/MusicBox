@@ -37,9 +37,6 @@ extraResources:
   - from: "dist/main/metadata_editor"
     to: "metadata_editor"
     filter: ["**/*"]
-  - from: "dist/main/NativeAudio.node"
-    to: "NativeAudio.node"
-    filter: ["**/*"]
 
 # macOS 配置
 mac:
@@ -64,6 +61,10 @@ mac:
 # Windows 配置
 win:
   icon: build/icons/icon.ico
+  extraResources:
+    - from: "dist/main/NativeAudio.node"
+      to: "NativeAudio.node"
+      filter: ["**/*"]
   target:
     - target: nsis
       arch:
