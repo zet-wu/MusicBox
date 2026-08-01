@@ -48,6 +48,13 @@
 - ▶️ 支持无间隙播放，为连续的专辑歌曲提供更好的播放体验
 - 🛠️ 更多特性开发中
 
+## 📔 TODOS
+- WASAPI 模式下的 Windows 媒体浮层同步
+- 分离文本与代码，i18n 支持
+- 支持更多来源的在线歌词，支持歌词翻译
+- 完善上游的首页音乐可视化、专注模式等功能
+- 更多的主题和外观选项
+
 ## 📃 文档
 - [总体架构](docs/Architecture.md)：进程模型、IPC、主进程、渲染进程、音频、插件、安全边界
 - [渲染进程架构](docs/RendererArchitecture.md)：重构后的 canonical 目录、依赖方向、兼容层和新增功能规则
@@ -59,7 +66,7 @@
 
 ### 预编译版本
 
-前往 [Releases](https://github.com/asxez/MusicBox/releases) 页面下载适合你系统的安装包。
+前往 [Releases](https://github.com/zet-wu/MusicBox/releases) 页面下载适合你系统的安装包。
 
 ### 从源码构建
 
@@ -126,7 +133,7 @@ npx electron dist/main/main.js --expose-gc
 
 #### 5. 构建应用
 
-安装包应在对应的目标操作系统上构建：
+安装包在对应的目标操作系统上构建：
 
 ```bash
 # Windows
@@ -139,10 +146,6 @@ npm run build:mac
 # Linux
 npm run build:linux
 ```
-
-其中 `build:win` 在 Windows 运行，`build:mac` 在 macOS 运行，`build:linux` 在 Linux 运行。Python helper、原生模块、代码签名及系统打包工具均可能依赖宿主平台，不应假设可以在单一系统上完成全部交叉构建。
-
-> 当前 `electron-builder.yml` 将 Windows 专用的 `NativeAudio.node` 配置为全平台资源。正式构建 macOS/Linux 安装包前，需要先将该资源调整为 Windows 条件配置；同时确保原生产物与目标 CPU 架构一致。
 
 ## 🛠️ 开发
 
