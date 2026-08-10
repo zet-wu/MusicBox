@@ -18,6 +18,7 @@ import {
 import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/library";
 import type {AlbumViewMode} from "@api/types/settings";
+import {escapeHtmlAttribute} from "@utils/html";
 
 type AlbumViewSize = 's' | 'm' | 'l';
 
@@ -395,7 +396,7 @@ class AlbumsPage extends Component {
                             ${this.sortDirection === 'asc' ? '↑' : '↓'}
                         </button>
                         <div class="search-inline">
-                            <input type="text" id="album-query" value="${this.escapeHtml(this.searchQuery)}" placeholder="搜索专辑或艺术家…" />
+                            <input type="text" id="album-query" value="${escapeHtmlAttribute(this.searchQuery)}" placeholder="搜索专辑或艺术家…" />
                         </div>
                         <div class="segmented" role="tablist" aria-label="视图模式">
                             <button class="seg-btn ${this.viewMode === 'grid' ? 'active' : ''}" data-view="grid">方格</button>
@@ -430,11 +431,12 @@ class AlbumsPage extends Component {
         const title = this.escapeHtml(album.name);
         const artist = this.escapeHtml(album.artist);
         const subtitle = `${artist} · ${album.year || '年份未知'} · ${trackCount} 首`;
+        const tooltip = `${album.name}\n${album.artist} · ${album.year || '年份未知'} · ${trackCount} 首`;
         return `
             <div class="albumsx-tile ${this.viewMode === 'list' ? 'albumsx-list-item' : ''}"
-                 data-album-key="${this.escapeHtml(album.key)}" title="${title}\n${subtitle}">
+                 data-album-key="${escapeHtmlAttribute(album.key)}" title="${escapeHtmlAttribute(tooltip)}">
                 <div class="art shadow">
-                    <img src="${cover}" alt="${title}" loading="lazy"/>
+                    <img src="${escapeHtmlAttribute(cover)}" alt="${escapeHtmlAttribute(album.name)}" loading="lazy"/>
                 </div>
                 <div class="meta">
                     <div class="name clamp-1">${title}</div>

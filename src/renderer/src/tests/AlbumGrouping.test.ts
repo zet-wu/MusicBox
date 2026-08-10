@@ -3,6 +3,7 @@ import type {Track} from '../api/types/library';
 import {libraryPageDataService} from '../features/library/service/LibraryPageDataService';
 import {coverLookupService} from '../features/mediaAssets/service/CoverLookupService';
 import {settingsStore} from '../features/settings/service/SettingsStore';
+import {escapeHtmlAttribute} from '../utils/html';
 
 const createTrack = (overrides: Partial<Track>): Track => ({
     title: '歌曲',
@@ -17,6 +18,34 @@ afterEach(() => {
 });
 
 describe('专辑分组', () => {
+    it('含特殊字符和多语言符号的专辑名可安全写入卡片属性', () => {
+        const albumName = [
+            'TVアニメ 『Summer Pockets』 "leave a mark"',
+            "中文《专辑》、日本語・한국어 'single' & <tag> = `template` / \\ |",
+            'Русский — Ελληνικά · العربية؟ · עברית · हिन्दी · ไทย',
+            'Tiếng Việt · français café · español ¡¿! · Deutsch ß · Türkçe İı',
+            '组合音标 e\u0301 · 全角ＡＢＣ１２３ · emoji 🎵🎧💿 · 音乐符号 𝄞 · 扩展汉字 𠮷'
+        ].join(' ');
+        const albums = libraryPageDataService.buildAlbums([
+            createTrack({album: albumName})
+        ]);
+
+        const escapedAlbumName = escapeHtmlAttribute(albumName);
+
+        expect(escapedAlbumName).toContain('&quot;leave a mark&quot;');
+        expect(escapedAlbumName).toContain('&#39;single&#39; &amp; &lt;tag&gt;');
+        expect(escapedAlbumName).toContain('中文《专辑》、日本語・한국어');
+        expect(escapedAlbumName).toContain('Русский — Ελληνικά · العربية؟ · עברית · हिन्दी · ไทย');
+        expect(escapedAlbumName).toContain('Tiếng Việt · français café · español ¡¿! · Deutsch ß · Türkçe İı');
+        expect(escapedAlbumName).toContain('组合音标 e\u0301 · 全角ＡＢＣ１２３ · emoji 🎵🎧💿 · 音乐符号 𝄞 · 扩展汉字 𠮷');
+        expect(escapedAlbumName).not.toContain('"');
+        expect(escapedAlbumName).not.toContain("'");
+        expect(escapedAlbumName).not.toContain('<');
+        expect(escapedAlbumName).not.toContain('>');
+        expect(escapedAlbumName.replace(/&(?:amp|lt|gt|quot|#39);/g, '')).not.toContain('&');
+        expect(escapeHtmlAttribute(albums[0].key)).toBe(escapeHtmlAttribute(albumName.toLocaleLowerCase()));
+    });
+
     it('默认合并不同艺术家的同名专辑', () => {
         const albums = libraryPageDataService.buildAlbums([
             createTrack({artist: '甲', album: ' 合辑 '}),
