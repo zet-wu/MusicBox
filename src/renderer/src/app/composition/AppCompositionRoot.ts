@@ -35,6 +35,7 @@ import {trackCoverNetworkPreferenceService} from '@/features/settings/service';
 import {systemMediaKeysGateway} from '@/infrastructure/electron';
 import {appShellRuntimeHost} from '@/features/appShell/service';
 import type {AudioEngineManagerBridge} from '@/features/equalizer/service';
+import {ContentMountManager} from '@/app/runtime/components/ContentMountManager';
 
 interface AppCompositionRootOptions {
     app: MusicBoxCompositionHost;
@@ -74,10 +75,12 @@ export function createAppComposition({
 }: AppCompositionRootOptions): AppComposition {
     const hostPorts = createAppHostPorts(app);
     const componentPort = hostPorts.components;
-    const ui = createAppUIPorts(hostPorts.components);
+    const contentMounts = new ContentMountManager();
+    const ui = createAppUIPorts(hostPorts.components, contentMounts);
     const componentRegistry = new ComponentRegistry({
         components,
-        setupComponentEvents: (componentName: string) => app.setupComponentEvents(componentName)
+        setupComponentEvents: (componentName: string) => app.setupComponentEvents(componentName),
+        contentMounts
     });
     const domEventBinder = new DOMEventBinder({
         app: hostPorts.domEvents,
@@ -89,6 +92,7 @@ export function createAppComposition({
         playbackUI: ui.playback
     });
     const shellView = new AppShellView({
+        contentMounts,
         onScanMusicFolder: () => app.scanMusicFolder(),
         onAddMusicFiles: () => app.addMusicFiles(),
         onShowHomePage: () => app.handleViewChange('home-page')

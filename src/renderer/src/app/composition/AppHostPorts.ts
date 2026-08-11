@@ -110,6 +110,7 @@ export interface MusicBoxCompositionHost {
     showNetworkDriveModal(): boolean;
     showPluginManager(): Promise<boolean>;
     showScanProgress(): void;
+    hideScanProgress(): void;
     showSuccess(message: string): void;
     showWelcomeScreen(): void;
     syncDesktopLyricsButtonState(): Promise<void>;
@@ -196,6 +197,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
         fileImport: {
             addManagedEventListener: (...args) => app.addManagedEventListener(...args),
             showScanProgress: () => app.showScanProgress(),
+            hideScanProgress: () => app.hideScanProgress(),
             showSuccess: notificationPort.showSuccess,
             showError: notificationPort.showError,
             showInfo: notificationPort.showInfo

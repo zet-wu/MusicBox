@@ -2,9 +2,13 @@ import type {Playlist} from '@api/types/playlist';
 import type {Track} from '@api/types/track';
 import type {AppComponentPort} from '../AppRuntimePorts';
 import type {CollectionType} from '@/features/playlists/domain/CollectionCapabilities';
+import {ContentMountManager, type ContentViewKey} from '../components/ContentMountManager';
 
 export class ContentUIFacade {
-    constructor(private readonly app: AppComponentPort) {}
+    constructor(
+        private readonly app: AppComponentPort,
+        private readonly contentMounts: ContentMountManager
+    ) {}
 
     clearPlaylistDetailSelection(): void {
         this.app.components.playlistDetailPage?.clearSelection();
@@ -44,10 +48,12 @@ export class ContentUIFacade {
     }
 
     async showPlaylistDetail(playlist: Playlist): Promise<void> {
+        this.activate('playlist-detail');
         await this.app.components.playlistDetailPage?.show(playlist);
     }
 
     async showSystemCollection(collectionType: Exclude<CollectionType, 'playlist'>): Promise<void> {
+        this.activate('playlist-detail');
         await this.app.components.playlistDetailPage?.showSystemCollection(collectionType);
     }
 
@@ -56,6 +62,7 @@ export class ContentUIFacade {
     }
 
     async showNetworkDriveDetail(drive: unknown): Promise<void> {
+        this.activate('network-drive-detail');
         await this.app.components.networkDriveDetailPage?.show(drive as any);
     }
 
@@ -104,26 +111,32 @@ export class ContentUIFacade {
     }
 
     async showHomePage(): Promise<void> {
+        this.activate('home-page');
         await this.app.components.homePage?.show();
     }
 
     async showRecentPage(): Promise<void> {
+        this.activate('recent');
         await this.app.components.recentPage?.show();
     }
 
     async showArtistsPage(): Promise<void> {
+        this.activate('artists');
         await this.app.components.artistsPage?.show();
     }
 
     async showAlbumsPage(): Promise<void> {
+        this.activate('albums');
         await this.app.components.albumsPage?.show();
     }
 
     async showPlaylistsPage(): Promise<void> {
+        this.activate('playlists');
         await this.app.components.playlistsPage?.show();
     }
 
     async showFolderSourcesPage(): Promise<void> {
+        this.activate('folders');
         await this.app.components.folderSourcesPage?.show();
     }
 
@@ -132,6 +145,7 @@ export class ContentUIFacade {
     }
 
     async showStatisticsPage(): Promise<void> {
+        this.activate('statistics');
         await this.app.components.statisticsPage?.show();
     }
 
@@ -145,6 +159,7 @@ export class ContentUIFacade {
         this.app.components.statisticsPage?.hide();
         this.app.components.playlistDetailPage?.hide();
         this.app.components.networkDriveDetailPage?.hide();
+        this.contentMounts.hideAllPages();
     }
 
     updateSidebarSelection(type: string, id: string | null = null): void {
@@ -181,5 +196,9 @@ export class ContentUIFacade {
 
     focusSearchInput(): void {
         this.app.components.search?.focusInput();
+    }
+
+    private activate(key: ContentViewKey): void {
+        this.contentMounts.activate(key);
     }
 }
