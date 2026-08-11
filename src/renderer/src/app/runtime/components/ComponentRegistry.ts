@@ -31,11 +31,13 @@ import {RenamePlaylistDialog} from "@ui/dialogs/RenamePlaylistDialog";
 import {cacheManager} from "@/shared/cache";
 import type {ComponentMap} from "@/app/runtime/components/ComponentTypes";
 import {ContentMountManager, type ContentViewKey} from './ContentMountManager';
+import type {MainContentScrollCoordinator} from '../MainContentScrollCoordinator';
 
 interface ComponentRegistryOptions {
     components: ComponentMap;
     setupComponentEvents: (componentName: string) => void;
     contentMounts: ContentMountManager;
+    mainContentScroll: MainContentScrollCoordinator;
 }
 
 type OnDemandComponentName =
@@ -49,11 +51,13 @@ export class ComponentRegistry {
     private readonly components: ComponentMap;
     private readonly setupComponentEvents: (componentName: string) => void;
     private readonly contentMounts: ContentMountManager;
+    private readonly mainContentScroll: MainContentScrollCoordinator;
 
-    constructor({components, setupComponentEvents, contentMounts}: ComponentRegistryOptions) {
+    constructor({components, setupComponentEvents, contentMounts, mainContentScroll}: ComponentRegistryOptions) {
         this.components = components;
         this.setupComponentEvents = setupComponentEvents;
         this.contentMounts = contentMounts;
+        this.mainContentScroll = mainContentScroll;
     }
 
     initializeComponents(): void {
@@ -104,14 +108,14 @@ export class ComponentRegistry {
 
         const artistsPageEnabled = getSetting('artistsPage', true);
         if (artistsPageEnabled) {
-            this.components.artistsPage = new ArtistsPage(this.mount('artists'));
+            this.components.artistsPage = new ArtistsPage(this.mount('artists'), this.mainContentScroll);
         } else {
             this.components.artistsPage = null;
         }
 
         const albumsPageEnabled = getSetting('albumsPage', true);
         if (albumsPageEnabled) {
-            this.components.albumsPage = new AlbumsPage(this.mount('albums'));
+            this.components.albumsPage = new AlbumsPage(this.mount('albums'), this.mainContentScroll);
         } else {
             this.components.albumsPage = null;
         }
@@ -141,13 +145,13 @@ export class ComponentRegistry {
                 break;
             case 'artistsPage':
                 if (!this.components.artistsPage) {
-                    this.components.artistsPage = new ArtistsPage(this.mount('artists'));
+                    this.components.artistsPage = new ArtistsPage(this.mount('artists'), this.mainContentScroll);
                     this.setupComponentEvents('artistsPage');
                 }
                 break;
             case 'albumsPage':
                 if (!this.components.albumsPage) {
-                    this.components.albumsPage = new AlbumsPage(this.mount('albums'));
+                    this.components.albumsPage = new AlbumsPage(this.mount('albums'), this.mainContentScroll);
                     this.setupComponentEvents('albumsPage');
                 }
                 break;

@@ -21,15 +21,7 @@ import type {VirtualItem} from "@tanstack/virtual-core";
 import type {Unsubscribe} from "@api/types/common";
 import type {ArtistViewMode} from "@api/types/settings";
 import type {Track} from "@api/types/track";
-
-interface SourceRectSnapshot {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    radius: string;
-    scrollTop: number;
-}
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 type ArtistViewSize = 's' | 'm' | 'l';
 
@@ -41,6 +33,9 @@ const ARTIST_COVER_SIZES: Record<ArtistViewSize, number> = {
 
 class ArtistsPage extends Component {
     private container: any;
+    private readonly listRoot: HTMLElement;
+    private readonly detailRoot: HTMLElement;
+    private readonly scroll: MainContentScrollCoordinator;
     private tracks: Track[];
     private artists: ArtistInfo[];
     private filteredArtists: ArtistInfo[];
@@ -58,11 +53,22 @@ class ArtistsPage extends Component {
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private isVisible: boolean;
     private renderDirty = true;
+    private listRenderDirty = true;
+    private listScrollTop = 0;
     private artistVirtualizer: ElementVirtualizer | null;
     private readonly trackCollectionDetail: TrackCollectionDetail;
 
-    constructor(container: string | Element | null) {
+    constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
+        const pageRoot = this.element as HTMLElement;
+        this.scroll = scroll;
+        this.listRoot = document.createElement('div');
+        this.listRoot.className = 'artists-list-root';
+        this.detailRoot = document.createElement('div');
+        this.detailRoot.className = 'artists-detail-root';
+        this.detailRoot.style.display = 'none';
+        pageRoot.replaceChildren(this.listRoot, this.detailRoot);
+        this.container = this.listRoot;
         this.tracks = [];
         this.artists = [];
         this.filteredArtists = [];
@@ -79,11 +85,8 @@ class ArtistsPage extends Component {
         this.coverGeneration = 0;
         this.isVisible = false;
         this.artistVirtualizer = null;
-        this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
-            onBack: () => {
-                this.selectedArtist = null;
-                this.renderArtistsList();
-            },
+        this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
+            onBack: () => this.closeArtistDetail(),
             onTrackPlayed: (track, index, tracks, mode) => {
                 this.emit('trackPlayed', track, index, tracks, mode);
             },
@@ -112,6 +115,7 @@ class ArtistsPage extends Component {
             this._coverLoading.clear();
             this._coverFailures.clear();
             this.renderDirty = true;
+            if (this.selectedArtist) this.listRenderDirty = true;
             if (!enabled) {
                 const selectedArtistName = this.selectedArtist?.name;
                 this.processArtists();
@@ -153,7 +157,7 @@ class ArtistsPage extends Component {
             this.renderDirty = true;
         }
 
-        if (this.renderDirty || !this.container?.firstElementChild) {
+        if (this.renderDirty || !this.listRoot.firstElementChild) {
             this.render();
         } else if (!this.selectedArtist) {
             this.mountArtistVirtualizer();
@@ -173,6 +177,7 @@ class ArtistsPage extends Component {
         this.destroyArtistVirtualizer();
         if (this.selectedArtist) {
             this.renderDirty = true;
+            this.scroll.remember('artists', this.listScrollTop);
         }
         this.trackCollectionDetail.hide();
         this.selectedArtist = null;
@@ -206,7 +211,7 @@ class ArtistsPage extends Component {
     }
 
     setupElements(): void {
-        this.container = this.element;
+        this.container = this.listRoot;
     }
 
     setupAPIListeners(): void {
@@ -219,6 +224,7 @@ class ArtistsPage extends Component {
                 ? this.artists.find((artist) => artist.name === selectedArtistName) || null
                 : null;
             this.renderDirty = true;
+            if (this.selectedArtist) this.listRenderDirty = true;
             if (this.isVisible) this.render();
         });
     }
@@ -241,6 +247,9 @@ class ArtistsPage extends Component {
     }
 
     renderArtistsList(): void {
+        this.container = this.listRoot;
+        this.listRoot.style.display = 'block';
+        this.detailRoot.style.display = 'none';
         this.trackCollectionDetail.hide();
         const coverSize = ARTIST_COVER_SIZES[this.viewSize];
         this.container.innerHTML = `
@@ -298,6 +307,7 @@ class ArtistsPage extends Component {
 
         this.setupEventListeners();
         this.mountArtistVirtualizer();
+        this.listRenderDirty = false;
     }
 
     // 设置事件监听器
@@ -368,19 +378,12 @@ class ArtistsPage extends Component {
         // 记录源位置信息用于可能的返回动画
         const scrollEl = this.getScrollContainer();
         const srcRadius = srcContainer ? getComputedStyle(srcContainer).borderRadius : '50%';
-        const sourceSnapshot: SourceRectSnapshot = {
-            left: srcRect.left,
-            top: srcRect.top,
-            width: srcRect.width,
-            height: srcRect.height,
-            radius: srcRadius,
-            scrollTop: scrollEl ? scrollEl.scrollTop : (window.scrollY || 0)
-        };
-        void sourceSnapshot;
+        this.rememberArtistListPosition(scrollEl?.scrollTop ?? window.scrollY ?? 0);
 
         // 渲染艺术家详情页面
         this.selectedArtist = artist;
         this.render();
+        this.scroll.scrollToTop();
 
         const targetAvatar = this.container.querySelector('.detail-target-avatar');
         const targetImg = targetAvatar ? targetAvatar.querySelector('img') : null;
@@ -485,9 +488,7 @@ class ArtistsPage extends Component {
 
     // 获取滚动容器
     getScrollContainer(): any {
-        return this.container.closest('.scrollable') ||
-            this.container.closest('.page-content') ||
-            document.documentElement;
+        return document.querySelector<HTMLElement>('.main-content');
     }
 
     // 获取艺术家封面
@@ -548,7 +549,7 @@ class ArtistsPage extends Component {
 
     // 设置艺术家卡片加载状态
     _setArtistCardLoading(artistName: string, isLoading: boolean): void {
-        const artistCards = this.container.querySelectorAll(`[data-artist="${CSS.escape(artistName)}"]`);
+        const artistCards = this.listRoot.querySelectorAll<HTMLElement>(`[data-artist="${CSS.escape(artistName)}"]`);
         artistCards.forEach((card: HTMLElement) => {
             const img = card.querySelector('img');
             if (img) {
@@ -565,7 +566,7 @@ class ArtistsPage extends Component {
 
     // 更新艺术家卡片封面
     _updateArtistCardCover(artistName: string, imageUrl: string): void {
-        const artistCards = this.container.querySelectorAll(`[data-artist="${CSS.escape(artistName)}"]`);
+        const artistCards = this.listRoot.querySelectorAll<HTMLElement>(`[data-artist="${CSS.escape(artistName)}"]`);
         artistCards.forEach((card: HTMLElement) => {
             const img = card.querySelector('img');
             if (img && imageUrl) {
@@ -862,6 +863,9 @@ class ArtistsPage extends Component {
 
         const artist = this.selectedArtist;
         this.destroyArtistVirtualizer();
+        this.container = this.detailRoot;
+        this.listRoot.style.display = 'none';
+        this.detailRoot.style.display = 'block';
         this.trackCollectionDetail.show({
             title: artist.name,
             description: '艺术家歌曲',
@@ -876,8 +880,30 @@ class ArtistsPage extends Component {
     }
 
     showArtistDetail(artist: ArtistInfo): void {
+        this.rememberArtistListPosition();
         this.selectedArtist = artist;
         this.render();
+        this.scroll.scrollToTop();
+    }
+
+    private closeArtistDetail(): void {
+        this.selectedArtist = null;
+        this.trackCollectionDetail.hide();
+        if (this.listRenderDirty || !this.listRoot.firstElementChild) {
+            this.renderArtistsList();
+        } else {
+            this.container = this.listRoot;
+            this.detailRoot.style.display = 'none';
+            this.listRoot.style.display = 'block';
+            this.mountArtistVirtualizer();
+        }
+        this.scroll.remember('artists', this.listScrollTop);
+        this.scroll.restore('artists', () => this.isVisible && !this.selectedArtist);
+    }
+
+    private rememberArtistListPosition(scrollTop = this.getScrollContainer()?.scrollTop ?? 0): void {
+        this.listScrollTop = Math.max(0, scrollTop);
+        this.scroll.remember('artists', this.listScrollTop);
     }
 
     formatDuration(seconds: number = 0): string {

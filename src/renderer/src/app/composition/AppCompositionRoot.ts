@@ -82,7 +82,8 @@ export function createAppComposition({
     const componentRegistry = new ComponentRegistry({
         components,
         setupComponentEvents: (componentName: string) => app.setupComponentEvents(componentName),
-        contentMounts
+        contentMounts,
+        mainContentScroll
     });
     const domEventBinder = new DOMEventBinder({
         app: hostPorts.domEvents,
