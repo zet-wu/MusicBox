@@ -47,6 +47,10 @@ export interface TrackCollectionDetailCallbacks {
     ): void;
 }
 
+interface TrackCollectionDetailOptions {
+    observeNetworkPreference?: boolean;
+}
+
 /**
  * 为艺术家、专辑等只读歌曲集合提供统一的歌单式详情交互。
  */
@@ -63,7 +67,8 @@ export class TrackCollectionDetail {
 
     constructor(
         private readonly container: HTMLElement,
-        private readonly callbacks: TrackCollectionDetailCallbacks
+        private readonly callbacks: TrackCollectionDetailCallbacks,
+        options: TrackCollectionDetailOptions = {}
     ) {
         this.coverPreferenceUnsubscribe = trackCoverDisplayPreferenceService.onChanged((enabled) => {
             this.showCovers = enabled;
@@ -71,11 +76,13 @@ export class TrackCollectionDetail {
                 this.render();
             }
         });
-        this.networkPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged(() => {
-            if (this.model) {
-                this.render();
-            }
-        });
+        this.networkPreferenceUnsubscribe = options.observeNetworkPreference === false
+            ? () => undefined
+            : trackCoverNetworkPreferenceService.onChanged(() => {
+                if (this.model) {
+                    this.render();
+                }
+            });
     }
 
     show(model: TrackCollectionDetailModel): void {

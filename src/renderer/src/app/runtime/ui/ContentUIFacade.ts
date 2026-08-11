@@ -151,10 +151,6 @@ export class ContentUIFacade {
         this.app.components.navigation?.updateSidebarSelection?.(type, id);
     }
 
-    async refreshNavigationPlaylists(): Promise<void> {
-        await this.app.components.navigation?.refreshPlaylists?.();
-    }
-
     async loadNetworkDrives(): Promise<void> {
         await this.app.components.navigation?.loadNetworkDrives?.();
     }

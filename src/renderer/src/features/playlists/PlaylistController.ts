@@ -22,7 +22,6 @@ interface PlaylistUI {
     reloadPlaylistDetailTracks(): Promise<void>;
     updatePlaylistDetailInfo(playlist: Playlist): boolean;
     updateNavigationPlaylistInfo(playlist: Playlist): void;
-    refreshNavigationPlaylists(): Promise<void>;
 }
 
 interface PlaylistPlaybackIntegrations {
@@ -105,11 +104,11 @@ export class PlaylistController {
     }
 
     async handlePlaylistCreated(): Promise<void> {
-        await this.refreshNavigationPlaylists();
+        // 侧边栏由主进程 playlistsUpdated 推送统一刷新。
     }
 
     async handleTrackAddedToPlaylist(): Promise<void> {
-        await this.refreshNavigationPlaylists();
+        // 侧边栏由主进程 playlistsUpdated 推送统一刷新。
     }
 
     async handlePlaylistSelected(playlist: Playlist): Promise<void> {
@@ -122,30 +121,23 @@ export class PlaylistController {
     }
 
     async handlePlaylistUpdated(): Promise<void> {
-        await this.refreshNavigationPlaylists();
+        // 当前详情页已就地更新，其余视图由主进程推送刷新。
     }
 
     async handlePlaylistBindingsChanged(): Promise<void> {
         if (this.app.currentView === 'playlist-detail') {
             await this.ui.reloadPlaylistDetailTracks();
         }
-        await this.refreshNavigationPlaylists();
     }
 
     async handlePlaylistRenamed(playlist?: Playlist): Promise<void> {
         if (playlist && this.app.currentView === 'playlist-detail') {
             this.ui.updatePlaylistDetailInfo(playlist);
         }
-        await this.refreshNavigationPlaylists();
     }
 
     async handlePlaylistCoverUpdated(playlist: Playlist): Promise<void> {
         this.ui.updateNavigationPlaylistInfo(playlist);
-        await this.refreshNavigationPlaylists();
-    }
-
-    async refreshNavigationPlaylists(): Promise<void> {
-        await this.ui.refreshNavigationPlaylists();
     }
 
     private resolveIndexAfterRemoval(removedIndex: number, currentIndex: number, nextLength: number): number {

@@ -178,6 +178,23 @@ describe('页面路由和最近播放索引', () => {
         expect(content.hideAllPages).not.toHaveBeenCalled();
     });
 
+    it('重复进入同一视图时不重复隐藏和显示页面', async () => {
+        vi.stubGlobal('document', {querySelector: vi.fn(() => null)});
+        const app = {currentView: 'home-page', library: [], filteredLibrary: []};
+        const content = {
+            hideAllPages: vi.fn(),
+            updateSidebarSelection: vi.fn(),
+            showHomePage: vi.fn().mockResolvedValue(undefined)
+        };
+        const router = new ViewRouter({app, content: content as never});
+
+        await router.handleViewChange('home-page');
+        await router.handleViewChange('home-page');
+
+        expect(content.hideAllPages).toHaveBeenCalledOnce();
+        expect(content.showHomePage).toHaveBeenCalledOnce();
+    });
+
     it('跨日期分组保留原始队列索引', () => {
         const first = createTrack('first', {playTime: new Date('2026-07-30T10:00:00').getTime()});
         const second = createTrack('second', {playTime: new Date('2026-07-29T10:00:00').getTime()});

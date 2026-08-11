@@ -33,6 +33,8 @@ export class FolderSourcesPage extends Component {
     private loading = false;
     private refreshGeneration = 0;
     private detailGeneration = 0;
+    private hasLoaded = false;
+    private renderDirty = true;
     private readonly trackCollectionDetail: TrackCollectionDetail;
     public isVisible = false;
 
@@ -61,6 +63,7 @@ export class FolderSourcesPage extends Component {
             }
         });
         this.removeSourcesUpdatedListener = librarySourceManagementService.onSourcesUpdated(() => {
+            this.renderDirty = true;
             if (this.isVisible && !this.loading) void this.refresh();
         });
         this.addEventListenerManaged(document, 'click', () => this.hideContextMenu());
@@ -74,8 +77,12 @@ export class FolderSourcesPage extends Component {
         if (!this.container) return;
         this.container.style.display = 'block';
         this.isVisible = true;
-        this.renderLoading();
-        await this.refresh();
+        if (!this.hasLoaded || this.renderDirty) {
+            this.renderLoading();
+            await this.refresh();
+        } else if (!this.container.firstElementChild) {
+            this.render();
+        }
     }
 
     hide(): void {
@@ -83,11 +90,14 @@ export class FolderSourcesPage extends Component {
         this.detailGeneration++;
         this.loading = false;
         this.isVisible = false;
+        if (this.selectedSource) {
+            this.renderDirty = true;
+        }
         this.selectedSource = null;
         this.detailTracks = [];
         this.trackCollectionDetail.hide();
         this.hideContextMenu();
-        if (this.container) this.container.innerHTML = '';
+        if (this.container) this.container.style.display = 'none';
     }
 
     destroy(): void {
@@ -105,6 +115,7 @@ export class FolderSourcesPage extends Component {
             const directories = await librarySourceManagementService.getDirectories();
             if (!this.isVisible || refreshGeneration !== this.refreshGeneration) return;
             this.directories = directories;
+            this.hasLoaded = true;
             this.sortDirectories();
             if (this.selectedSource) {
                 const selectedSource = this.findSource(this.selectedSource.id);
@@ -174,6 +185,7 @@ export class FolderSourcesPage extends Component {
         `;
         this.setupPageListeners();
         this.applySearchFilter();
+        this.renderDirty = false;
     }
 
     private renderLoading(): void {
@@ -243,7 +255,7 @@ export class FolderSourcesPage extends Component {
             });
         });
         const addFolder = async (): Promise<void> => {
-            if (await librarySourceManagementService.addDirectories()) await this.refresh();
+            await librarySourceManagementService.addDirectories();
         };
         this.container.querySelector('#folder-source-add')?.addEventListener('click', () => void addFolder());
         this.container.querySelector('[data-empty-add]')?.addEventListener('click', () => void addFolder());
@@ -337,11 +349,11 @@ export class FolderSourcesPage extends Component {
     }
 
     private async handleRescan(source: LibraryDirectoryOverview): Promise<void> {
-        if (await librarySourceManagementService.rescan(source)) await this.refresh();
+        await librarySourceManagementService.rescan(source);
     }
 
     private async handleRemove(source: LibraryDirectoryOverview): Promise<void> {
-        if (await librarySourceManagementService.remove(source)) await this.refresh();
+        await librarySourceManagementService.remove(source);
     }
 
     private async showSourceDetail(source: LibraryDirectoryOverview): Promise<void> {

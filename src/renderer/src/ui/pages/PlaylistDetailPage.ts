@@ -1336,8 +1336,6 @@ class PlaylistDetailPage extends Component {
         if (result.changed) {
             this.currentPlaylist.coverImage = result.coverImage || null;
             this.updateCoverDisplay();
-            this.emit('playlistUpdated', this.currentPlaylist);
-            this.emit('playlistCoverUpdated', this.currentPlaylist);
         }
     }
 
@@ -1348,8 +1346,6 @@ class PlaylistDetailPage extends Component {
         if (!result?.changed || this.currentPlaylist !== playlist) return;
         playlist.coverImage = result.coverImage || null;
         this.updateCoverDisplay();
-        this.emit('playlistUpdated', playlist);
-        this.emit('playlistCoverUpdated', playlist);
     }
 
     // 设置歌单封面
@@ -1360,8 +1356,6 @@ class PlaylistDetailPage extends Component {
         if (result.changed) {
             this.currentPlaylist.coverImage = result.coverImage || null;
             this.updateCoverDisplay();
-            this.emit('playlistUpdated', this.currentPlaylist);
-            this.emit('playlistCoverUpdated', this.currentPlaylist);
         }
     }
 
@@ -1373,8 +1367,6 @@ class PlaylistDetailPage extends Component {
         if (result.changed) {
             this.currentPlaylist.coverImage = result.coverImage || null;
             this.updateCoverDisplay();
-            this.emit('playlistUpdated', this.currentPlaylist);
-            this.emit('playlistCoverUpdated', this.currentPlaylist);
         }
     }
 

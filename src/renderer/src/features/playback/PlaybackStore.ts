@@ -49,10 +49,16 @@ export class PlaybackStore {
     }
 
     setTrack(track: Track | null): void {
+        if (this.state.currentTrack === track) {
+            return;
+        }
         this.patch({currentTrack: track}, {type: 'trackChanged', payload: track});
     }
 
     setTrackIndex(index: number): void {
+        if (this.state.currentIndex === index) {
+            return;
+        }
         this.patch({currentIndex: index}, {type: 'trackIndexChanged', payload: index});
     }
 
@@ -61,22 +67,37 @@ export class PlaybackStore {
     }
 
     setPlaybackState(state: PlaybackStateName): void {
+        if (this.state.isPlaying === (state === 'playing')) {
+            return;
+        }
         this.patch({isPlaying: state === 'playing'}, {type: 'playbackStateChanged', payload: state});
     }
 
     setPosition(position: number): void {
+        if (this.state.position === position) {
+            return;
+        }
         this.patch({position}, {type: 'positionChanged', payload: position});
     }
 
     setDuration(duration: number): void {
+        if (this.state.duration === duration) {
+            return;
+        }
         this.patch({duration}, {type: 'durationChanged', payload: duration});
     }
 
     setVolume(volume: number): void {
+        if (this.state.volume === volume) {
+            return;
+        }
         this.patch({volume}, {type: 'volumeChanged', payload: volume});
     }
 
     setPlayMode(playMode: PlayMode): void {
+        if (this.state.playMode === playMode) {
+            return;
+        }
         this.patch({playMode}, {type: 'playModeChanged', payload: playMode});
     }
 

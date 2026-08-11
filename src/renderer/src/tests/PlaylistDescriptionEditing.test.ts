@@ -40,7 +40,7 @@ describe('歌单描述编辑', () => {
         );
     });
 
-    it('编辑当前活动歌单后立即更新详情页并刷新侧边栏', async () => {
+    it('编辑当前活动歌单后只就地更新详情页', async () => {
         const updatePlaylistDetailInfo = vi.fn(() => true);
         const refreshNavigationPlaylists = vi.fn(async () => undefined);
         const controller = new PlaylistController({
@@ -58,10 +58,10 @@ describe('歌单描述编辑', () => {
         await controller.handlePlaylistRenamed(playlist);
 
         expect(updatePlaylistDetailInfo).toHaveBeenCalledWith(playlist);
-        expect(refreshNavigationPlaylists).toHaveBeenCalledOnce();
+        expect(refreshNavigationPlaylists).not.toHaveBeenCalled();
     });
 
-    it('编辑非活动歌单时只刷新侧边栏', async () => {
+    it('编辑非活动歌单时等待主进程推送更新侧边栏', async () => {
         const updatePlaylistDetailInfo = vi.fn(() => true);
         const refreshNavigationPlaylists = vi.fn(async () => undefined);
         const controller = new PlaylistController({
@@ -78,6 +78,6 @@ describe('歌单描述编辑', () => {
         });
 
         expect(updatePlaylistDetailInfo).not.toHaveBeenCalled();
-        expect(refreshNavigationPlaylists).toHaveBeenCalledOnce();
+        expect(refreshNavigationPlaylists).not.toHaveBeenCalled();
     });
 });

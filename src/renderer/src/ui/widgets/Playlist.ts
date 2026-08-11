@@ -25,6 +25,7 @@ class Playlist extends Component {
     currentTrackIndex: number;
     draggedQueueId: string | null;
     listenersSetup: boolean;
+    renderPending: boolean;
     panel!: HTMLElement;
     closeBtn!: HTMLElement;
     clearBtn!: HTMLElement;
@@ -41,6 +42,7 @@ class Playlist extends Component {
         this.currentTrackIndex = -1;
         this.draggedQueueId = null;
         this.listenersSetup = false; // 事件监听器是否已设置
+        this.renderPending = true;
 
         this.setupElements();
     }
@@ -53,6 +55,10 @@ class Playlist extends Component {
         this.isVisible = true;
         this.panel.style.display = 'flex';
         this.panel.classList.add('show');
+
+        if (this.renderPending) {
+            this.render();
+        }
 
         // 自动滚动到当前播放的歌曲
         this.scrollToCurrentTrack();
@@ -233,6 +239,7 @@ class Playlist extends Component {
     }
 
     setTracks(tracks: Track[], currentIndex = -1): void {
+        const previousEntries = this.entries;
         this.tracks = [...tracks];
         this.entries = tracks.map((track, index) => ({
             queueId: track.fileId || track.filePath || `legacy-${index}`,
@@ -240,22 +247,31 @@ class Playlist extends Component {
         }));
         this.currentQueueId = this.entries[currentIndex]?.queueId ?? null;
         this.currentTrackIndex = currentIndex;
-        this.render();
+        this.applyEntriesUpdate(previousEntries);
         console.log('🎵 Playlist: 设置播放列表:', tracks.length, '首歌曲');
     }
 
     setEntries(entries: QueueEntry[], currentQueueId: string | null): void {
+        const previousEntries = this.entries;
         this.entries = entries.map((entry) => ({...entry}));
         this.tracks = this.entries.map((entry) => entry.track);
         this.currentQueueId = currentQueueId;
         this.currentTrackIndex = this.entries.findIndex((entry) => entry.queueId === currentQueueId);
-        this.render();
+        this.applyEntriesUpdate(previousEntries);
     }
 
     setCurrentTrack(index: number): void {
+        if (this.currentTrackIndex === index) {
+            return;
+        }
+        const previousIndex = this.currentTrackIndex;
         this.currentTrackIndex = index;
         this.currentQueueId = this.entries[index]?.queueId ?? null;
-        this.render();
+        if (this.isVisible && !this.renderPending) {
+            this.updateCurrentTrackRows(previousIndex, index);
+        } else {
+            this.renderPending = true;
+        }
 
         // 如果播放列表可见，滚动到当前歌曲
         if (this.isVisible) {
@@ -278,6 +294,7 @@ class Playlist extends Component {
     }
 
     render(): void {
+        this.renderPending = false;
         this.countEl.textContent = `${this.tracks.length} 首歌曲`;
 
         if (this.tracks.length === 0) {
@@ -317,6 +334,66 @@ class Playlist extends Component {
                 </div>
             `;
         }).join('');
+    }
+
+    private applyEntriesUpdate(previousEntries: QueueEntry[]): void {
+        const structureChanged = previousEntries.length !== this.entries.length
+            || previousEntries.some((entry, index) => entry.queueId !== this.entries[index]?.queueId);
+
+        if (!this.isVisible) {
+            this.renderPending = true;
+            return;
+        }
+
+        if (structureChanged || this.renderPending) {
+            this.render();
+            return;
+        }
+
+        this.patchVisibleRows();
+    }
+
+    private patchVisibleRows(): void {
+        const rows = this.tracksContainer.querySelectorAll<HTMLElement>('.playlist-track');
+        if (rows.length !== this.entries.length) {
+            this.render();
+            return;
+        }
+
+        rows.forEach((row, index) => {
+            const track = this.tracks[index];
+            const title = row.querySelector<HTMLElement>('.playlist-track-title');
+            const artist = row.querySelector<HTMLElement>('.playlist-track-artist');
+            const duration = row.querySelector<HTMLElement>('.playlist-track-duration');
+            if (title) title.textContent = track?.title || 'Unknown Title';
+            if (artist) artist.textContent = track?.artist || 'Unknown Artist';
+            if (duration) duration.textContent = formatTime(track?.duration || 0);
+        });
+        this.updateCurrentTrackRows(-1, this.currentTrackIndex);
+    }
+
+    private updateCurrentTrackRows(previousIndex: number, currentIndex: number): void {
+        const updateRow = (index: number, active: boolean): void => {
+            const row = this.tracksContainer.querySelector<HTMLElement>(`[data-index="${index}"]`);
+            if (!row) return;
+            row.classList.toggle('current', active);
+            row.classList.toggle('playing', active);
+            const number = row.querySelector<HTMLElement>('.playlist-track-number');
+            if (!number) return;
+            number.innerHTML = active
+                ? `<svg class="icon playing-icon" viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg>`
+                : String(index + 1);
+        };
+
+        if (previousIndex >= 0 && previousIndex !== currentIndex) {
+            updateRow(previousIndex, false);
+        } else {
+            this.tracksContainer.querySelectorAll<HTMLElement>('.playlist-track.current').forEach((row) => {
+                const index = Number.parseInt(row.dataset.index || '-1', 10);
+                if (index !== currentIndex) updateRow(index, false);
+            });
+        }
+        if (currentIndex >= 0) updateRow(currentIndex, true);
     }
 
     createTrackPayload(index: number): PlaylistTrackEventPayload | null {

@@ -21,6 +21,7 @@ class RecentPage extends Component {
     private historyUnsubscribe: (() => void) | null;
     isVisible: boolean;
     private viewGeneration = 0;
+    private renderDirty = true;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -43,14 +44,16 @@ class RecentPage extends Component {
         }
         this.isVisible = true;
         this.loadPlayHistory();
-        this.render();
+        if (this.renderDirty || !this.container?.firstElementChild) {
+            this.render();
+        }
     }
 
     hide(): void {
         this.viewGeneration++;
         this.isVisible = false;
-        if (this.container) {
-            this.container.innerHTML = '';
+        if (this.element instanceof HTMLElement) {
+            this.element.style.display = 'none';
         }
     }
 
@@ -69,6 +72,7 @@ class RecentPage extends Component {
     setupAPIListeners(): void {
         this.historyUnsubscribe = recentPlaybackHistoryService.subscribe(() => {
             this.loadPlayHistory();
+            this.renderDirty = true;
             if (this.isVisible) {
                 this.render();
             }
@@ -157,6 +161,7 @@ class RecentPage extends Component {
         `;
 
         this.setupPageEventListeners();
+        this.renderDirty = false;
 
         // 预加载当前显示的歌曲封面
         this.preloadVisibleCovers();

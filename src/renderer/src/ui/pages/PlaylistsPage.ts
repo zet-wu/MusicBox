@@ -24,6 +24,8 @@ export class PlaylistsPage extends Component {
     private searchQuery: string;
     private contextMenuRequestId: number;
     private refreshGeneration = 0;
+    private hasLoaded = false;
+    private renderDirty = true;
     public isVisible: boolean;
 
     constructor(container: string | Element | null) {
@@ -43,7 +45,11 @@ export class PlaylistsPage extends Component {
         if (!this.container) return;
         this.container.style.display = 'block';
         this.isVisible = true;
-        await this.refresh();
+        if (!this.hasLoaded) {
+            await this.refresh();
+        } else if (this.renderDirty || !this.container.firstElementChild) {
+            this.render();
+        }
     }
 
     hide(): void {
@@ -51,15 +57,17 @@ export class PlaylistsPage extends Component {
         this.contextMenuRequestId++;
         this.isVisible = false;
         if (this.container) {
-            this.container.innerHTML = '';
+            this.container.style.display = 'none';
         }
     }
 
-    async refresh(): Promise<void> {
+    async refresh(playlists?: Playlist[]): Promise<void> {
         const refreshGeneration = ++this.refreshGeneration;
-        const playlists = await libraryDataService.getPlaylists();
-        if (!this.isVisible || refreshGeneration !== this.refreshGeneration) return;
-        this.playlists = playlists;
+        const nextPlaylists = playlists ?? await libraryDataService.getPlaylists();
+        if (refreshGeneration !== this.refreshGeneration) return;
+        this.playlists = nextPlaylists;
+        this.hasLoaded = true;
+        this.renderDirty = true;
         this.sortPlaylists();
         if (this.isVisible) {
             this.render();
@@ -115,6 +123,7 @@ export class PlaylistsPage extends Component {
         `;
         this.setupEventListeners();
         this.applySearchFilter();
+        this.renderDirty = false;
     }
 
     private renderPlaylistItem(playlist: Playlist): string {

@@ -24,6 +24,7 @@ export class ElementVirtualizer {
     private readonly virtualizer: Virtualizer<HTMLElement, HTMLElement>;
     private disposeMount: (() => void) | null = null;
     private renderFrame: number | null = null;
+    private lastRenderSignature: string | null = null;
 
     constructor(options: ElementVirtualizerOptions) {
         this.options = options;
@@ -52,6 +53,7 @@ export class ElementVirtualizer {
 
         this.disposeMount?.();
         this.disposeMount = null;
+        this.lastRenderSignature = null;
     }
 
     private createOptions() {
@@ -81,9 +83,18 @@ export class ElementVirtualizer {
     }
 
     private renderNow(): void {
+        const items = this.virtualizer.getVirtualItems();
+        const totalSize = this.virtualizer.getTotalSize();
+        const signature = `${totalSize}|${items.map((item) => (
+            `${String(item.key)}:${item.index}:${item.start}:${item.size}`
+        )).join('|')}`;
+        if (signature === this.lastRenderSignature) {
+            return;
+        }
+        this.lastRenderSignature = signature;
         this.options.onChange(
-            this.virtualizer.getVirtualItems(),
-            this.virtualizer.getTotalSize()
+            items,
+            totalSize
         );
     }
 }

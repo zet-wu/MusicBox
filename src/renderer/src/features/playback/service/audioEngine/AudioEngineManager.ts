@@ -99,8 +99,8 @@ class AudioEngineManager {
     setupEngineCallbacks(): void {
         if (!this.currentEngine) return;
 
-        this.currentEngine.onTrackChanged = (track) => {
-            if (this.onTrackChanged) this.onTrackChanged(track);
+        this.currentEngine.onTrackChanged = async (track) => {
+            if (this.onTrackChanged) await this.onTrackChanged(track);
         };
 
         this.currentEngine.onPlaybackStateChanged = (isPlaying) => {

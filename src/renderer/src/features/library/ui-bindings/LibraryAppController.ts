@@ -148,12 +148,6 @@ export class LibraryAppController {
             app.addManagedAPIEventListener('cacheValidationCompleted', async (result: MusicBoxAPIEvents['cacheValidationCompleted']) => {
                 if (result.invalid > 0) {
                     app.showInfo(`已清理 ${result.invalid} 个无效的音乐文件`);
-
-                    if (result.tracks) {
-                        app.library = result.tracks;
-                        await this.reapplyActiveSearch();
-                        await this.refreshActiveCollection();
-                    }
                 }
             });
 
@@ -435,8 +429,9 @@ export class LibraryAppController {
 
     private applySearchToActiveCollection(): void {
         if (!this.isTrackCollectionView() || !this.ui.isPlaylistDetailVisible()) return;
+        if (!this.activeSearchQuery) return;
         this.ui.applySystemCollectionSearchResults(
-            this.activeSearchQuery ? this.app.filteredLibrary : null
+            this.app.filteredLibrary
         );
     }
 
@@ -486,6 +481,14 @@ export class LibraryAppController {
         const currentPlaylist = this.integrations.getPlaybackPlaylist();
         const trackIndex = currentPlaylist.findIndex((track) => track.filePath === filePath);
         if (trackIndex === -1) {
+            return;
+        }
+
+        const currentTrack = currentPlaylist[trackIndex];
+        const changed = Object.entries(updatedData).some(([key, value]) => (
+            currentTrack[key as keyof Track] !== value
+        ));
+        if (!changed) {
             return;
         }
 

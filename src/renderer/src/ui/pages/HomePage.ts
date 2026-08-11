@@ -18,6 +18,7 @@ class HomePage extends Component {
     private breathingInterval: ReturnType<typeof setInterval> | null;
     private isVisible = false;
     private viewGeneration = 0;
+    private renderDirty = true;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -30,6 +31,7 @@ class HomePage extends Component {
         this.setupElements();
         this.addAPIEventListenerManaged('libraryUpdated', (tracks: Track[]) => {
             this.tracks = tracks || [];
+            this.renderDirty = true;
             if (this.isVisible) this.render();
         });
     }
@@ -47,9 +49,14 @@ class HomePage extends Component {
             if (!this.isVisible || viewGeneration !== this.viewGeneration) return;
             this.tracks = tracks;
             this._lastTracksHash = this._generateTracksHash(this.tracks);
+            this.renderDirty = true;
         }
 
-        this.render();
+        if (this.renderDirty || !this.container?.firstElementChild) {
+            this.render();
+        } else {
+            this.initializeVisualizationState();
+        }
     }
 
     // 生成tracks的简单哈希值
@@ -64,8 +71,8 @@ class HomePage extends Component {
         this.isVisible = false;
         this.stopAudioVisualization();
         this.stopBreathingGuide();
-        if (this.container) {
-            this.container.innerHTML = '';
+        if (this.element instanceof HTMLElement) {
+            this.element.style.display = 'none';
         }
     }
 
@@ -474,6 +481,9 @@ class HomePage extends Component {
     render(): void {
         if (!this.container) return;
 
+        this.stopAudioVisualization();
+        this.stopBreathingGuide();
+
         this.container.innerHTML = `
             <div class="page-content clean-home">
                 <!-- 欢迎区域 -->
@@ -608,6 +618,7 @@ class HomePage extends Component {
         this.setupPageEventListeners();
         this.initializeVisualizationState();
         this.initializeFocusModeState();
+        this.renderDirty = false;
     }
 
     // 初始化专注模式状态
@@ -652,7 +663,6 @@ class HomePage extends Component {
                     const result = await homeLibraryActionService.scanSelectedFolders();
                     if (result.changed) {
                         this.tracks = result.tracks;
-                        this.render();
                     }
                 } catch (error) {
                     console.error('扫描文件夹失败:', error);
@@ -668,7 +678,6 @@ class HomePage extends Component {
                     const result = await homeLibraryActionService.addMusicFiles();
                     if (result.changed) {
                         this.tracks = result.tracks;
-                        this.render();
                     }
                 } catch (error) {
                     console.error('添加文件失败:', error);

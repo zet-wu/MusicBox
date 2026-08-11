@@ -237,8 +237,7 @@ export function createAppComposition({
             showPlaylistDetail: (playlist) => ui.content.showPlaylistDetail(playlist),
             reloadPlaylistDetailTracks: () => ui.content.reloadPlaylistDetailTracks(),
             updatePlaylistDetailInfo: (playlist) => ui.content.updatePlaylistDetailInfo(playlist),
-            updateNavigationPlaylistInfo: (playlist) => ui.content.updateNavigationPlaylistInfo(playlist),
-            refreshNavigationPlaylists: () => ui.content.refreshNavigationPlaylists()
+            updateNavigationPlaylistInfo: (playlist) => ui.content.updateNavigationPlaylistInfo(playlist)
         }
     });
     const networkDriveRouteController = new NetworkDriveRouteController({

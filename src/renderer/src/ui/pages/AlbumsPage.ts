@@ -56,6 +56,7 @@ class AlbumsPage extends Component {
     private readonly trackCollectionDetail: TrackCollectionDetail;
     private coverObserver: IntersectionObserver | null;
     isVisible: boolean;
+    private renderDirty = true;
 
     constructor(container: string | Element | null) {
         super(container);
@@ -84,6 +85,7 @@ class AlbumsPage extends Component {
             this._coverQueue.length = 0;
             this._coverFailures.clear();
             this.processAlbums();
+            this.renderDirty = true;
             if (this.isVisible) {
                 this.render();
             }
@@ -116,12 +118,13 @@ class AlbumsPage extends Component {
                     this.selectedAlbum?.tracks || []
                 );
             }
-        });
+        }, {observeNetworkPreference: false});
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverQueue.length = 0;
             this._coverRequests.clear();
             this._coverFailures.clear();
+            this.renderDirty = true;
             if (!enabled) {
                 const selectedAlbumKey = this.selectedAlbum?.key;
                 this.processAlbums();
@@ -131,8 +134,12 @@ class AlbumsPage extends Component {
                 if (this.isVisible) {
                     this.render();
                 }
-            } else if (this.isVisible && !this.selectedAlbum) {
-                this.scheduleCoversForMissing();
+            } else if (this.isVisible) {
+                if (this.selectedAlbum) {
+                    this.render();
+                } else {
+                    this.scheduleCoversForMissing();
+                }
             }
         });
         this.isVisible = false;
@@ -156,9 +163,14 @@ class AlbumsPage extends Component {
             this.tracks = pageData.tracks;
             this.albums = pageData.albums;
             this.scheduleCoversForMissing();
+            this.renderDirty = true;
         }
 
-        this.render();
+        if (this.renderDirty || !this.container?.firstElementChild) {
+            this.render();
+        } else if (!this.selectedAlbum) {
+            this.scheduleCoversForMissing();
+        }
 
         // 记忆共享元素转场所需信息
         this._lastSourceRect = null;   // {left, top, width, height, radius, scrollTop}
@@ -171,9 +183,12 @@ class AlbumsPage extends Component {
         this.coverObserver?.disconnect();
         this.coverObserver = null;
         this.isVisible = false;
+        if (this.selectedAlbum) {
+            this.renderDirty = true;
+        }
         this.selectedAlbum = null;
         this.trackCollectionDetail.hide();
-        if (this.container) this.container.innerHTML = '';
+        if (this.element instanceof HTMLElement) this.element.style.display = 'none';
     }
 
     destroy(): void {
@@ -204,6 +219,7 @@ class AlbumsPage extends Component {
             this.selectedAlbum = selectedAlbumKey
                 ? this.albums.find((album) => album.key === selectedAlbumKey) || null
                 : null;
+            this.renderDirty = true;
             if (this.isVisible) this.render();
         });
     }
@@ -358,6 +374,7 @@ class AlbumsPage extends Component {
         } else {
             this.renderAlbumsList();
         }
+        this.renderDirty = false;
     }
 
     // 专辑墙

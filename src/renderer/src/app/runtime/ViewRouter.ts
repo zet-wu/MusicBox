@@ -10,6 +10,8 @@ interface ViewRouterOptions {
 export class ViewRouter {
     private readonly app: ViewRouterHost;
     private readonly content: ContentUIFacade;
+    private activeView: AppView | null = null;
+    private readonly scrollPositions = new Map<AppView, number>();
 
     constructor({app, content}: ViewRouterOptions) {
         this.app = app;
@@ -23,6 +25,12 @@ export class ViewRouter {
             console.warn('🎵 App: 未注册的视图，保持当前页面:', view);
             return;
         }
+
+        if (this.activeView === view && app.currentView === view) {
+            return;
+        }
+
+        this.rememberScrollPosition(app.currentView);
 
         this.hideAllPages();
         app.currentView = view;
@@ -62,6 +70,9 @@ export class ViewRouter {
             default:
                 break;
         }
+
+        this.activeView = view;
+        this.restoreScrollPosition(view);
     }
 
     hideAllPages(): void {
@@ -84,5 +95,23 @@ export class ViewRouter {
             'playlists',
             'statistics'
         ].includes(view);
+    }
+
+    private rememberScrollPosition(view: AppView): void {
+        if (typeof document === 'undefined') return;
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (scrollElement) {
+            this.scrollPositions.set(view, scrollElement.scrollTop);
+        }
+    }
+
+    private restoreScrollPosition(view: AppView): void {
+        if (typeof document === 'undefined') return;
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (!scrollElement) return;
+        const scrollTop = this.scrollPositions.get(view) ?? 0;
+        requestAnimationFrame(() => {
+            scrollElement.scrollTop = scrollTop;
+        });
     }
 }

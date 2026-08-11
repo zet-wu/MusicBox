@@ -57,6 +57,7 @@ class ArtistsPage extends Component {
     private coverGeneration: number;
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private isVisible: boolean;
+    private renderDirty = true;
     private artistVirtualizer: ElementVirtualizer | null;
     private readonly trackCollectionDetail: TrackCollectionDetail;
 
@@ -104,12 +105,13 @@ class ArtistsPage extends Component {
                     this.selectedArtist?.tracks || []
                 );
             }
-        });
+        }, {observeNetworkPreference: false});
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverFetchingInProgress = false;
             this._coverLoading.clear();
             this._coverFailures.clear();
+            this.renderDirty = true;
             if (!enabled) {
                 const selectedArtistName = this.selectedArtist?.name;
                 this.processArtists();
@@ -119,8 +121,12 @@ class ArtistsPage extends Component {
                 if (this.isVisible) {
                     this.render();
                 }
-            } else if (this.isVisible && !this.selectedArtist) {
-                this._startCoverFetching();
+            } else if (this.isVisible) {
+                if (this.selectedArtist) {
+                    this.render();
+                } else {
+                    this._startCoverFetching();
+                }
             }
         });
     }
@@ -144,9 +150,14 @@ class ArtistsPage extends Component {
             this.tracks = pageData.tracks as Track[];
             this.artists = pageData.artists as ArtistInfo[];
             this.filteredArtists = [...this.artists];
+            this.renderDirty = true;
         }
 
-        this.render();
+        if (this.renderDirty || !this.container?.firstElementChild) {
+            this.render();
+        } else if (!this.selectedArtist) {
+            this.mountArtistVirtualizer();
+        }
     }
 
     // 生成tracks的简单哈希值
@@ -160,10 +171,13 @@ class ArtistsPage extends Component {
         this.coverGeneration++;
         this.isVisible = false;
         this.destroyArtistVirtualizer();
+        if (this.selectedArtist) {
+            this.renderDirty = true;
+        }
         this.trackCollectionDetail.hide();
         this.selectedArtist = null;
-        if (this.container) {
-            this.container.innerHTML = '';
+        if (this.element instanceof HTMLElement) {
+            this.element.style.display = 'none';
         }
     }
 
@@ -204,6 +218,7 @@ class ArtistsPage extends Component {
             this.selectedArtist = selectedArtistName
                 ? this.artists.find((artist) => artist.name === selectedArtistName) || null
                 : null;
+            this.renderDirty = true;
             if (this.isVisible) this.render();
         });
     }
@@ -222,6 +237,7 @@ class ArtistsPage extends Component {
         } else {
             this.renderArtistsList();
         }
+        this.renderDirty = false;
     }
 
     renderArtistsList(): void {
