@@ -12,8 +12,10 @@ import {
 } from "@/features/settings/service";
 import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
 import type {VirtualItem} from "@tanstack/virtual-core";
+import type {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 export interface TrackCollectionDetailModel {
+    identity?: string;
     title: string;
     description?: string;
     cover: string | null;
@@ -49,6 +51,8 @@ export interface TrackCollectionDetailCallbacks {
 
 interface TrackCollectionDetailOptions {
     observeNetworkPreference?: boolean;
+    scroll?: MainContentScrollCoordinator;
+    scrollKey?: string;
 }
 
 /**
@@ -64,31 +68,40 @@ export class TrackCollectionDetail {
     private readonly networkPreferenceUnsubscribe: Unsubscribe;
     private readonly coverLoadQueue = new CoverLoadQueue(4);
     private viewGeneration = 0;
+    private readonly scroll: MainContentScrollCoordinator | null;
+    private readonly scrollKey: string;
 
     constructor(
         private readonly container: HTMLElement,
         private readonly callbacks: TrackCollectionDetailCallbacks,
         options: TrackCollectionDetailOptions = {}
     ) {
+        this.scroll = options.scroll ?? null;
+        this.scrollKey = options.scrollKey ?? 'readonly-collection';
         this.coverPreferenceUnsubscribe = trackCoverDisplayPreferenceService.onChanged((enabled) => {
             this.showCovers = enabled;
             if (this.model) {
-                this.render();
+                this.render(true);
             }
         });
         this.networkPreferenceUnsubscribe = options.observeNetworkPreference === false
             ? () => undefined
             : trackCoverNetworkPreferenceService.onChanged(() => {
                 if (this.model) {
-                    this.render();
+                    this.render(true);
                 }
             });
     }
 
     show(model: TrackCollectionDetailModel): void {
+        const preserveScroll = Boolean(
+            this.model
+            && this.getModelIdentity(this.model) === this.getModelIdentity(model)
+            && this.container.firstElementChild
+        );
         this.model = model;
         this.clearSelection();
-        this.render();
+        this.render(preserveScroll);
     }
 
     hide(): void {
@@ -107,12 +120,17 @@ export class TrackCollectionDetail {
         this.coverLoadQueue.destroy();
     }
 
-    private render(): void {
+    private render(preserveScroll = false): void {
         if (!this.model) {
             return;
         }
 
+        const model = this.model;
         const generation = ++this.viewGeneration;
+        const scrollStateKey = this.getScrollStateKey(model);
+        if (preserveScroll) {
+            this.scroll?.capture(scrollStateKey);
+        }
         this.coverLoadQueue.beginBatch();
         this.destroyVirtualizer();
         const totalDuration = this.model.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
@@ -190,6 +208,21 @@ export class TrackCollectionDetail {
         this.bindEvents();
         this.mountVirtualizer();
         this.loadCollectionCover(generation);
+        if (preserveScroll) {
+            this.scroll?.restore(scrollStateKey, () => (
+                this.viewGeneration === generation
+                && this.model === model
+                && this.container.style.display !== 'none'
+            ));
+        }
+    }
+
+    private getModelIdentity(model: TrackCollectionDetailModel): string {
+        return model.identity || `${model.title}|${model.coverArtist || ''}|${model.coverAlbum || ''}`;
+    }
+
+    private getScrollStateKey(model: TrackCollectionDetailModel): string {
+        return `${this.scrollKey}:${this.getModelIdentity(model)}`;
     }
 
     private renderTrackListShell(): string {

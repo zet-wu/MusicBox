@@ -129,7 +129,11 @@ class AlbumsPage extends Component {
                     this.selectedAlbum?.tracks || []
                 );
             }
-        }, {observeNetworkPreference: false});
+        }, {
+            observeNetworkPreference: false,
+            scroll: this.scroll,
+            scrollKey: 'albums-detail'
+        });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverQueue.length = 0;
@@ -499,6 +503,7 @@ class AlbumsPage extends Component {
         this.listRoot.style.display = 'none';
         this.detailRoot.style.display = 'block';
         this.trackCollectionDetail.show({
+            identity: album.key,
             title: album.name,
             description: album.artist,
             cover: album.cover,

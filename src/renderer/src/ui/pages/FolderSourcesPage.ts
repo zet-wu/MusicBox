@@ -6,6 +6,7 @@ import {librarySourceManagementService} from '@/features/library/service';
 import {folderSourceViewModePreferenceService} from '@/features/settings/service';
 import {Component} from '@ui/base/Component';
 import {TrackCollectionDetail} from '@ui/components/TrackCollectionDetail';
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 type FolderViewSize = 's' | 'm' | 'l';
 type FolderSortKey = 'name' | 'tracks' | 'bindings' | 'lastScan';
@@ -38,7 +39,7 @@ export class FolderSourcesPage extends Component {
     private readonly trackCollectionDetail: TrackCollectionDetail;
     public isVisible = false;
 
-    constructor(container: string | Element | null) {
+    constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
         this.container = this.element as HTMLElement | null;
         this.viewMode = folderSourceViewModePreferenceService.getMode();
@@ -61,7 +62,7 @@ export class FolderSourcesPage extends Component {
                     this.detailTracks
                 );
             }
-        });
+        }, {scroll, scrollKey: 'folder-detail'});
         this.removeSourcesUpdatedListener = librarySourceManagementService.onSourcesUpdated(() => {
             this.renderDirty = true;
             if (this.isVisible && !this.loading) void this.refresh();
@@ -372,6 +373,7 @@ export class FolderSourcesPage extends Component {
 
         this.detailTracks = tracks;
         this.trackCollectionDetail.show({
+            identity: String(source.id),
             title: this.getDisplayName(source.path),
             description: source.path,
             cover: null,

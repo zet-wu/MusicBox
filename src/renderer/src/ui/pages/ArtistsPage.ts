@@ -108,7 +108,11 @@ class ArtistsPage extends Component {
                     this.selectedArtist?.tracks || []
                 );
             }
-        }, {observeNetworkPreference: false});
+        }, {
+            observeNetworkPreference: false,
+            scroll: this.scroll,
+            scrollKey: 'artists-detail'
+        });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverFetchingInProgress = false;
@@ -867,6 +871,7 @@ class ArtistsPage extends Component {
         this.listRoot.style.display = 'none';
         this.detailRoot.style.display = 'block';
         this.trackCollectionDetail.show({
+            identity: artist.name,
             title: artist.name,
             description: '艺术家歌曲',
             cover: artist.cover,

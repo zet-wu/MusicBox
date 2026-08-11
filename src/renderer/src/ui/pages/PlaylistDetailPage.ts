@@ -31,6 +31,7 @@ import type {PlaylistInfoAlignment} from "@api/types/settings";
 import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
 import {PlaylistCoverTrackDialog} from "@ui/dialogs/PlaylistCoverTrackDialog";
 import type {VirtualItem} from "@tanstack/virtual-core";
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 type PlaylistDetailTrack = Track & {
     fileId?: string;
@@ -79,7 +80,10 @@ class PlaylistDetailPage extends Component {
     private readonly playlistCoverTrackDialog = new PlaylistCoverTrackDialog();
     private viewGeneration = 0;
 
-    constructor(container: string | Element | null) {
+    constructor(
+        container: string | Element | null,
+        private readonly scroll: MainContentScrollCoordinator
+    ) {
         super(container);
         this.isVisible = false;
         this.currentPlaylist = null;
@@ -100,7 +104,7 @@ class PlaylistDetailPage extends Component {
         this.setupSettingsListener();
         this.networkCoverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged(() => {
             if (this.isVisible) {
-                this.render();
+                this.render(true);
             }
         });
         this.favoriteUnsubscribe = favoriteService.onChanged(({trackIds}) => {
@@ -140,6 +144,7 @@ class PlaylistDetailPage extends Component {
             return;
         }
         this.render();
+        this.scroll.scrollToTop();
 
         // 平滑显示页面
         if (this.element instanceof HTMLElement) {
@@ -225,7 +230,7 @@ class PlaylistDetailPage extends Component {
         this.coverDisplayPreferenceUnsubscribe = trackCoverDisplayPreferenceService.onChanged((enabled) => {
             this.showCovers = enabled;
             if (this.isVisible) {
-                this.render();
+                this.render(true);
             }
         });
         this.playlistInfoAlignmentUnsubscribe = playlistInfoAlignmentPreferenceService.onChanged((alignment) => {
@@ -256,7 +261,20 @@ class PlaylistDetailPage extends Component {
 
         this.currentPlaylist.name = playlist.name;
         this.currentPlaylist.description = playlist.description || '';
-        this.render();
+        const title = this.container?.querySelector<HTMLElement>('.playlist-title');
+        if (title) title.textContent = this.currentPlaylist.name;
+        const info = this.container?.querySelector<HTMLElement>('.playlist-detail-info');
+        const existingDescription = info?.querySelector<HTMLElement>('.playlist-description');
+        if (this.currentPlaylist.description) {
+            const description = existingDescription || document.createElement('p');
+            description.className = 'playlist-description';
+            description.textContent = this.currentPlaylist.description;
+            if (!existingDescription) {
+                info?.querySelector('.playlist-meta')?.before(description);
+            }
+        } else {
+            existingDescription?.remove();
+        }
         return true;
     }
 
@@ -270,13 +288,20 @@ class PlaylistDetailPage extends Component {
             : null;
         this.applySourceTracks();
         this.clearSelection();
-        this.render();
+        this.render(true);
         return true;
     }
 
-    render(): void {
+    render(preserveScroll = false): void {
         if (!this.currentPlaylist || !this.container) return;
 
+        const playlist = this.currentPlaylist;
+        const generation = this.viewGeneration;
+        const scrollStateKey = this.getScrollStateKey(playlist);
+        const shouldPreserveScroll = preserveScroll && Boolean(this.container.firstElementChild);
+        if (shouldPreserveScroll) {
+            this.scroll.capture(scrollStateKey);
+        }
         this.coverLoadQueue.beginBatch();
         const capabilities = getCollectionCapabilities(this.getCollectionType());
         const createdDate = new Date(this.currentPlaylist.createdAt || Date.now());
@@ -387,6 +412,13 @@ class PlaylistDetailPage extends Component {
         `;
 
         this.mountTrackVirtualizer();
+        if (shouldPreserveScroll) {
+            this.scroll.restore(scrollStateKey, () => (
+                this.isVisible
+                && this.viewGeneration === generation
+                && this.currentPlaylist === playlist
+            ));
+        }
     }
 
     setupEventListeners(): void {
@@ -675,7 +707,7 @@ class PlaylistDetailPage extends Component {
                     .map((track) => track.fileId)
                     .filter((fileId): fileId is string => Boolean(fileId));
                 playlist.trackCount = this.tracks.length;
-                if (renderPage) this.render();
+                if (renderPage) this.render(true);
                 return;
             }
 
@@ -699,7 +731,7 @@ class PlaylistDetailPage extends Component {
                     }
                 }
 
-                if (renderPage) this.render();
+                if (renderPage) this.render(true);
             } else {
                 console.error('❌ PlaylistDetailPage: 加载歌单歌曲失败', result.error);
                 this.sourceTracks = [];
@@ -707,7 +739,7 @@ class PlaylistDetailPage extends Component {
                 // 同步更新空状态
                 playlist.trackIds = [];
                 playlist.trackCount = 0;
-                if (renderPage) this.render();
+                if (renderPage) this.render(true);
             }
         } catch (error) {
             if (!this.isCurrentView(viewGeneration, playlist)) {
@@ -719,7 +751,7 @@ class PlaylistDetailPage extends Component {
             // 同步更新空状态
             playlist.trackIds = [];
             playlist.trackCount = 0;
-            if (renderPage) this.render();
+            if (renderPage) this.render(true);
         }
     }
 
@@ -1433,10 +1465,14 @@ class PlaylistDetailPage extends Component {
     }
 
     private updateCollectionContent(): void {
-        if (!this.container) {
+        if (!this.container || !this.currentPlaylist) {
             return;
         }
 
+        const playlist = this.currentPlaylist;
+        const generation = this.viewGeneration;
+        const scrollStateKey = this.getScrollStateKey(playlist);
+        this.scroll.capture(scrollStateKey);
         this.selectedTracks.clear();
         this.lastSelectedIndex = -1;
         this.isMultiSelectMode = false;
@@ -1451,6 +1487,11 @@ class PlaylistDetailPage extends Component {
             }
         }
         this.mountTrackVirtualizer();
+        this.scroll.restore(scrollStateKey, () => (
+            this.isVisible
+            && this.viewGeneration === generation
+            && this.currentPlaylist === playlist
+        ));
 
         const trackCount = this.tracks.length;
         const countElement = this.container.querySelector('.meta-track-count');
@@ -1485,6 +1526,10 @@ class PlaylistDetailPage extends Component {
 
     private getTrackIdentity(track: Pick<Track, 'fileId' | 'filePath'>): string {
         return track.fileId || track.filePath || '';
+    }
+
+    private getScrollStateKey(playlist: PlaylistDetail): string {
+        return `playlist-detail:${playlist.collectionType || 'playlist'}:${playlist.id}`;
     }
 }
 

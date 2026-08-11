@@ -79,7 +79,10 @@ export class ComponentRegistry {
         this.components.editTrackInfoDialog = new EditTrackInfoDialog();
         this.components.folderPlaylistBindingDialog = new FolderPlaylistBindingDialog();
 
-        this.components.playlistDetailPage = new PlaylistDetailPage(this.mount('playlist-detail'));
+        this.components.playlistDetailPage = new PlaylistDetailPage(
+            this.mount('playlist-detail'),
+            this.mainContentScroll
+        );
         this.components.playlistsPage = new PlaylistsPage(this.mount('playlists'));
         this.components.networkDriveDetailPage = new NetworkDriveDetailPage(this.mount('network-drive-detail'));
 
@@ -88,7 +91,10 @@ export class ComponentRegistry {
         this.components.networkDiskModal = null;
         this.components.pluginManagerModal = new PluginManagerModal();
         this.components.homePage = new HomePage(this.mount('home-page'));
-        this.components.folderSourcesPage = new FolderSourcesPage(this.mount('folders'));
+        this.components.folderSourcesPage = new FolderSourcesPage(
+            this.mount('folders'),
+            this.mainContentScroll
+        );
 
         this.initializePageComponentsOnDemand();
     }
