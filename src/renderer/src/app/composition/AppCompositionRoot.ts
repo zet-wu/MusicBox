@@ -36,6 +36,7 @@ import {systemMediaKeysGateway} from '@/infrastructure/electron';
 import {appShellRuntimeHost} from '@/features/appShell/service';
 import type {AudioEngineManagerBridge} from '@/features/equalizer/service';
 import {ContentMountManager} from '@/app/runtime/components/ContentMountManager';
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 interface AppCompositionRootOptions {
     app: MusicBoxCompositionHost;
@@ -76,6 +77,7 @@ export function createAppComposition({
     const hostPorts = createAppHostPorts(app);
     const componentPort = hostPorts.components;
     const contentMounts = new ContentMountManager();
+    const mainContentScroll = new MainContentScrollCoordinator();
     const ui = createAppUIPorts(hostPorts.components, contentMounts);
     const componentRegistry = new ComponentRegistry({
         components,
@@ -110,7 +112,11 @@ export function createAppComposition({
         components: componentPort,
         ui
     });
-    const viewRouter = new ViewRouter({app: hostPorts.viewRouter, content: ui.content});
+    const viewRouter = new ViewRouter({
+        app: hostPorts.viewRouter,
+        content: ui.content,
+        scroll: mainContentScroll
+    });
     const notifier = new AppNotifier(shellView);
     const desktopLyricsButtonSync = new DesktopLyricsButtonSync(ui.playback);
     const playbackQueueSyncService = new PlaybackQueueSyncService({

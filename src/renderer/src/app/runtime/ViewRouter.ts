@@ -1,21 +1,24 @@
 import type {ViewRouterHost} from './AppRuntimePorts';
 import type {AppView} from '@/shared/types/AppContracts';
 import type {ContentUIFacade} from './ui/ContentUIFacade';
+import {MainContentScrollCoordinator} from './MainContentScrollCoordinator';
 
 interface ViewRouterOptions {
     app: ViewRouterHost;
     content: ContentUIFacade;
+    scroll: MainContentScrollCoordinator;
 }
 
 export class ViewRouter {
     private readonly app: ViewRouterHost;
     private readonly content: ContentUIFacade;
+    private readonly scroll: MainContentScrollCoordinator;
     private activeView: AppView | null = null;
-    private readonly scrollPositions = new Map<AppView, number>();
 
-    constructor({app, content}: ViewRouterOptions) {
+    constructor({app, content, scroll}: ViewRouterOptions) {
         this.app = app;
         this.content = content;
+        this.scroll = scroll;
     }
 
     async handleViewChange(view: AppView): Promise<void> {
@@ -30,7 +33,7 @@ export class ViewRouter {
             return;
         }
 
-        this.rememberScrollPosition(app.currentView);
+        this.scroll.capture(app.currentView);
 
         this.hideAllPages();
         app.currentView = view;
@@ -72,7 +75,7 @@ export class ViewRouter {
         }
 
         this.activeView = view;
-        this.restoreScrollPosition(view);
+        this.scroll.restore(view, () => this.activeView === view && app.currentView === view);
     }
 
     hideAllPages(): void {
@@ -97,21 +100,4 @@ export class ViewRouter {
         ].includes(view);
     }
 
-    private rememberScrollPosition(view: AppView): void {
-        if (typeof document === 'undefined') return;
-        const scrollElement = document.querySelector<HTMLElement>('.main-content');
-        if (scrollElement) {
-            this.scrollPositions.set(view, scrollElement.scrollTop);
-        }
-    }
-
-    private restoreScrollPosition(view: AppView): void {
-        if (typeof document === 'undefined') return;
-        const scrollElement = document.querySelector<HTMLElement>('.main-content');
-        if (!scrollElement) return;
-        const scrollTop = this.scrollPositions.get(view) ?? 0;
-        requestAnimationFrame(() => {
-            scrollElement.scrollTop = scrollTop;
-        });
-    }
 }

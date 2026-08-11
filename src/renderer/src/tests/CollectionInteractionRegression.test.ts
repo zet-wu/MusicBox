@@ -5,6 +5,7 @@ import {libraryDataService} from '../features/library/service/LibraryDataService
 import {ViewRouter} from '../app/runtime/ViewRouter';
 import {groupRecentTracksByDate} from '../features/playback/domain/RecentTrackGrouping';
 import {PlaybackAppController} from '../features/playback/ui-bindings/PlaybackAppController';
+import {MainContentScrollCoordinator} from '../app/runtime/MainContentScrollCoordinator';
 
 const createTrack = (fileId: string, overrides: Partial<Track> = {}): Track => ({
     fileId,
@@ -170,7 +171,11 @@ describe('页面路由和最近播放索引', () => {
             hideAllPages: vi.fn(),
             updateSidebarSelection: vi.fn()
         };
-        const router = new ViewRouter({app, content: content as never});
+        const router = new ViewRouter({
+            app,
+            content: content as never,
+            scroll: new MainContentScrollCoordinator()
+        });
 
         await router.handleViewChange('third-party-view');
 
@@ -186,7 +191,11 @@ describe('页面路由和最近播放索引', () => {
             updateSidebarSelection: vi.fn(),
             showHomePage: vi.fn().mockResolvedValue(undefined)
         };
-        const router = new ViewRouter({app, content: content as never});
+        const router = new ViewRouter({
+            app,
+            content: content as never,
+            scroll: new MainContentScrollCoordinator()
+        });
 
         await router.handleViewChange('home-page');
         await router.handleViewChange('home-page');
