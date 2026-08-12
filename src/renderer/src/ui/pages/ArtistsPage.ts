@@ -724,15 +724,16 @@ class ArtistsPage extends Component {
     // 过滤艺术家
     filterArtists(searchTerm: string): void {
         this.searchQuery = searchTerm;
-        if (!searchTerm.trim()) {
+        const term = searchTerm.trim().toLocaleLowerCase();
+        if (!term) {
             this.filteredArtists = [...this.artists];
         } else {
-            const term = searchTerm.toLowerCase();
             this.filteredArtists = this.artists.filter((artist) =>
-                artist.name.toLowerCase().includes(term)
+                artist.name.toLocaleLowerCase().includes(term)
             );
         }
 
+        this.scroll.scrollToTop();
         this.updateArtistsDisplay();
     }
 
@@ -744,7 +745,7 @@ class ArtistsPage extends Component {
 
     // 更新艺术家显示区域
     updateArtistsDisplay(): void {
-        const browser = this.container.querySelector('.artists-browser');
+        const browser = this.listRoot.querySelector('.artists-browser');
         if (browser) {
             browser.className = `artists-browser ${this.viewMode}-view`;
             this.updateArtistSurface();
@@ -752,9 +753,8 @@ class ArtistsPage extends Component {
     }
 
     private updateArtistSurface(): void {
-        const container = this.container as HTMLElement | null;
-        const surfaceRoot = container?.querySelector<HTMLElement>('.artist-surface-root');
-        const noResults = container?.querySelector<HTMLElement>('.artists-no-results');
+        const surfaceRoot = this.listRoot.querySelector<HTMLElement>('.artist-surface-root');
+        const noResults = this.listRoot.querySelector<HTMLElement>('.artists-no-results');
         const scrollElement = document.querySelector<HTMLElement>('.main-content');
         if (!surfaceRoot || !scrollElement) {
             return;

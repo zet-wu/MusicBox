@@ -101,4 +101,47 @@ describe('ArtistsPage 列表事件生命周期', () => {
 
         page.destroy();
     });
+
+    it('搜索会规范化查询、更新 Surface 并回到结果顶部', async () => {
+        const {ArtistsPage} = await import('../ui/pages/ArtistsPage');
+        const pageRoot = new FakeElement();
+        const scroll = new MainContentScrollCoordinator();
+        const scrollToTop = vi.spyOn(scroll, 'scrollToTop');
+        const page = new ArtistsPage(pageRoot as unknown as HTMLElement, scroll);
+        const target = {
+            name: '星河乐队',
+            tracks: [],
+            albums: new Set<string>(),
+            cover: null,
+            totalDuration: 0
+        };
+        const other = {...target, name: '远山歌手'};
+        const browser = new FakeElement();
+        const surfaceRoot = new FakeElement();
+        const noResults = new FakeElement() as FakeElement & {hidden: boolean};
+        noResults.hidden = false;
+        const mainContent = new FakeElement();
+        const internals = page as any;
+        internals.artists = [target, other];
+        internals.listRoot.querySelector = vi.fn((selector: string) => {
+            if (selector === '.artists-browser') return browser;
+            if (selector === '.artist-surface-root') return surfaceRoot;
+            if (selector === '.artists-no-results') return noResults;
+            return null;
+        });
+        vi.mocked(document.querySelector).mockImplementation((selector: string) => (
+            selector === '.main-content' ? mainContent as unknown as Element : null
+        ));
+        vi.spyOn(internals.artistSurface, 'mount').mockImplementation(() => undefined);
+        const update = vi.spyOn(internals.artistSurface, 'update').mockImplementation(() => undefined);
+
+        page.filterArtists('  星河  ');
+
+        expect(internals.filteredArtists).toEqual([target]);
+        expect(scrollToTop).toHaveBeenCalledOnce();
+        expect(update).toHaveBeenCalledWith([target], expect.objectContaining({mode: 'grid'}));
+        expect(noResults.hidden).toBe(true);
+
+        page.destroy();
+    });
 });
