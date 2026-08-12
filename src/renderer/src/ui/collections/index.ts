@@ -1,5 +1,10 @@
 export {AdaptiveCollectionSurface} from './AdaptiveCollectionSurface';
 export {
+    MasterDetailViewHost,
+    type MasterDetailLocation,
+    type MasterDetailSurface
+} from './MasterDetailViewHost';
+export {
     COLLECTION_GRID_OVERSCAN,
     COLLECTION_LIST_OVERSCAN,
     COLLECTION_VIRTUALIZATION_THRESHOLD,

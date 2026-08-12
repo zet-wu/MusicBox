@@ -33,4 +33,5 @@ export type CollectionSurfaceMode = 'direct' | 'virtual';
 
 export interface CollectionSurfaceOptions {
     onRenderedRangeChange?(keys: CollectionItemKey[]): void;
+    restoreScrollOffset?(scrollTop: number): void | Promise<void>;
 }

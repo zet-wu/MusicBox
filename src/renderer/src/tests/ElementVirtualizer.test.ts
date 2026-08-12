@@ -19,6 +19,7 @@ vi.mock('@tanstack/virtual-core', () => ({
         measure = vi.fn();
         scrollToOffset = vi.fn();
         scrollToIndex = vi.fn();
+        getOffsetForIndex = vi.fn((index: number) => [index * 40, 'start']);
 
         constructor(options: any) {
             this.options = options;
@@ -103,11 +104,13 @@ describe('ElementVirtualizer', () => {
         adapter.measure();
         adapter.scrollToOffset(120, {align: 'start'});
         adapter.scrollToIndex(7, {align: 'center', behavior: 'smooth'});
+        expect(adapter.getOffsetForIndex(7, 'center')).toBe(280);
 
         expect(core.measureElement).toHaveBeenCalledWith(element);
         expect(core.measure).toHaveBeenCalledOnce();
         expect(core.scrollToOffset).toHaveBeenCalledWith(120, {align: 'start'});
         expect(core.scrollToIndex).toHaveBeenCalledWith(7, {align: 'center', behavior: 'smooth'});
+        expect(core.getOffsetForIndex).toHaveBeenCalledWith(7, 'center');
     });
 
     it('销毁后可重新挂载并获得新的 ready 周期', async () => {

@@ -71,6 +71,10 @@ export class ElementVirtualizer {
         this.virtualizer.scrollToIndex(index, options);
     }
 
+    getOffsetForIndex(index: number, align: NonNullable<ScrollToOptions['align']> = 'auto'): number | null {
+        return this.virtualizer.getOffsetForIndex(index, align)?.[0] ?? null;
+    }
+
     whenReady(): Promise<void> {
         return this.readyPromise;
     }

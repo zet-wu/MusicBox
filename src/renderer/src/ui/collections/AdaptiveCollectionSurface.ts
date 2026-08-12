@@ -34,6 +34,7 @@ export class AdaptiveCollectionSurface<T> {
     private resolveReady: (() => void) | null = null;
     private readyFrame: number | null = null;
     private renderedKeys: CollectionItemKey[] = [];
+    private pendingFocusedKey: CollectionItemKey | null = null;
 
     constructor(
         private readonly renderer: CollectionSurfaceRenderer<T>,
@@ -187,6 +188,7 @@ export class AdaptiveCollectionSurface<T> {
         this.shell = null;
         this.body = null;
         this.renderedKeys = [];
+        this.pendingFocusedKey = null;
         this.options.onRenderedRangeChange?.([]);
     }
 
@@ -282,6 +284,9 @@ export class AdaptiveCollectionSurface<T> {
             this.virtualizer?.measureElement(row);
         });
         this.publishRenderedKeys(renderedKeys);
+        if (this.pendingFocusedKey !== null && this.restoreFocusedKey(this.pendingFocusedKey)) {
+            this.pendingFocusedKey = null;
+        }
     }
 
     private createItemElement(item: T, index: number): HTMLElement {
@@ -341,55 +346,61 @@ export class AdaptiveCollectionSurface<T> {
         if (generation !== this.renderGeneration || this.suspended || !this.scrollElement) {
             return;
         }
+        this.pendingFocusedKey = snapshot.focusedKey;
         const anchorKey = snapshot.anchorKey;
         if (anchorKey === null) {
-            this.restoreFallbackOffset(snapshot.fallbackScrollTop);
-            this.restoreFocusedKey(snapshot.focusedKey);
+            await this.restoreFallbackOffset(snapshot.fallbackScrollTop);
+            this.finishFocusRestore(snapshot.focusedKey);
             return;
         }
         const index = this.itemIndexByKey.get(anchorKey);
         if (index === undefined) {
-            this.restoreFallbackOffset(snapshot.fallbackScrollTop);
-            this.restoreFocusedKey(snapshot.focusedKey);
+            await this.restoreFallbackOffset(snapshot.fallbackScrollTop);
+            this.finishFocusRestore(snapshot.focusedKey);
             return;
         }
 
         if (this.mode === 'virtual') {
             const rowIndex = this.layout?.mode === 'grid' ? Math.floor(index / this.columns) : index;
-            this.virtualizer?.scrollToIndex(rowIndex, {align: 'start'});
-            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-            if (generation !== this.renderGeneration || this.suspended) return;
+            const rowOffset = this.virtualizer?.getOffsetForIndex(rowIndex, 'start');
+            await this.writeScrollOffset(Math.max(0, (rowOffset ?? snapshot.fallbackScrollTop) - snapshot.anchorOffset));
+            this.finishFocusRestore(snapshot.focusedKey);
+            return;
         }
 
         const anchor = this.findRenderedItemElement(anchorKey);
         const scrollRect = this.scrollElement.getBoundingClientRect();
         if (anchor) {
             const currentOffset = anchor.getBoundingClientRect().top - scrollRect.top;
-            this.scrollElement.scrollTop = Math.max(
-                0,
+            await this.writeScrollOffset(
                 this.scrollElement.scrollTop + currentOffset - snapshot.anchorOffset
             );
         } else {
-            this.restoreFallbackOffset(snapshot.fallbackScrollTop);
+            await this.restoreFallbackOffset(snapshot.fallbackScrollTop);
         }
-        this.restoreFocusedKey(snapshot.focusedKey);
+        this.finishFocusRestore(snapshot.focusedKey);
     }
 
-    private restoreFallbackOffset(offset: number): void {
-        if (this.mode === 'virtual') {
-            this.virtualizer?.scrollToOffset(offset, {align: 'start'});
-        } else if (this.scrollElement) {
-            this.scrollElement.scrollTop = Math.max(0, offset);
-        }
+    private restoreFallbackOffset(offset: number): Promise<void> {
+        return this.writeScrollOffset(offset);
     }
 
-    private restoreFocusedKey(key: CollectionItemKey | null): void {
-        if (key === null || !this.root) return;
+    private restoreFocusedKey(key: CollectionItemKey | null): boolean {
+        if (key === null || !this.root) return true;
         const activeElement = document.activeElement;
         if (activeElement instanceof HTMLElement && activeElement !== document.body && !this.root.contains(activeElement)) {
-            return;
+            return true;
         }
-        this.findRenderedItemElement(key)?.focus({preventScroll: true});
+        const element = this.findRenderedItemElement(key);
+        if (!element) return false;
+        element.focus({preventScroll: true});
+        return true;
+    }
+
+    private finishFocusRestore(key: CollectionItemKey | null): void {
+        if (this.restoreFocusedKey(key)) {
+            this.pendingFocusedKey = null;
+        }
     }
 
     private findRenderedItemElement(key: CollectionItemKey): HTMLElement | null {
@@ -432,6 +443,17 @@ export class AdaptiveCollectionSurface<T> {
     private publishRenderedKeys(keys: CollectionItemKey[]): void {
         this.renderedKeys = keys;
         this.options.onRenderedRangeChange?.([...keys]);
+    }
+
+    private async writeScrollOffset(offset: number): Promise<void> {
+        const scrollTop = Math.max(0, offset);
+        if (this.options.restoreScrollOffset) {
+            await this.options.restoreScrollOffset(scrollTop);
+            return;
+        }
+        if (this.scrollElement) {
+            this.scrollElement.scrollTop = scrollTop;
+        }
     }
 
     private beginReadyCycle(): void {

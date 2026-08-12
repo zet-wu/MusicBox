@@ -10,6 +10,7 @@ vi.mock('../ui/virtualization/ElementVirtualizer', () => ({
         measureElement = vi.fn();
         scrollToOffset = vi.fn();
         scrollToIndex = vi.fn();
+        getOffsetForIndex = vi.fn((index: number) => index * this.options.estimateSize(index));
 
         constructor(public options: any) {
             virtualizerState.instances.push(this);
@@ -268,7 +269,7 @@ describe('AdaptiveCollectionSurface', () => {
         expect(surface.getRenderedKeys()).toEqual([0, 1, 2, 3]);
         flushFrames();
         await Promise.resolve();
-        expect(virtualizerState.instances.at(-1).scrollToIndex).toHaveBeenCalledWith(0, {align: 'start'});
+        expect(virtualizerState.instances.at(-1).getOffsetForIndex).toHaveBeenCalledWith(0, 'start');
     });
 
     it('只重绘可见失效项目，离屏项目保持模型更新', () => {
