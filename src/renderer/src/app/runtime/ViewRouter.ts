@@ -33,7 +33,9 @@ export class ViewRouter {
             return;
         }
 
-        this.scroll.capture(app.currentView);
+        if (!this.isSurfaceManagedView(app.currentView)) {
+            this.scroll.capture(app.currentView);
+        }
 
         this.hideAllPages();
         app.currentView = view;
@@ -75,7 +77,9 @@ export class ViewRouter {
         }
 
         this.activeView = view;
-        this.scroll.restore(view, () => this.activeView === view && app.currentView === view);
+        if (!this.isSurfaceManagedView(view)) {
+            this.scroll.restore(view, () => this.activeView === view && app.currentView === view);
+        }
     }
 
     hideAllPages(): void {
@@ -98,6 +102,10 @@ export class ViewRouter {
             'playlists',
             'statistics'
         ].includes(view);
+    }
+
+    private isSurfaceManagedView(view: AppView): boolean {
+        return view === 'artists' || view === 'albums' || view === 'playlists';
     }
 
 }

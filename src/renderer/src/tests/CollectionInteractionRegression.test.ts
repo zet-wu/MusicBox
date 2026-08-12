@@ -204,6 +204,25 @@ describe('页面路由和最近播放索引', () => {
         expect(content.showHomePage).toHaveBeenCalledOnce();
     });
 
+    it('Surface 管理的集合视图不会再被路由级像素恢复覆盖', async () => {
+        const app = {currentView: 'artists', library: [], filteredLibrary: []};
+        const content = {
+            hideAllPages: vi.fn(),
+            updateSidebarSelection: vi.fn(),
+            showAlbumsPage: vi.fn().mockResolvedValue(undefined)
+        };
+        const scroll = {
+            capture: vi.fn(),
+            restore: vi.fn()
+        };
+        const router = new ViewRouter({app, content: content as never, scroll: scroll as never});
+
+        await router.handleViewChange('albums');
+
+        expect(scroll.capture).not.toHaveBeenCalled();
+        expect(scroll.restore).not.toHaveBeenCalled();
+    });
+
     it('跨日期分组保留原始队列索引', () => {
         const first = createTrack('first', {playTime: new Date('2026-07-30T10:00:00').getTime()});
         const second = createTrack('second', {playTime: new Date('2026-07-29T10:00:00').getTime()});

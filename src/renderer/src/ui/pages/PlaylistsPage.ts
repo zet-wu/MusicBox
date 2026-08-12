@@ -3,6 +3,8 @@ import {libraryDataService} from "@/features/library/service/LibraryDataService"
 import {playlistViewModePreferenceService} from "@/features/settings/service";
 import type {Playlist} from "@api/types/library";
 import type {PlaylistViewMode} from "@api/types/settings";
+import {AdaptiveCollectionSurface, type CollectionLayout, type CollectionSurfaceSnapshot} from '@ui/collections';
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 type PlaylistViewSize = 's' | 'm' | 'l';
 type PlaylistSortKey = 'name' | 'tracks' | 'duration';
@@ -16,7 +18,9 @@ const PLAYLIST_COVER_SIZES: Record<PlaylistViewSize, number> = {
 
 export class PlaylistsPage extends Component {
     private readonly container: HTMLElement | null;
+    private readonly scroll: MainContentScrollCoordinator;
     private playlists: Playlist[];
+    private filteredPlaylists: Playlist[];
     private viewMode: PlaylistViewMode;
     private viewSize: PlaylistViewSize;
     private sortBy: PlaylistSortKey;
@@ -26,12 +30,16 @@ export class PlaylistsPage extends Component {
     private refreshGeneration = 0;
     private hasLoaded = false;
     private renderDirty = true;
+    private surfaceSnapshot: CollectionSurfaceSnapshot | null = null;
+    private readonly playlistSurface: AdaptiveCollectionSurface<Playlist>;
     public isVisible: boolean;
 
-    constructor(container: string | Element | null) {
+    constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
         this.container = this.element as HTMLElement | null;
+        this.scroll = scroll;
         this.playlists = [];
+        this.filteredPlaylists = [];
         this.viewMode = playlistViewModePreferenceService.getMode();
         this.viewSize = 'm';
         this.sortBy = 'name';
@@ -39,12 +47,30 @@ export class PlaylistsPage extends Component {
         this.searchQuery = '';
         this.contextMenuRequestId = 0;
         this.isVisible = false;
+        this.playlistSurface = new AdaptiveCollectionSurface<Playlist>({
+            getKey: playlist => playlist.id,
+            renderItem: playlist => this.renderPlaylistItem(playlist)
+        }, {
+            restoreScrollOffset: scrollTop => {
+                this.scroll.remember('playlists/list', scrollTop);
+                return this.scroll.restore('playlists/list', {
+                    scrollTop,
+                    whenReady: () => this.playlistSurface.whenReady(),
+                    isCurrent: () => this.isVisible
+                });
+            }
+        });
+        this.setupCollectionEventDelegation();
     }
 
     async show(): Promise<void> {
         if (!this.container) return;
         this.container.style.display = 'block';
         this.isVisible = true;
+        if (this.surfaceSnapshot) {
+            await this.playlistSurface.resume(this.surfaceSnapshot);
+            this.surfaceSnapshot = null;
+        }
         if (!this.hasLoaded) {
             await this.refresh();
         } else if (this.renderDirty || !this.container.firstElementChild) {
@@ -56,6 +82,9 @@ export class PlaylistsPage extends Component {
         this.refreshGeneration++;
         this.contextMenuRequestId++;
         this.isVisible = false;
+        if (this.container?.querySelector('.playlist-surface-root')) {
+            this.surfaceSnapshot = this.playlistSurface.suspend();
+        }
         if (this.container) {
             this.container.style.display = 'none';
         }
@@ -70,12 +99,21 @@ export class PlaylistsPage extends Component {
         this.renderDirty = true;
         this.sortPlaylists();
         if (this.isVisible) {
-            this.render();
+            if (this.container?.querySelector('.playlist-surface-root')) {
+                this.updatePlaylistSurface();
+                this.updatePlaylistCount();
+                this.renderDirty = false;
+            } else {
+                this.render();
+            }
         }
     }
 
     render(): void {
         if (!this.container) return;
+        const snapshot = this.container.querySelector('.playlist-surface-root')
+            ? this.playlistSurface.captureSnapshot()
+            : null;
         const coverSize = PLAYLIST_COVER_SIZES[this.viewSize];
         this.container.innerHTML = `
             <div class="albumsx playlistsx page">
@@ -115,14 +153,17 @@ export class PlaylistsPage extends Component {
                     </div>
                 </div>
                 ${this.playlists.length > 0 ? `
-                    <div class="${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}" style="--cover:${coverSize}px;">
-                        ${this.playlists.map(playlist => this.renderPlaylistItem(playlist)).join('')}
+                    <div class="album-surface-root playlist-surface-root ${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}" style="--cover:${coverSize}px;"></div>
+                    <div class="albumsx-empty playlists-no-results" hidden>
+                        <h3>没有匹配的歌单</h3>
+                        <p>请尝试其他歌单名称</p>
                     </div>
                 ` : this.renderEmptyState()}
             </div>
         `;
         this.setupEventListeners();
-        this.applySearchFilter();
+        this.updatePlaylistSurface();
+        if (snapshot) void this.playlistSurface.resume(snapshot);
         this.renderDirty = false;
     }
 
@@ -201,16 +242,24 @@ export class PlaylistsPage extends Component {
             this.searchQuery = searchInput.value;
             this.applySearchFilter();
         });
-        this.container.querySelectorAll<HTMLElement>('.playlist-browser-item').forEach((item) => {
-            item.addEventListener('dblclick', () => {
-                const playlist = this.playlists.find(candidate => candidate.id === item.dataset.playlistId);
-                if (playlist) this.emit('playlistSelected', playlist);
-            });
-            item.addEventListener('contextmenu', (event: MouseEvent) => {
-                event.preventDefault();
-                const playlist = this.playlists.find(candidate => candidate.id === item.dataset.playlistId);
-                if (playlist) void this.showPlaylistContextMenu(playlist, event.clientX, event.clientY);
-            });
+    }
+
+    private setupCollectionEventDelegation(): void {
+        if (!this.container) return;
+        this.addEventListenerManaged(this.container, 'dblclick', (event: Event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.playlist-browser-item');
+            const playlist = this.findFilteredPlaylist(item?.dataset.playlistId);
+            if (playlist) this.emit('playlistSelected', playlist);
+        });
+        this.addEventListenerManaged(this.container, 'contextmenu', (event: Event) => {
+            const mouseEvent = event as MouseEvent;
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.playlist-browser-item');
+            const playlist = this.findFilteredPlaylist(item?.dataset.playlistId);
+            if (!playlist) return;
+            mouseEvent.preventDefault();
+            void this.showPlaylistContextMenu(playlist, mouseEvent.clientX, mouseEvent.clientY);
         });
     }
 
@@ -232,16 +281,53 @@ export class PlaylistsPage extends Component {
                     : a.name.localeCompare(b.name, 'zh-CN');
             return result === 0 ? a.name.localeCompare(b.name, 'zh-CN') : result * multiplier;
         });
+        this.applySearchFilter(false);
     }
 
-    private applySearchFilter(): void {
-        if (!this.container) return;
+    private applySearchFilter(updateSurface = true): void {
         const query = this.searchQuery.trim().toLocaleLowerCase();
-        this.container.querySelectorAll<HTMLElement>('.playlist-browser-item').forEach((item) => {
-            const playlist = this.playlists.find(candidate => candidate.id === item.dataset.playlistId);
-            const matches = playlist && (!query || playlist.name.toLocaleLowerCase().includes(query));
-            item.style.display = matches ? '' : 'none';
-        });
+        this.filteredPlaylists = this.playlists.filter(playlist => (
+            !query || playlist.name.toLocaleLowerCase().includes(query)
+        ));
+        if (updateSurface) this.updatePlaylistSurface();
+    }
+
+    private findFilteredPlaylist(id: string | undefined): Playlist | null {
+        if (!id) return null;
+        return this.filteredPlaylists.find(playlist => playlist.id === id) || null;
+    }
+
+    private updatePlaylistSurface(): void {
+        if (!this.container) return;
+        const surfaceRoot = this.container.querySelector<HTMLElement>('.playlist-surface-root');
+        const noResults = this.container.querySelector<HTMLElement>('.playlists-no-results');
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (!surfaceRoot || !scrollElement) return;
+        surfaceRoot.className = `album-surface-root playlist-surface-root ${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}`;
+        surfaceRoot.style.setProperty('--cover', `${PLAYLIST_COVER_SIZES[this.viewSize]}px`);
+        surfaceRoot.style.display = this.filteredPlaylists.length === 0 ? 'none' : 'block';
+        if (noResults) noResults.hidden = this.filteredPlaylists.length !== 0;
+        this.playlistSurface.mount(surfaceRoot, scrollElement);
+        this.playlistSurface.update(this.filteredPlaylists, this.getCollectionLayout());
+    }
+
+    private getCollectionLayout(): CollectionLayout {
+        if (this.viewMode === 'list') {
+            return {mode: 'list', estimateRowSize: 80, overscan: 8};
+        }
+        const coverSize = PLAYLIST_COVER_SIZES[this.viewSize];
+        const gap = 24;
+        return {
+            mode: 'grid',
+            estimateRowSize: coverSize + 104,
+            getColumnCount: width => Math.max(1, Math.floor((width + gap) / (coverSize + 60 + gap))),
+            overscan: 3
+        };
+    }
+
+    private updatePlaylistCount(): void {
+        const count = this.container?.querySelector<HTMLElement>('.albumsx-toolbar .title .muted');
+        if (count) count.textContent = `${this.playlists.length} 个`;
     }
 
     private getTrackCount(playlist: Playlist): number {
@@ -270,6 +356,13 @@ export class PlaylistsPage extends Component {
         const element = document.createElement('div');
         element.textContent = value == null ? '' : String(value);
         return element.innerHTML;
+    }
+
+    destroy(): void {
+        this.playlistSurface.destroy();
+        this.playlists.length = 0;
+        this.filteredPlaylists.length = 0;
+        super.destroy();
     }
 }
 

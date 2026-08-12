@@ -83,7 +83,10 @@ export class ComponentRegistry {
             this.mount('playlist-detail'),
             this.mainContentScroll
         );
-        this.components.playlistsPage = new PlaylistsPage(this.mount('playlists'));
+        this.components.playlistsPage = new PlaylistsPage(
+            this.mount('playlists'),
+            this.mainContentScroll
+        );
         this.components.networkDriveDetailPage = new NetworkDriveDetailPage(this.mount('network-drive-detail'));
 
         this.components.updateModal = new UpdateModal();
