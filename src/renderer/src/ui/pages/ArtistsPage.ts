@@ -85,6 +85,7 @@ class ArtistsPage extends Component {
         this.coverGeneration = 0;
         this.isVisible = false;
         this.artistVirtualizer = null;
+        this.setupArtistListEventDelegation();
         this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
             onBack: () => this.closeArtistDetail(),
             onTrackPlayed: (track, index, tracks, mode) => {
@@ -231,6 +232,41 @@ class ArtistsPage extends Component {
             if (this.selectedArtist) this.listRenderDirty = true;
             if (this.isVisible) this.render();
         });
+    }
+
+    private setupArtistListEventDelegation(): void {
+        this.addEventListenerManaged(this.listRoot, 'click', (event: Event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.artist-library-item');
+            const artist = this.findArtistByKey(item?.dataset.artist);
+            if (!artist || !item) {
+                return;
+            }
+
+            this.showArtistDetailWithTransition(artist, item);
+        });
+
+        this.addEventListenerManaged(this.listRoot, 'contextmenu', (event: Event) => {
+            const mouseEvent = event as MouseEvent;
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.artist-library-item');
+            const artist = this.findArtistByKey(item?.dataset.artist);
+            if (!artist || !item) {
+                return;
+            }
+
+            mouseEvent.preventDefault();
+            if (artist.tracks.length > 0) {
+                this.emit('collectionRightClick', artist.tracks, mouseEvent.clientX, mouseEvent.clientY);
+            }
+        });
+    }
+
+    private findArtistByKey(key: string | undefined): ArtistInfo | null {
+        if (!key) {
+            return null;
+        }
+        return this.filteredArtists.find((artist) => artist.name === key) || null;
     }
 
     processArtists(): void {
@@ -758,30 +794,6 @@ class ArtistsPage extends Component {
             : 1;
         const rowCount = Math.ceil(this.filteredArtists.length / columns);
         const scrollMargin = this.getArtistScrollMargin(body, scrollElement);
-
-        body.addEventListener('click', (event: MouseEvent) => {
-            const target = event.target instanceof Element ? event.target : null;
-            const item = target?.closest<HTMLElement>('.artist-library-item');
-            const index = Number.parseInt(item?.dataset.artistIndex || '', 10);
-            const artist = Number.isInteger(index) ? this.filteredArtists[index] : null;
-            if (!artist || !item) {
-                return;
-            }
-
-            this.showArtistDetailWithTransition(artist, item);
-        });
-
-        body.addEventListener('contextmenu', (event: MouseEvent) => {
-            const target = event.target instanceof Element ? event.target : null;
-            const item = target?.closest<HTMLElement>('.artist-library-item');
-            const index = Number.parseInt(item?.dataset.artistIndex || '', 10);
-            const artist = Number.isInteger(index) ? this.filteredArtists[index] : null;
-            if (!artist || !item) return;
-            event.preventDefault();
-            if (artist.tracks.length > 0) {
-                this.emit('collectionRightClick', artist.tracks, event.clientX, event.clientY);
-            }
-        });
 
         this.artistVirtualizer = new ElementVirtualizer({
             count: rowCount,
