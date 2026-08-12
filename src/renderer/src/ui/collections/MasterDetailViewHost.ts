@@ -52,7 +52,7 @@ export class MasterDetailViewHost {
 
     enterDetail(identity: string): MasterDetailLocation {
         this.generation++;
-        if (this.surface) {
+        if (this.surface && this.location.kind === 'list') {
             this.listSnapshot = this.surface.suspend();
         }
         this.location = {
