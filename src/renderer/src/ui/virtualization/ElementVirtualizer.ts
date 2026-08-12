@@ -3,6 +3,7 @@ import {
     observeElementOffset,
     observeElementRect,
     Virtualizer,
+    type ScrollToOptions,
     type VirtualItem
 } from '@tanstack/virtual-core';
 
@@ -25,17 +26,27 @@ export class ElementVirtualizer {
     private disposeMount: (() => void) | null = null;
     private renderFrame: number | null = null;
     private lastRenderSignature: string | null = null;
+    private isMounted = false;
+    private mountCount = 0;
+    private readyPromise!: Promise<void>;
+    private resolveReady: (() => void) | null = null;
 
     constructor(options: ElementVirtualizerOptions) {
         this.options = options;
         this.virtualizer = new Virtualizer<HTMLElement, HTMLElement>(this.createOptions());
+        this.resetReadyPromise();
     }
 
     mount(): void {
-        if (this.disposeMount) {
+        if (this.isMounted) {
             return;
         }
 
+        if (this.mountCount > 0) {
+            this.resetReadyPromise();
+        }
+        this.mountCount++;
+        this.isMounted = true;
         this.disposeMount = this.virtualizer._didMount();
         this.virtualizer._willUpdate();
         this.renderNow();
@@ -45,7 +56,31 @@ export class ElementVirtualizer {
         this.virtualizer.measureElement(element);
     }
 
+    measure(): void {
+        this.virtualizer.measure();
+        if (this.isMounted) {
+            this.scheduleRender();
+        }
+    }
+
+    scrollToOffset(offset: number, options?: ScrollToOptions): void {
+        this.virtualizer.scrollToOffset(offset, options);
+    }
+
+    scrollToIndex(index: number, options?: ScrollToOptions): void {
+        this.virtualizer.scrollToIndex(index, options);
+    }
+
+    whenReady(): Promise<void> {
+        return this.readyPromise;
+    }
+
     destroy(): void {
+        if (!this.isMounted && !this.disposeMount && this.renderFrame === null) {
+            return;
+        }
+
+        this.isMounted = false;
         if (this.renderFrame !== null) {
             cancelAnimationFrame(this.renderFrame);
             this.renderFrame = null;
@@ -54,6 +89,8 @@ export class ElementVirtualizer {
         this.disposeMount?.();
         this.disposeMount = null;
         this.lastRenderSignature = null;
+        this.resolveReady?.();
+        this.resolveReady = null;
     }
 
     private createOptions() {
@@ -72,17 +109,23 @@ export class ElementVirtualizer {
     }
 
     private scheduleRender(): void {
-        if (this.renderFrame !== null) {
+        if (!this.isMounted || this.renderFrame !== null) {
             return;
         }
 
         this.renderFrame = requestAnimationFrame(() => {
             this.renderFrame = null;
+            if (!this.isMounted) {
+                return;
+            }
             this.renderNow();
         });
     }
 
     private renderNow(): void {
+        if (!this.isMounted) {
+            return;
+        }
         const items = this.virtualizer.getVirtualItems();
         const totalSize = this.virtualizer.getTotalSize();
         const signature = `${totalSize}|${items.map((item) => (
@@ -96,5 +139,13 @@ export class ElementVirtualizer {
             items,
             totalSize
         );
+        this.resolveReady?.();
+        this.resolveReady = null;
+    }
+
+    private resetReadyPromise(): void {
+        this.readyPromise = new Promise<void>((resolve) => {
+            this.resolveReady = resolve;
+        });
     }
 }
