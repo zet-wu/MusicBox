@@ -194,9 +194,6 @@ class ArtistsPage extends Component {
         this.coverGeneration++;
         this.isVisible = false;
         this.masterDetailHost.suspend();
-        if (this.selectedArtist) {
-            this.renderDirty = true;
-        }
         this.trackCollectionDetail.hide();
         this.selectedArtist = null;
         if (this.element instanceof HTMLElement) {

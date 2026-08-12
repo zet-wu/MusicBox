@@ -24,14 +24,6 @@ import {AdaptiveCollectionSurface, MasterDetailViewHost, type CollectionLayout} 
 
 type AlbumViewSize = 's' | 'm' | 'l';
 
-interface SourceRect {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    radius: string;
-}
-
 class AlbumsPage extends Component {
     private tracks: Track[];
     private albums: AlbumItem[];
@@ -46,8 +38,6 @@ class AlbumsPage extends Component {
     private readonly listRoot: HTMLElement;
     private readonly detailRoot: HTMLElement;
     private readonly scroll: MainContentScrollCoordinator;
-    private _lastSourceRect: SourceRect | null;
-    private _lastSourceKey: string | null;
     private _coverRequests: Set<string>;
     private _coverFailures: Set<string>;
     private _coverQueue: string[];
@@ -88,9 +78,6 @@ class AlbumsPage extends Component {
         this.sortDirection = 'asc';
         this.searchQuery = '';
         this.container = this.listRoot;
-        // 共享元素转场：记忆源位置信息与滚动
-        this._lastSourceRect = null;   // {left, top, width, height, radius, scrollTop}
-        this._lastSourceKey = null;    // 专辑 key
         // 封面获取去重与队列
         this._coverRequests = new Set();  // in-flight keys
         this._coverFailures = new Set();  // failed keys (避免重复请求)
@@ -104,7 +91,6 @@ class AlbumsPage extends Component {
             this._coverFailures.clear();
             this.processAlbums();
             this.renderDirty = true;
-            if (this.selectedAlbum) this.listRenderDirty = true;
             if (this.isVisible) {
                 this.render();
             }
@@ -202,19 +188,12 @@ class AlbumsPage extends Component {
         if (this.renderDirty || !this.listRoot.firstElementChild) {
             this.render();
         }
-
-        // 记忆共享元素转场所需信息
-        this._lastSourceRect = null;   // {left, top, width, height, radius, scrollTop}
-        this._lastSourceKey = null;    // 对应的专辑 key，返回时用于定位原卡片
     }
 
     hide(): void {
         this.coverGeneration++;
         this.isVisible = false;
         this.masterDetailHost.suspend();
-        if (this.selectedAlbum) {
-            this.renderDirty = true;
-        }
         this.selectedAlbum = null;
         this.trackCollectionDetail.hide();
         if (this.element instanceof HTMLElement) this.element.style.display = 'none';
@@ -228,8 +207,6 @@ class AlbumsPage extends Component {
         this._coverRequests.clear();
         this._coverFailures.clear();
         this._coverQueue.length = 0;
-        this._lastSourceRect = null;
-        this._lastSourceKey = null;
         this.listenersSetup = false;
         this.albumGroupingUnsubscribe?.();
         this.albumGroupingUnsubscribe = null;
@@ -686,16 +663,7 @@ class AlbumsPage extends Component {
         const srcArt = tileEl.querySelector('.art');
         if (!srcArtImg || !srcArt) return this.showAlbumDetail(album);
         const srcRect = srcArtImg.getBoundingClientRect();
-
-        // 预渲染详情页用于定位目标元素
-        // 记忆源卡片位置信息 & 当前滚动位置
-        // 反向转场与滚动恢复
         const srcRadius = getComputedStyle(srcArt).borderRadius;
-        this._lastSourceRect = {
-            left: srcRect.left, top: srcRect.top, width: srcRect.width, height: srcRect.height,
-            radius: srcRadius
-        };
-        this._lastSourceKey = album.key;
 
         this.masterDetailHost.enterDetail(album.key);
         this.selectedAlbum = album;
@@ -817,105 +785,6 @@ class AlbumsPage extends Component {
         phase(stats, 120);
         phase(actions, 200);
         phase(tracks, 280); // 列表逐个延迟 24ms，整体节奏轻快
-    }
-
-    // 反向共享元素转场：从详情页封面飞回网格卡片
-    animateBackToGrid(): void {
-        const dstCover = this.container.querySelector('.detail-hero .cover');
-        const dstImg = dstCover ? dstCover.querySelector('img') : null;
-        if (!dstCover || !dstImg) {
-            void this.closeAlbumDetail();
-            return;
-        }
-        const dstRect = dstCover.getBoundingClientRect();
-        const src = this._lastSourceRect;
-
-        // 先淡出详情的文本内容
-        const title = this.container.querySelector('.detail-hero .info .name');
-        const stats = this.container.querySelector('.detail-hero .info .stats');
-        const actions = this.container.querySelector('.detail-hero .info .actions');
-        const tracks = this.container.querySelectorAll('.detail-tracks .trackx');
-        const fadeOut = (els: any) => {
-            const list = els instanceof NodeList ? Array.from(els) : [els];
-            return list.map(el => el ? el.animate([
-                {opacity: 1, transform: 'translateY(0px)'},
-                {opacity: 0, transform: 'translateY(6px)'}
-            ], {duration: 150, easing: 'ease-in', fill: 'forwards'}).finished : Promise.resolve());
-        };
-        Promise.allSettled([
-            ...fadeOut(title), ...fadeOut(stats), ...fadeOut(actions), ...fadeOut(tracks)
-        ]).finally(() => {
-            // 创建 ghost 做反向飞行
-            const ghostWrap = document.createElement('div');
-            const ghost = dstImg.cloneNode(true);
-            const dstRadius = getComputedStyle(dstCover).borderRadius;
-            Object.assign(ghostWrap.style, {
-                position: 'fixed', left: `${dstRect.left}px`, top: `${dstRect.top}px`,
-                width: `${dstRect.width}px`, height: `${dstRect.height}px`,
-                borderRadius: dstRadius, overflow: 'hidden',
-                boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: '9999',
-                transformOrigin: 'top left', willChange: 'transform, border-radius', pointerEvents: 'none'
-            });
-            Object.assign(ghost.style, {width: '100%', height: '100%', objectFit: 'cover'});
-            document.body.appendChild(ghostWrap);
-            ghostWrap.appendChild(ghost);
-
-            // 切换视图到网格，但先隐藏网格中可能的目标卡片以避免闪烁
-            const key = this._lastSourceKey;
-            this.selectedAlbum = null;
-            this.trackCollectionDetail.hide();
-            this.container = this.listRoot;
-            void this.masterDetailHost.returnToList();
-            const gridTile = key ? this.container.querySelector(`.albumsx-tile[data-album-key="${CSS.escape(key)}"]`) : null;
-            const gridArt = gridTile ? gridTile.querySelector('.art') : null;
-            if (gridArt) gridArt.style.visibility = 'hidden';
-
-            // 强制布局后获取源卡片（网格）目标 rect
-            let targetRect;
-            if (gridArt) {
-                void gridArt.offsetHeight;
-                const img = gridArt.querySelector('img') || gridArt;
-                targetRect = img.getBoundingClientRect();
-            }
-
-            // 若无法找到原卡片，使用淡出收场
-            if (!src || !targetRect) {
-                ghostWrap.animate([{opacity: 1}, {opacity: 0}], {duration: 160, easing: 'ease-out', fill: 'forwards'})
-                    .onfinish = () => {
-                    ghostWrap.remove();
-                    if (gridArt) gridArt.style.visibility = '';
-                };
-                return;
-            }
-
-            const dx = (src.left ?? targetRect.left) - dstRect.left;
-            const dy = (src.top ?? targetRect.top) - dstRect.top;
-            const sx = (src.width ?? targetRect.width) / dstRect.width;
-            const sy = (src.height ?? targetRect.height) / dstRect.height;
-            const finalRadius = src.radius || getComputedStyle(gridArt).borderRadius;
-
-            const anim = ghostWrap.animate([
-                {transform: 'translate(0px, 0px) scale(1, 1)', borderRadius: dstRadius},
-                {transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, borderRadius: finalRadius}
-            ], {duration: 420, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)', fill: 'forwards'});
-
-            anim.onfinish = () => {
-                requestAnimationFrame(() => {
-                    if (gridArt) gridArt.style.visibility = '';
-                    // 交叉淡入淡出，保证无缝
-                    const fadeInGrid = gridArt ? gridArt.animate([{opacity: 0}, {opacity: 1}], {
-                        duration: 140,
-                        fill: 'forwards'
-                    }) : null;
-                    ghostWrap.animate([{opacity: 1}, {opacity: 0}], {duration: 140, fill: 'forwards'})
-                        .onfinish = () => {
-                        ghostWrap.remove();
-                    };
-                    if (fadeInGrid && fadeInGrid.finished) fadeInGrid.finished.catch(() => {
-                    });
-                });
-            };
-        });
     }
 
 }
