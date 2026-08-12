@@ -51,6 +51,7 @@ export class AdaptiveCollectionSurface<T> {
 
         this.root = root;
         this.scrollElement = scrollElement;
+        this.suspended = false;
         this.shell = document.createElement('div');
         this.shell.className = 'adaptive-collection-surface';
         this.body = document.createElement('div');

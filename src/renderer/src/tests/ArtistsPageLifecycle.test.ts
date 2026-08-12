@@ -37,6 +37,7 @@ vi.mock('../ui/virtualization/ElementVirtualizer', () => ({
 
 class FakeElement extends EventTarget {
     className = '';
+    classList = {add: vi.fn()};
     dataset: DOMStringMap = {};
     style: Partial<CSSStyleDeclaration> = {};
     firstElementChild: FakeElement | null = null;
@@ -87,15 +88,15 @@ describe('ArtistsPage 列表事件生命周期', () => {
         internals.listRoot.dataset.artist = artist.name;
         vi.spyOn(page, 'render').mockImplementation(() => undefined);
         const enterDetail = vi.spyOn(page, 'showArtistDetail');
-        const rememberPosition = vi.spyOn(internals, 'rememberArtistListPosition');
+        const capturePosition = vi.spyOn(internals.artistSurface, 'suspend');
 
-        internals.mountArtistVirtualizer();
-        internals.mountArtistVirtualizer();
-        internals.mountArtistVirtualizer();
+        internals.updateArtistSurface();
+        internals.updateArtistSurface();
+        internals.updateArtistSurface();
         internals.listRoot.dispatchEvent(new Event('click'));
 
         expect(enterDetail).toHaveBeenCalledOnce();
-        expect(rememberPosition).toHaveBeenCalledOnce();
+        expect(capturePosition).toHaveBeenCalledOnce();
         expect(internals.selectedArtist).toBe(artist);
 
         page.destroy();

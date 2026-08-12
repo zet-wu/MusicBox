@@ -2,7 +2,6 @@
  * 艺术家页组件
  */
 
-import {urlValidator} from "@utils/URLValidator";
 import {Component} from "@ui/base/Component";
 import {
     libraryPageDataService,
@@ -15,9 +14,8 @@ import {
     artistViewModePreferenceService,
     trackCoverNetworkPreferenceService
 } from "@/features/settings/service";
-import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
 import {TrackCollectionDetail} from "@ui/components/TrackCollectionDetail";
-import type {VirtualItem} from "@tanstack/virtual-core";
+import {AdaptiveCollectionSurface, MasterDetailViewHost, type CollectionLayout} from '@ui/collections';
 import type {Unsubscribe} from "@api/types/common";
 import type {ArtistViewMode} from "@api/types/settings";
 import type {Track} from "@api/types/track";
@@ -54,20 +52,22 @@ class ArtistsPage extends Component {
     private isVisible: boolean;
     private renderDirty = true;
     private listRenderDirty = true;
-    private listScrollTop = 0;
-    private artistVirtualizer: ElementVirtualizer | null;
+    private readonly masterDetailHost: MasterDetailViewHost;
+    private readonly artistSurface: AdaptiveCollectionSurface<ArtistInfo>;
     private readonly trackCollectionDetail: TrackCollectionDetail;
 
     constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
         const pageRoot = this.element as HTMLElement;
         this.scroll = scroll;
-        this.listRoot = document.createElement('div');
-        this.listRoot.className = 'artists-list-root';
-        this.detailRoot = document.createElement('div');
-        this.detailRoot.className = 'artists-detail-root';
-        this.detailRoot.style.display = 'none';
-        pageRoot.replaceChildren(this.listRoot, this.detailRoot);
+        this.masterDetailHost = new MasterDetailViewHost(pageRoot, scroll, {
+            listLocationKey: 'artists/list',
+            detailLocationKey: identity => `artists/detail/${encodeURIComponent(identity)}`
+        });
+        this.listRoot = this.masterDetailHost.listRoot;
+        this.listRoot.classList.add('artists-list-root');
+        this.detailRoot = this.masterDetailHost.detailRoot;
+        this.detailRoot.classList.add('artists-detail-root');
         this.container = this.listRoot;
         this.tracks = [];
         this.artists = [];
@@ -84,10 +84,22 @@ class ArtistsPage extends Component {
         this._coverFetchingInProgress = false; // 防止重复启动封面获取
         this.coverGeneration = 0;
         this.isVisible = false;
-        this.artistVirtualizer = null;
         this.setupArtistListEventDelegation();
+        this.artistSurface = new AdaptiveCollectionSurface<ArtistInfo>({
+            getKey: artist => artist.name,
+            renderItem: artist => this.renderArtistLibraryItem(artist)
+        }, {
+            onRenderedRangeChange: keys => {
+                const visibleArtists = keys
+                    .map(key => this.findArtistByKey(String(key)))
+                    .filter((artist): artist is ArtistInfo => artist !== null);
+                this._startCoverFetching(visibleArtists);
+            },
+            restoreScrollOffset: scrollTop => this.masterDetailHost.restoreListOffset(scrollTop)
+        });
+        this.masterDetailHost.attachSurface(this.artistSurface);
         this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
-            onBack: () => this.closeArtistDetail(),
+            onBack: () => void this.closeArtistDetail(),
             onTrackPlayed: (track, index, tracks, mode) => {
                 this.emit('trackPlayed', track, index, tracks, mode);
             },
@@ -151,6 +163,10 @@ class ArtistsPage extends Component {
             this.element.style.display = 'block';
         }
         this.isVisible = true;
+        await this.masterDetailHost.resume();
+        if (!this.selectedArtist && this.masterDetailHost.getLocation().kind === 'detail') {
+            await this.masterDetailHost.returnToList();
+        }
 
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
@@ -164,8 +180,6 @@ class ArtistsPage extends Component {
 
         if (this.renderDirty || !this.listRoot.firstElementChild) {
             this.render();
-        } else if (!this.selectedArtist) {
-            this.mountArtistVirtualizer();
         }
     }
 
@@ -179,10 +193,9 @@ class ArtistsPage extends Component {
     hide(): void {
         this.coverGeneration++;
         this.isVisible = false;
-        this.destroyArtistVirtualizer();
+        this.masterDetailHost.suspend();
         if (this.selectedArtist) {
             this.renderDirty = true;
-            this.scroll.remember('artists', this.listScrollTop);
         }
         this.trackCollectionDetail.hide();
         this.selectedArtist = null;
@@ -192,7 +205,7 @@ class ArtistsPage extends Component {
     }
 
     destroy(): void {
-        this.destroyArtistVirtualizer();
+        this.masterDetailHost.destroy();
         this.trackCollectionDetail.destroy();
 
         this.tracks.length = 0;
@@ -331,7 +344,8 @@ class ArtistsPage extends Component {
 
                 ${this.artists.length > 0 ? `
                     <div class="artists-browser ${this.viewMode}-view" style="--cover:${coverSize}px;">
-                        <div class="artist-virtual-body"></div>
+                        <div class="artist-surface-root"></div>
+                        <div class="artists-no-results" hidden>没有找到匹配的艺术家</div>
                     </div>
                 ` : `
                     <div class="albumsx-empty">
@@ -346,7 +360,7 @@ class ArtistsPage extends Component {
         `;
 
         this.setupEventListeners();
-        this.mountArtistVirtualizer();
+        this.updateArtistSurface();
         this.listRenderDirty = false;
     }
 
@@ -415,15 +429,12 @@ class ArtistsPage extends Component {
         const srcRect = sourceImg.getBoundingClientRect();
         const srcContainer = sourceImg.closest('.artist-avatar');
 
-        // 记录源位置信息用于可能的返回动画
-        const scrollEl = this.getScrollContainer();
         const srcRadius = srcContainer ? getComputedStyle(srcContainer).borderRadius : '50%';
-        this.rememberArtistListPosition(scrollEl?.scrollTop ?? window.scrollY ?? 0);
 
         // 渲染艺术家详情页面
+        this.masterDetailHost.enterDetail(artist.name);
         this.selectedArtist = artist;
         this.render();
-        this.scroll.scrollToTop();
 
         const targetAvatar = this.container.querySelector('.detail-target-avatar');
         const targetImg = targetAvatar ? targetAvatar.querySelector('img') : null;
@@ -526,11 +537,6 @@ class ArtistsPage extends Component {
         };
     }
 
-    // 获取滚动容器
-    getScrollContainer(): any {
-        return document.querySelector<HTMLElement>('.main-content');
-    }
-
     // 获取艺术家封面
     async _fetchArtistCover(artist: ArtistInfo): Promise<void> {
         const generation = this.coverGeneration;
@@ -566,8 +572,7 @@ class ArtistsPage extends Component {
             ) {
                 // 更新艺术家数据
                 artist.cover = result.imageUrl;
-                // 局部刷新：更新对应卡片的图片src
-                this._updateArtistCardCover(artist.name, result.imageUrl);
+                this.artistSurface.invalidateItem(artist.name);
             } else {
                 this._coverFailures.add(artist.name);
                 console.log('❌ 艺术家封面获取失败:', artistName, result?.error);
@@ -597,29 +602,6 @@ class ArtistsPage extends Component {
                     img.style.opacity = '0.6';
                     img.style.filter = 'blur(1px)';
                 } else {
-                    img.style.opacity = '';
-                    img.style.filter = '';
-                }
-            }
-        });
-    }
-
-    // 更新艺术家卡片封面
-    _updateArtistCardCover(artistName: string, imageUrl: string): void {
-        const artistCards = this.listRoot.querySelectorAll<HTMLElement>(`[data-artist="${CSS.escape(artistName)}"]`);
-        artistCards.forEach((card: HTMLElement) => {
-            const img = card.querySelector('img');
-            if (img && imageUrl) {
-                // 使用安全的图片设置方法
-                if (urlValidator) {
-                    urlValidator.safeSetImageSrc(img, imageUrl).then((success: boolean) => {
-                        if (success) {
-                            img.style.opacity = '';
-                            img.style.filter = '';
-                        }
-                    });
-                } else {
-                    img.src = imageUrl;
                     img.style.opacity = '';
                     img.style.filter = '';
                 }
@@ -768,80 +750,49 @@ class ArtistsPage extends Component {
         const browser = this.container.querySelector('.artists-browser');
         if (browser) {
             browser.className = `artists-browser ${this.viewMode}-view`;
-            this.mountArtistVirtualizer();
+            this.updateArtistSurface();
         }
     }
 
-    private mountArtistVirtualizer(): void {
-        this.destroyArtistVirtualizer();
+    private updateArtistSurface(): void {
         const container = this.container as HTMLElement | null;
-        const body = container?.querySelector<HTMLElement>('.artist-virtual-body');
+        const surfaceRoot = container?.querySelector<HTMLElement>('.artist-surface-root');
+        const noResults = container?.querySelector<HTMLElement>('.artists-no-results');
         const scrollElement = document.querySelector<HTMLElement>('.main-content');
-        if (!body || !scrollElement) {
+        if (!surfaceRoot || !scrollElement) {
             return;
         }
 
-        if (this.filteredArtists.length === 0) {
-            body.innerHTML = '<div class="artists-no-results">没有找到匹配的艺术家</div>';
-            return;
+        surfaceRoot.style.display = this.filteredArtists.length === 0 ? 'none' : 'block';
+        if (noResults) {
+            noResults.hidden = this.filteredArtists.length !== 0;
         }
+        this.artistSurface.mount(surfaceRoot, scrollElement);
+        this.artistSurface.update(this.filteredArtists, this.getArtistCollectionLayout());
+    }
 
-        const availableWidth = body.clientWidth || this.container.clientWidth || 800;
+    private getArtistCollectionLayout(): CollectionLayout {
         const coverSize = ARTIST_COVER_SIZES[this.viewSize];
+        if (this.viewMode === 'list') {
+            return {
+                mode: 'list',
+                estimateRowSize: 82,
+                overscan: 8
+            };
+        }
         const gridCellWidth = coverSize + 60;
-        const columns = this.viewMode === 'grid'
-            ? Math.max(1, Math.floor((availableWidth + 20) / (gridCellWidth + 20)))
-            : 1;
-        const rowCount = Math.ceil(this.filteredArtists.length / columns);
-        const scrollMargin = this.getArtistScrollMargin(body, scrollElement);
-
-        this.artistVirtualizer = new ElementVirtualizer({
-            count: rowCount,
-            estimateSize: () => this.viewMode === 'grid' ? coverSize + 94 : 82,
-            getItemKey: (index) => `artist-row-${index}`,
-            getScrollElement: () => scrollElement,
-            scrollMargin,
-            overscan: 3,
-            onChange: (items, totalSize) => {
-                if (!this.isVisible || !this.artistVirtualizer) {
-                    return;
-                }
-
-                body.style.height = `${totalSize}px`;
-                body.innerHTML = items
-                    .map(item => this.renderArtistVirtualRow(item, columns, scrollMargin))
-                    .join('');
-                body.querySelectorAll<HTMLElement>('.artist-virtual-row').forEach((row) => {
-                    this.artistVirtualizer?.measureElement(row);
-                });
-
-                const visibleArtists = items.flatMap((item) => {
-                    const start = item.index * columns;
-                    return this.filteredArtists.slice(start, start + columns);
-                });
-                this._startCoverFetching(visibleArtists);
-            }
-        });
-        this.artistVirtualizer.mount();
+        return {
+            mode: 'grid',
+            estimateRowSize: coverSize + 94,
+            getColumnCount: width => Math.max(1, Math.floor((width + 20) / (gridCellWidth + 20))),
+            overscan: 3
+        };
     }
 
-    private renderArtistVirtualRow(item: VirtualItem, columns: number, scrollMargin: number): string {
-        const start = item.index * columns;
-        const artists = this.filteredArtists.slice(start, start + columns);
-        const translateY = item.start - scrollMargin;
-        return `
-            <div class="artist-virtual-row ${this.viewMode}-row"
-                 data-index="${item.index}"
-                 style="transform: translateY(${translateY}px); --artist-columns:${columns};">
-                ${artists.map((artist, offset) => this.renderArtistLibraryItem(artist, start + offset)).join('')}
-            </div>
-        `;
-    }
-
-    private renderArtistLibraryItem(artist: ArtistInfo, index: number): string {
+    private renderArtistLibraryItem(artist: ArtistInfo): string {
         const cover = artist.cover || 'assets/images/default-cover.svg';
         return `
-            <div class="artist-library-item" data-artist-index="${index}" data-artist="${this.escapeHtml(artist.name)}" tabindex="0">
+            <div class="artist-library-item" data-artist="${this.escapeHtml(artist.name)}" tabindex="0">
                 <div class="artist-avatar">
                     <img src="${cover}" alt="${this.escapeHtml(artist.name)}" loading="lazy">
                 </div>
@@ -856,17 +807,6 @@ class ArtistsPage extends Component {
         `;
     }
 
-    private getArtistScrollMargin(body: HTMLElement, scrollElement: HTMLElement): number {
-        const bodyRect = body.getBoundingClientRect();
-        const scrollRect = scrollElement.getBoundingClientRect();
-        return bodyRect.top - scrollRect.top + scrollElement.scrollTop;
-    }
-
-    private destroyArtistVirtualizer(): void {
-        this.artistVirtualizer?.destroy();
-        this.artistVirtualizer = null;
-    }
-
     // 切换视图模式
     switchViewMode(newMode: ArtistViewMode): void {
         this.viewMode = newMode;
@@ -878,10 +818,7 @@ class ArtistsPage extends Component {
         if (!this.selectedArtist) return;
 
         const artist = this.selectedArtist;
-        this.destroyArtistVirtualizer();
         this.container = this.detailRoot;
-        this.listRoot.style.display = 'none';
-        this.detailRoot.style.display = 'block';
         this.trackCollectionDetail.show({
             identity: artist.name,
             title: artist.name,
@@ -897,30 +834,19 @@ class ArtistsPage extends Component {
     }
 
     showArtistDetail(artist: ArtistInfo): void {
-        this.rememberArtistListPosition();
+        this.masterDetailHost.enterDetail(artist.name);
         this.selectedArtist = artist;
         this.render();
-        this.scroll.scrollToTop();
     }
 
-    private closeArtistDetail(): void {
+    private async closeArtistDetail(): Promise<void> {
         this.selectedArtist = null;
         this.trackCollectionDetail.hide();
         if (this.listRenderDirty || !this.listRoot.firstElementChild) {
             this.renderArtistsList();
-        } else {
-            this.container = this.listRoot;
-            this.detailRoot.style.display = 'none';
-            this.listRoot.style.display = 'block';
-            this.mountArtistVirtualizer();
         }
-        this.scroll.remember('artists', this.listScrollTop);
-        this.scroll.restore('artists', () => this.isVisible && !this.selectedArtist);
-    }
-
-    private rememberArtistListPosition(scrollTop = this.getScrollContainer()?.scrollTop ?? 0): void {
-        this.listScrollTop = Math.max(0, scrollTop);
-        this.scroll.remember('artists', this.listScrollTop);
+        this.container = this.listRoot;
+        await this.masterDetailHost.returnToList();
     }
 
     formatDuration(seconds: number = 0): string {
