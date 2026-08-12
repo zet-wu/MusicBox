@@ -129,6 +129,33 @@
     gap: var(--spacing-sm);
   }
 
+  .album-surface-root.albumsx-grid,
+  .album-surface-root.albumsx-list {
+    display: block;
+  }
+
+  .album-surface-root {
+    .adaptive-collection-surface,
+    .adaptive-collection-body {
+      width: 100%;
+    }
+
+    .adaptive-collection-surface[data-layout='grid'] {
+      .adaptive-collection-body,
+      .collection-surface-grid-row {
+        gap: var(--spacing-lg);
+      }
+
+      .collection-surface-grid-row {
+        padding-bottom: var(--spacing-lg);
+      }
+    }
+
+    .adaptive-collection-surface[data-layout='list'] .collection-surface-virtual-row {
+      margin-bottom: var(--spacing-sm);
+    }
+  }
+
   .albumsx-list .albumsx-list-item {
     display: grid;
     grid-template-columns: 56px minmax(0, 1fr) minmax(260px, auto);
