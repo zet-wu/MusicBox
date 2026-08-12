@@ -3,7 +3,12 @@ import {libraryDataService} from "@/features/library/service/LibraryDataService"
 import {playlistViewModePreferenceService} from "@/features/settings/service";
 import type {Playlist} from "@api/types/library";
 import type {PlaylistViewMode} from "@api/types/settings";
-import {AdaptiveCollectionSurface, type CollectionLayout, type CollectionSurfaceSnapshot} from '@ui/collections';
+import {
+    AdaptiveCollectionSurface,
+    applyCollectionSearch,
+    type CollectionLayout,
+    type CollectionSurfaceSnapshot
+} from '@ui/collections';
 import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 type PlaylistViewSize = 's' | 'm' | 'l';
@@ -285,11 +290,16 @@ export class PlaylistsPage extends Component {
     }
 
     private applySearchFilter(updateSurface = true): void {
-        const query = this.searchQuery.trim().toLocaleLowerCase();
-        this.filteredPlaylists = this.playlists.filter(playlist => (
-            !query || playlist.name.toLocaleLowerCase().includes(query)
-        ));
-        if (updateSurface) this.updatePlaylistSurface();
+        applyCollectionSearch({
+            source: this.playlists,
+            query: this.searchQuery,
+            getSearchableValues: playlist => [playlist.name],
+            commit: results => this.filteredPlaylists = results,
+            refresh: updateSurface ? {
+                resetScroll: () => this.scroll.scrollToTop(),
+                updateView: () => this.updatePlaylistSurface()
+            } : undefined
+        });
     }
 
     private findFilteredPlaylist(id: string | undefined): Playlist | null {

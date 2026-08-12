@@ -83,17 +83,20 @@ describe('FolderSourcesPage 主从生命周期', () => {
 
     it('搜索只更新过滤后的来源数据', async () => {
         const {FolderSourcesPage} = await import('../ui/pages/FolderSourcesPage');
+        const scroll = new MainContentScrollCoordinator();
+        const scrollToTop = vi.spyOn(scroll, 'scrollToTop');
         const page = new FolderSourcesPage(
             new FakeElement() as unknown as HTMLElement,
-            new MainContentScrollCoordinator()
+            scroll
         );
         const internals = page as any;
         internals.directories = [source, {...source, id: 'source-2', path: 'C:/Music/晨光'}];
-        internals.searchQuery = '夜色';
+        internals.searchQuery = '  夜色  ';
 
-        internals.applySearchFilter(false);
+        internals.applySearchFilter();
 
         expect(internals.filteredDirectories).toEqual([source]);
+        expect(scrollToTop).toHaveBeenCalledOnce();
         page.destroy();
     });
 

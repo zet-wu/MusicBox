@@ -1,5 +1,11 @@
 export {AdaptiveCollectionSurface} from './AdaptiveCollectionSurface';
 export {
+    applyCollectionSearch,
+    normalizeCollectionSearchText,
+    type CollectionSearchOptions,
+    type CollectionSearchValue
+} from './CollectionSearch';
+export {
     MasterDetailViewHost,
     type MasterDetailLocation,
     type MasterDetailSurface

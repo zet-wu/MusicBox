@@ -89,17 +89,20 @@ describe('AlbumsPage 集合生命周期', () => {
 
     it('搜索只过滤业务数据，不遍历离屏专辑 DOM', async () => {
         const {AlbumsPage} = await import('../ui/pages/AlbumsPage');
-        const page = new AlbumsPage(new FakeElement() as unknown as HTMLElement, new MainContentScrollCoordinator());
+        const scroll = new MainContentScrollCoordinator();
+        const scrollToTop = vi.spyOn(scroll, 'scrollToTop');
+        const page = new AlbumsPage(new FakeElement() as unknown as HTMLElement, scroll);
         const internals = page as any;
         internals.albums = [
             createAlbum('a', '晨光', '甲'),
             createAlbum('b', '夜色', '乙')
         ];
-        internals.searchQuery = '夜';
+        internals.searchQuery = '  乙  ';
 
-        internals.applyAlbumFilter(false);
+        internals.applyAlbumFilter();
 
         expect(internals.filteredAlbums.map((album: {key: string}) => album.key)).toEqual(['b']);
+        expect(scrollToTop).toHaveBeenCalledOnce();
         page.destroy();
     });
 

@@ -20,7 +20,12 @@ import type {Track} from "@api/types/library";
 import type {AlbumViewMode} from "@api/types/settings";
 import {escapeHtmlAttribute} from "@utils/html";
 import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
-import {AdaptiveCollectionSurface, MasterDetailViewHost, type CollectionLayout} from '@ui/collections';
+import {
+    AdaptiveCollectionSurface,
+    applyCollectionSearch,
+    MasterDetailViewHost,
+    type CollectionLayout
+} from '@ui/collections';
 
 type AlbumViewSize = 's' | 'm' | 'l';
 
@@ -579,13 +584,16 @@ class AlbumsPage extends Component {
     }
 
     private applyAlbumFilter(updateSurface = true): void {
-        const query = this.searchQuery.trim().toLocaleLowerCase();
-        this.filteredAlbums = this.albums.filter(album => (
-            !query
-                || album.name.toLocaleLowerCase().includes(query)
-                || album.artist.toLocaleLowerCase().includes(query)
-        ));
-        if (updateSurface) this.updateAlbumSurface();
+        applyCollectionSearch({
+            source: this.albums,
+            query: this.searchQuery,
+            getSearchableValues: album => [album.name, album.artist],
+            commit: results => this.filteredAlbums = results,
+            refresh: updateSurface ? {
+                resetScroll: () => this.scroll.scrollToTop(),
+                updateView: () => this.updateAlbumSurface()
+            } : undefined
+        });
     }
 
     private updateAlbumSurface(): void {

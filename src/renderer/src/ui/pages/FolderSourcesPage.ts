@@ -9,6 +9,7 @@ import {TrackCollectionDetail} from '@ui/components/TrackCollectionDetail';
 import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 import {
     AdaptiveCollectionSurface,
+    applyCollectionSearch,
     MasterDetailViewHost,
     type CollectionLayout
 } from '@ui/collections';
@@ -27,6 +28,7 @@ export class FolderSourcesPage extends Component {
     private readonly container: HTMLElement | null;
     private readonly listRoot: HTMLElement;
     private readonly detailRoot: HTMLElement;
+    private readonly scroll: MainContentScrollCoordinator;
     private directories: LibraryDirectoryOverview[] = [];
     private filteredDirectories: LibraryDirectoryOverview[] = [];
     private viewMode: FolderSourceViewMode;
@@ -52,6 +54,7 @@ export class FolderSourcesPage extends Component {
     constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
         this.container = this.element as HTMLElement | null;
+        this.scroll = scroll;
         const pageRoot = this.element as HTMLElement;
         this.masterDetailHost = new MasterDetailViewHost(pageRoot, scroll, {
             listLocationKey: 'folders/list',
@@ -479,11 +482,16 @@ export class FolderSourcesPage extends Component {
     }
 
     private applySearchFilter(updateSurface = true): void {
-        const query = this.searchQuery.trim().toLocaleLowerCase();
-        this.filteredDirectories = this.directories.filter(source => (
-            !query || source.path.toLocaleLowerCase().includes(query)
-        ));
-        if (updateSurface) this.updateDirectorySurface();
+        applyCollectionSearch({
+            source: this.directories,
+            query: this.searchQuery,
+            getSearchableValues: source => [source.path],
+            commit: results => this.filteredDirectories = results,
+            refresh: updateSurface ? {
+                resetScroll: () => this.scroll.scrollToTop(),
+                updateView: () => this.updateDirectorySurface()
+            } : undefined
+        });
     }
 
     private findSource(sourceId?: string): LibraryDirectoryOverview | undefined {

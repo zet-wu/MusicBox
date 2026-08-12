@@ -15,7 +15,12 @@ import {
     trackCoverNetworkPreferenceService
 } from "@/features/settings/service";
 import {TrackCollectionDetail} from "@ui/components/TrackCollectionDetail";
-import {AdaptiveCollectionSurface, MasterDetailViewHost, type CollectionLayout} from '@ui/collections';
+import {
+    AdaptiveCollectionSurface,
+    applyCollectionSearch,
+    MasterDetailViewHost,
+    type CollectionLayout
+} from '@ui/collections';
 import type {Unsubscribe} from "@api/types/common";
 import type {ArtistViewMode} from "@api/types/settings";
 import type {Track} from "@api/types/track";
@@ -174,7 +179,7 @@ class ArtistsPage extends Component {
             if (!this.isVisible || viewGeneration !== this.coverGeneration) return;
             this.tracks = pageData.tracks as Track[];
             this.artists = pageData.artists as ArtistInfo[];
-            this.filteredArtists = [...this.artists];
+            this.applySearchFilter(false);
             this.renderDirty = true;
         }
 
@@ -282,7 +287,7 @@ class ArtistsPage extends Component {
     processArtists(): void {
         this.artists = libraryPageDataService.buildArtists(this.tracks as any) as ArtistInfo[];
         libraryPageDataService.sortArtists(this.artists, this.sortBy, this.sortDirection);
-        this.filteredArtists = [...this.artists];
+        this.applySearchFilter(false);
     }
 
     render(): void {
@@ -724,22 +729,25 @@ class ArtistsPage extends Component {
     // 过滤艺术家
     filterArtists(searchTerm: string): void {
         this.searchQuery = searchTerm;
-        const term = searchTerm.trim().toLocaleLowerCase();
-        if (!term) {
-            this.filteredArtists = [...this.artists];
-        } else {
-            this.filteredArtists = this.artists.filter((artist) =>
-                artist.name.toLocaleLowerCase().includes(term)
-            );
-        }
+        this.applySearchFilter();
+    }
 
-        this.scroll.scrollToTop();
-        this.updateArtistsDisplay();
+    private applySearchFilter(updateView = true): void {
+        applyCollectionSearch({
+            source: this.artists,
+            query: this.searchQuery,
+            getSearchableValues: artist => [artist.name],
+            commit: results => this.filteredArtists = results,
+            refresh: updateView ? {
+                resetScroll: () => this.scroll.scrollToTop(),
+                updateView: () => this.updateArtistsDisplay()
+            } : undefined
+        });
     }
 
     private applyArtistSort(): void {
         libraryPageDataService.sortArtists(this.artists, this.sortBy, this.sortDirection);
-        libraryPageDataService.sortArtists(this.filteredArtists, this.sortBy, this.sortDirection);
+        this.applySearchFilter(false);
         this.renderArtistsList();
     }
 

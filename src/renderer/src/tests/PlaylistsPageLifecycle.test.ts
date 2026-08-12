@@ -70,15 +70,17 @@ describe('PlaylistsPage 集合生命周期', () => {
 
     it('搜索基于过滤数据且稳定委托只触发一次选择', async () => {
         const {PlaylistsPage} = await import('../ui/pages/PlaylistsPage');
+        const scroll = new MainContentScrollCoordinator();
+        const scrollToTop = vi.spyOn(scroll, 'scrollToTop');
         const page = new PlaylistsPage(
             new FakeElement() as unknown as HTMLElement,
-            new MainContentScrollCoordinator()
+            scroll
         );
         const internals = page as any;
         const selected = createPlaylist('selected', '夜色');
         internals.playlists = [createPlaylist('other', '晨光'), selected];
-        internals.searchQuery = '夜';
-        internals.applySearchFilter(false);
+        internals.searchQuery = '  夜  ';
+        internals.applySearchFilter();
         internals.container.dataset.playlistId = selected.id;
         const emit = vi.spyOn(page, 'emit');
 
@@ -87,6 +89,7 @@ describe('PlaylistsPage 集合生命周期', () => {
         internals.container.dispatchEvent(new Event('dblclick'));
 
         expect(internals.filteredPlaylists).toEqual([selected]);
+        expect(scrollToTop).toHaveBeenCalledOnce();
         expect(emit).toHaveBeenCalledOnce();
         expect(emit).toHaveBeenCalledWith('playlistSelected', selected);
         page.destroy();
