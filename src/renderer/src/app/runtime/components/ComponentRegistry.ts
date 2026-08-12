@@ -110,7 +110,7 @@ export class ComponentRegistry {
 
         const recentPlayEnabled = getSetting('recentPlay', true);
         if (recentPlayEnabled) {
-            this.components.recentPage = new RecentPage(this.mount('recent'));
+            this.components.recentPage = new RecentPage(this.mount('recent'), this.mainContentScroll);
         } else {
             this.components.recentPage = null;
         }
@@ -148,7 +148,7 @@ export class ComponentRegistry {
         switch (componentName) {
             case 'recentPage':
                 if (!this.components.recentPage) {
-                    this.components.recentPage = new RecentPage(this.mount('recent'));
+                    this.components.recentPage = new RecentPage(this.mount('recent'), this.mainContentScroll);
                     this.setupComponentEvents('recentPage');
                 }
                 break;

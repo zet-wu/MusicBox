@@ -78,7 +78,8 @@
   }
 
   .recent-content {
-    .date-group {
+    .date-group,
+    .recent-surface-root .adaptive-collection-body {
       margin-bottom: var(--spacing-xl);
 
       .date-header {
@@ -102,7 +103,8 @@
         }
       }
 
-      .recent-track-list {
+      .recent-track-list,
+      & {
         .recent-track-item {
           display: flex;
           align-items: center;

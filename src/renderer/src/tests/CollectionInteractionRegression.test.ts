@@ -3,7 +3,7 @@ import type {Track} from '../api/types/library';
 import {LibraryAppController} from '../features/library/ui-bindings/LibraryAppController';
 import {libraryDataService} from '../features/library/service/LibraryDataService';
 import {ViewRouter} from '../app/runtime/ViewRouter';
-import {groupRecentTracksByDate} from '../features/playback/domain/RecentTrackGrouping';
+import {flattenRecentTrackRows, groupRecentTracksByDate} from '../features/playback/domain/RecentTrackGrouping';
 import {PlaybackAppController} from '../features/playback/ui-bindings/PlaybackAppController';
 import {MainContentScrollCoordinator} from '../app/runtime/MainContentScrollCoordinator';
 
@@ -234,6 +234,16 @@ describe('页面路由和最近播放索引', () => {
             ['first', 0],
             ['second', 1]
         ]);
+    });
+
+    it('最近播放扁平序列保留日期标题和原始歌曲索引', () => {
+        const first = createTrack('first', {playTime: new Date('2026-07-30T10:00:00').getTime()});
+        const second = createTrack('second', {playTime: new Date('2026-07-29T10:00:00').getTime()});
+
+        const rows = flattenRecentTrackRows([first, second], new Date('2026-07-31T10:00:00'));
+
+        expect(rows.map(row => row.kind)).toEqual(['date-header', 'track', 'date-header', 'track']);
+        expect(rows.filter(row => row.kind === 'track').map(row => row.index)).toEqual([0, 1]);
     });
 });
 

@@ -250,6 +250,17 @@ describe('AdaptiveCollectionSurface', () => {
         flushFrames();
     });
 
+    it('允许按业务项目数判断阈值而不把分组标题计入', () => {
+        const {surface} = createSurface();
+        const rows = Array.from({length: 55}, (_, index) => index);
+        const layout = {mode: 'list' as const, estimateRowSize: 40};
+
+        surface.update(rows, layout, 49);
+        expect(surface.getMode()).toBe('direct');
+        surface.update(rows, layout, 50);
+        expect(surface.getMode()).toBe('virtual');
+    });
+
     it('方格按响应式行虚拟化并在列数变化后保持项目锚点', async () => {
         const {surface} = createSurface();
         surface.update(Array.from({length: 50}, (_, index) => index), {

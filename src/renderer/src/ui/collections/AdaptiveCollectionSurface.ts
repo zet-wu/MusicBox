@@ -63,13 +63,13 @@ export class AdaptiveCollectionSurface<T> {
         this.renderCurrent();
     }
 
-    update(items: readonly T[], layout: CollectionLayout): void {
+    update(items: readonly T[], layout: CollectionLayout, virtualizationCount = items.length): void {
         const snapshot = this.root && !this.suspended ? this.captureSnapshot() : null;
         this.items = [...items];
         this.layout = layout;
         this.rebuildKeyIndexes();
         this.columns = this.resolveColumnCount();
-        this.mode = this.items.length >= COLLECTION_VIRTUALIZATION_THRESHOLD ? 'virtual' : 'direct';
+        this.mode = virtualizationCount >= COLLECTION_VIRTUALIZATION_THRESHOLD ? 'virtual' : 'direct';
         if (this.root && !this.suspended) {
             this.renderCurrent();
             if (snapshot) {

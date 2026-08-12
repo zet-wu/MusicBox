@@ -105,7 +105,7 @@ export class ViewRouter {
     }
 
     private isSurfaceManagedView(view: AppView): boolean {
-        return view === 'artists' || view === 'albums' || view === 'playlists' || view === 'folders';
+        return view === 'artists' || view === 'albums' || view === 'playlists' || view === 'folders' || view === 'recent';
     }
 
 }
