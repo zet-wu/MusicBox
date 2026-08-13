@@ -36,49 +36,52 @@ class LyricsVolumeController {
             void this.toggleVolumeMute();
         });
 
-        this.addDomListener(this.elements.volumeSliderContainer, 'mousedown', (event) => {
-            this.dragging = true;
-            void this.updateVolumeFromEvent(event as MouseEvent);
+        this.addDomListener(this.elements.volumeSliderContainer, 'pointerdown', (event) => {
+            this.startVolumeDrag(event as PointerEvent);
         });
 
-        this.addDomListener(this.elements.volumeSliderContainer, 'click', (event) => {
-            if (!this.dragging) {
-                void this.updateVolumeFromEvent(event as MouseEvent);
-            }
-        });
-
-        this.addDomListener(this.elements.volumeSliderContainer, 'mousewheel', (event) => {
-            const wheelEvent = event as WheelEvent & {wheelDelta?: number};
-            if ((wheelEvent.wheelDelta || -wheelEvent.deltaY) < 0) {
-                void this.setVolume(Math.min(100, this.currentVolume + 1));
-            } else {
-                void this.setVolume(Math.max(0, this.currentVolume - 1));
-            }
-        });
-
-        this.addDomListener(document, 'mousemove', (event) => {
+        this.addDomListener(document, 'pointermove', (event) => {
             if (this.dragging) {
-                void this.updateVolumeFromEvent(event as MouseEvent);
+                this.previewVolumeFromEvent(event as PointerEvent);
             }
         });
 
-        this.addDomListener(document, 'mouseup', () => {
+        this.addDomListener(document, 'pointerup', () => {
             if (this.dragging) {
                 this.dragging = false;
+                void this.commitVolume();
             }
         });
+
+        this.addDomListener(document, 'pointercancel', () => {
+            this.dragging = false;
+            this.setVolumeFromRuntime(playbackUiStateService.getVolume());
+        });
+
+        this.addDomListener(this.elements.volumeSliderContainer, 'wheel', (event) => {
+            const wheelEvent = event as WheelEvent;
+            wheelEvent.preventDefault();
+            const delta = wheelEvent.deltaY < 0 ? 1 : -1;
+            void this.setVolume(this.currentVolume + delta);
+        }, {passive: false});
 
         this.bound = true;
     }
 
     async setVolume(volume: number): Promise<void> {
         this.currentVolume = Math.max(0, Math.min(100, volume));
+        if (this.currentVolume > 0) {
+            this.previousVolume = this.currentVolume;
+        }
         this.updateVolumeDisplay();
         await playbackUiStateService.setVolume(this.currentVolume / 100);
     }
 
     setVolumeFromRuntime(volume: number): void {
-        this.currentVolume = volume * 100;
+        this.currentVolume = Math.max(0, Math.min(100, volume * 100));
+        if (this.currentVolume > 0) {
+            this.previousVolume = this.currentVolume;
+        }
         this.updateVolumeDisplay();
     }
 
@@ -101,11 +104,22 @@ class LyricsVolumeController {
         }
     }
 
-    private async updateVolumeFromEvent(event: MouseEvent): Promise<void> {
+    private startVolumeDrag(event: PointerEvent): void {
+        this.dragging = true;
+        this.elements.volumeSliderContainer.setPointerCapture?.(event.pointerId);
+        this.previewVolumeFromEvent(event);
+    }
+
+    private previewVolumeFromEvent(event: PointerEvent): void {
         const rect = this.elements.volumeSliderContainer.getBoundingClientRect();
         const clickX = event.clientX - rect.left;
         const percentage = Math.max(0, Math.min(1, clickX / rect.width));
-        await this.setVolume(Math.round(percentage * 100));
+        this.currentVolume = Math.round(percentage * 100);
+        this.updateVolumeDisplay();
+    }
+
+    private async commitVolume(): Promise<void> {
+        await this.setVolume(this.currentVolume);
     }
 
     private async toggleVolumeMute(): Promise<void> {
