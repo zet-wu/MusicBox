@@ -4,6 +4,56 @@
  */
 
 import * as path from 'path';
+import {realpathSync} from 'fs';
+
+/**
+ * 获取用于安全比较的规范路径。
+ * 已存在路径会解析符号链接；尚未创建的路径会从最近存在的父目录继续解析。
+ */
+function resolveCanonicalPath(filePath: string): string {
+    const resolvedPath = path.resolve(filePath);
+
+    try {
+        return realpathSync.native(resolvedPath);
+    } catch (error: any) {
+        if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') {
+            throw error;
+        }
+
+        const parentPath = path.dirname(resolvedPath);
+        if (parentPath === resolvedPath) {
+            return resolvedPath;
+        }
+
+        return path.join(resolveCanonicalPath(parentPath), path.basename(resolvedPath));
+    }
+}
+
+/**
+ * 判断目标路径是否位于指定根目录内（包含根目录本身）。
+ */
+function isCanonicalPathWithin(filePath: string, rootPath: string): boolean {
+    const canonicalPath = resolveCanonicalPath(filePath);
+    const canonicalRoot = resolveCanonicalPath(rootPath);
+    const relativePath = path.relative(canonicalRoot, canonicalPath);
+
+    return relativePath === '' || (
+        relativePath !== '..'
+        && !relativePath.startsWith(`..${path.sep}`)
+        && !path.isAbsolute(relativePath)
+    );
+}
+
+export function isPathWithin(filePath: string, rootPath: string): boolean {
+    if (!filePath || typeof filePath !== 'string') return false;
+    if (!rootPath || typeof rootPath !== 'string') return false;
+
+    try {
+        return isCanonicalPathWithin(filePath, rootPath);
+    } catch {
+        return false;
+    }
+}
 
 /**
  * 检查路径是否在允许的根目录范围内，防止路径遍历攻击
@@ -15,15 +65,7 @@ export function isSafePath(filePath: string, allowedRoots: string[]): boolean {
     if (!filePath || typeof filePath !== 'string') return false;
     if (!allowedRoots || allowedRoots.length === 0) return false;
 
-    try {
-        const resolved = path.resolve(filePath);
-        return allowedRoots.some(root => {
-            const resolvedRoot = path.resolve(root);
-            return resolved.startsWith(resolvedRoot + path.sep) || resolved === resolvedRoot;
-        });
-    } catch {
-        return false;
-    }
+    return allowedRoots.some(root => isPathWithin(filePath, root));
 }
 
 /**
@@ -52,23 +94,18 @@ export function isDangerousPath(filePath: string): boolean {
     if (!filePath || typeof filePath !== 'string') return true;
 
     try {
-        const resolved = path.resolve(filePath).toLowerCase();
-
-        // 拒绝包含路径遍历序列的原始输入
-        if (filePath.includes('..')) return true;
-
         if (process.platform === 'win32') {
-            const dangerousPrefixes = [
+            const dangerousRoots = [
                 'c:\\windows',
                 'c:\\program files',
                 'c:\\program files (x86)',
                 'c:\\programdata',
                 'c:\\users\\default',
             ];
-            return dangerousPrefixes.some(p => resolved.startsWith(p));
+            return dangerousRoots.some(root => isCanonicalPathWithin(filePath, root));
         } else {
-            const dangerousPrefixes = ['/etc', '/sys', '/proc', '/boot', '/dev'];
-            return dangerousPrefixes.some(p => resolved.startsWith(p));
+            const dangerousRoots = ['/etc', '/sys', '/proc', '/boot', '/dev'];
+            return dangerousRoots.some(root => isCanonicalPathWithin(filePath, root));
         }
     } catch {
         return true;
