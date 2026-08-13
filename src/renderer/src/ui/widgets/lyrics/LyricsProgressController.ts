@@ -34,24 +34,24 @@ class LyricsProgressController {
     bind(): void {
         if (this.bound) return;
 
-        this.addDomListener(this.elements.progressBar, 'click', (event) => {
-            void this.seekToPosition(event as MouseEvent);
+        this.addDomListener(this.elements.progressBar, 'pointerdown', (event) => {
+            this.startProgressDrag(event as PointerEvent);
         });
 
-        this.addDomListener(this.elements.progressBar, 'mousedown', (event) => {
-            this.startProgressDrag(event as MouseEvent);
-        });
-
-        this.addDomListener(document, 'mousemove', (event) => {
+        this.addDomListener(document, 'pointermove', (event) => {
             if (this.dragging) {
-                this.updateProgressDrag(event as MouseEvent);
+                this.updateProgressDrag(event as PointerEvent);
             }
         });
 
-        this.addDomListener(document, 'mouseup', () => {
+        this.addDomListener(document, 'pointerup', () => {
             if (this.dragging) {
                 void this.endProgressDrag();
             }
+        });
+
+        this.addDomListener(document, 'pointercancel', () => {
+            this.cancelProgressDrag();
         });
 
         this.bound = true;
@@ -84,25 +84,17 @@ class LyricsProgressController {
         }
     }
 
-    private async seekToPosition(event: MouseEvent): Promise<void> {
+    private startProgressDrag(event: PointerEvent): void {
         const duration = this.getPlaybackDuration();
-        if (!this.getCurrentTrack() || !duration) return;
+        if (!this.getCurrentTrack() || duration <= 0) return;
 
-        const rect = this.elements.progressBar.getBoundingClientRect();
-        const clickX = event.clientX - rect.left;
-        const percentage = Math.max(0, Math.min(1, clickX / rect.width));
-        this.dragPercentage = percentage;
-        this.setProgressPercentage(percentage * 100);
-        await playbackUiStateService.seek(percentage * duration);
-    }
-
-    private startProgressDrag(event: MouseEvent): void {
         this.dragging = true;
         this.elements.progressBar.classList.add('dragging');
+        this.elements.progressBar.setPointerCapture?.(event.pointerId);
         this.updateProgressDrag(event);
     }
 
-    private updateProgressDrag(event: MouseEvent): void {
+    private updateProgressDrag(event: PointerEvent): void {
         const duration = this.getPlaybackDuration();
         if (!this.dragging || !this.getCurrentTrack() || duration <= 0) return;
 
@@ -122,6 +114,12 @@ class LyricsProgressController {
 
         const duration = this.getPlaybackDuration();
         await playbackUiStateService.seek(this.dragPercentage * (duration || 0));
+    }
+
+    private cancelProgressDrag(): void {
+        if (!this.dragging) return;
+        this.dragging = false;
+        this.elements.progressBar.classList.remove('dragging');
     }
 
     private getPlaybackDuration(): number {
