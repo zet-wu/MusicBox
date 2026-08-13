@@ -60,6 +60,10 @@ class LyricsPlaybackStateController {
         state: Readonly<PlaybackState>,
         change: PlaybackStoreChange
     ): Promise<void> {
+        if (!this.isVisible()) {
+            return;
+        }
+
         switch (change.type) {
             case 'positionChanged':
                 this.onPositionChanged(state.position, state.duration);
@@ -74,9 +78,7 @@ class LyricsPlaybackStateController {
                 break;
 
             case 'trackChanged':
-                if (this.isVisible()) {
-                    await this.onTrackChanged(state.currentTrack as LyricsTrack | null);
-                }
+                await this.onTrackChanged(state.currentTrack as LyricsTrack | null);
                 break;
 
             case 'volumeChanged':

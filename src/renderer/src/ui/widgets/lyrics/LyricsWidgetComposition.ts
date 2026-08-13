@@ -145,8 +145,12 @@ class LyricsWidgetComposition {
     resetAfterHide(): void {
         this.trackInfoController.reset();
         this.lyricsLoader.reset();
-        this.renderController.setPlaying(false);
-        this.renderController.resetPlaybackPosition();
+        this.coverArtController.reset();
+        this.renderController.reset();
+        if (this.layoutController.isFullscreen()) {
+            this.layoutController.exitFullscreen();
+        }
+        this.layoutController.resetLayoutState();
     }
 
     destroy(): void {
@@ -213,6 +217,10 @@ class LyricsWidgetComposition {
     }
 
     private async updateTrackAndPlaybackState(track: LyricsTrack | null): Promise<void> {
+        if (!track) {
+            this.onClose();
+            return;
+        }
         await this.updateTrackInfo(track);
         this.syncCurrentPlaybackState(true);
     }

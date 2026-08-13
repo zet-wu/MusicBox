@@ -35,6 +35,9 @@ export class PlaybackUIFacade {
     }
 
     async toggleLyricsForTrack(track: Track | null): Promise<void> {
+        if (!track && !this.isLyricsVisible()) {
+            return;
+        }
         await this.app.components.lyrics?.toggle(track);
     }
 

@@ -64,6 +64,7 @@ class Lyrics extends Component {
 
     hide(): void {
         this.isVisible = false;
+        this.currentTrack = null;
         this.composition.elements.page.classList.remove('show');
         this.composition.resetAfterHide();
 

@@ -51,6 +51,10 @@ class LyricsCoverArtController {
     }
 
     destroy(): void {
+        this.reset();
+    }
+
+    reset(): void {
         this.updateGeneration++;
         this.setBackgroundImageUrl(null);
         this.elements.trackCover.src = 'assets/images/default-cover.svg';
