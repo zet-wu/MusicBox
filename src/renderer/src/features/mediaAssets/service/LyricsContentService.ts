@@ -14,14 +14,6 @@ export interface TrackLyricsLoadResult {
 
 class LyricsContentService {
     async loadTrackLyrics(track: Track): Promise<TrackLyricsLoadResult> {
-        if (!this.canLoadTrackLyrics(track)) {
-            return {
-                success: false,
-                lyrics: [],
-                error: '缺少歌曲标题或艺术家'
-            };
-        }
-
         const cachedLyrics = this.parseTrackLyrics(track);
         if (cachedLyrics.length > 0) {
             track.lyrics = cachedLyrics;
@@ -29,6 +21,14 @@ class LyricsContentService {
                 success: true,
                 lyrics: cachedLyrics,
                 source: 'track'
+            };
+        }
+
+        if (!this.canLookupTrackLyrics(track)) {
+            return {
+                success: false,
+                lyrics: [],
+                error: '缺少歌曲标题或艺术家'
             };
         }
 
@@ -100,7 +100,7 @@ class LyricsContentService {
         return [];
     }
 
-    private canLoadTrackLyrics(track: Track | null | undefined): track is Track {
+    private canLookupTrackLyrics(track: Track | null | undefined): track is Track {
         return Boolean(track && track.title && track.artist);
     }
 

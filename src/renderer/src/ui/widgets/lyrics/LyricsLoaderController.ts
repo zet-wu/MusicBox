@@ -1,6 +1,6 @@
 import {desktopLyricsService} from "@/features/desktopLyrics/service/DesktopLyricsService";
 import {lyricsContentService} from "@/features/mediaAssets/service/LyricsContentService";
-import type {LyricsTrack, RenderLyricLine} from "@ui/widgets/lyrics/LyricsTypes";
+import {getLyricsTrackIdentity, type LyricsTrack, type RenderLyricLine} from "@ui/widgets/lyrics/LyricsTypes";
 
 interface LyricsLoaderControllerOptions {
     setLyrics: (lyrics: RenderLyricLine[]) => void;
@@ -14,9 +14,8 @@ class LyricsLoaderController {
     private readonly renderLyrics: () => void;
     private readonly showLoading: () => void;
     private readonly showNoLyrics: () => void;
-    private lastLoadedLyricsPath: string | null = null;
-    private lastLoadedTrackId: string | null = null;
-    private loadingLyrics = false;
+    private loadGeneration = 0;
+    private currentTrackIdentity: string | null = null;
 
     constructor(options: LyricsLoaderControllerOptions) {
         this.setLyrics = options.setLyrics;
@@ -26,30 +25,23 @@ class LyricsLoaderController {
     }
 
     reset(): void {
-        this.lastLoadedLyricsPath = null;
-        this.loadingLyrics = false;
+        this.loadGeneration++;
+        this.currentTrackIdentity = null;
     }
 
     async loadLyrics(track: LyricsTrack): Promise<void> {
-        if (!track || !track.title || !track.artist) {
+        if (!track) {
             this.showNoLyrics();
             return;
         }
 
-        const trackPath = track.filePath || track.path || `${track.title}_${track.artist}`;
-        const trackId = `${track.title}_${track.artist}_${track.album || ''}`;
-
-        if (this.loadingLyrics || this.lastLoadedLyricsPath === trackPath) {
+        const trackIdentity = getLyricsTrackIdentity(track);
+        if (this.currentTrackIdentity === trackIdentity) {
             return;
         }
 
-        if (this.lastLoadedTrackId === trackId) {
-            return;
-        }
-
-        this.loadingLyrics = true;
-        this.lastLoadedLyricsPath = trackPath;
-        this.lastLoadedTrackId = trackId;
+        const generation = ++this.loadGeneration;
+        this.currentTrackIdentity = trackIdentity;
 
         if (!track.lyrics) {
             this.showLoading();
@@ -57,6 +49,10 @@ class LyricsLoaderController {
 
         try {
             const result = await lyricsContentService.loadTrackLyrics(track);
+            if (!this.isCurrentLoad(generation, trackIdentity)) {
+                return;
+            }
+
             if (result.success && result.lyrics.length > 0) {
                 const lyrics = result.lyrics as RenderLyricLine[];
                 this.setLyrics(lyrics);
@@ -67,11 +63,16 @@ class LyricsLoaderController {
                 console.log(`❌ Lyrics: ${result.error || '歌词获取失败'}`);
             }
         } catch (error) {
+            if (!this.isCurrentLoad(generation, trackIdentity)) {
+                return;
+            }
             console.error('❌ Lyrics: 歌词加载失败:', error);
             this.showNoLyrics();
-        } finally {
-            this.loadingLyrics = false;
         }
+    }
+
+    private isCurrentLoad(generation: number, trackIdentity: string): boolean {
+        return generation === this.loadGeneration && trackIdentity === this.currentTrackIdentity;
     }
 }
 
