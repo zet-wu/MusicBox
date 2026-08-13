@@ -34,12 +34,8 @@ export class LibraryBridge {
 
     async scanDirectory(path: string): Promise<boolean> {
         try {
-            const result = await libraryDataService.scanDirectory(path);
-            if (result) {
-                const tracks = await libraryDataService.getTracks();
-                this.emit('libraryUpdated', tracks);
-            }
-            return result;
+            // 音乐库更新由主进程的 library:updated 统一发布。
+            return await libraryDataService.scanDirectory(path);
         } catch (error) {
             console.error('Failed to scan directory:', error);
             return false;
@@ -48,12 +44,7 @@ export class LibraryBridge {
 
     async scanNetworkDrive(driveId: string | number, relativePath = '/'): Promise<boolean> {
         try {
-            const result = await libraryDataService.scanNetworkDrive(driveId, relativePath);
-            if (result) {
-                const tracks = await libraryDataService.getTracks();
-                this.emit('libraryUpdated', tracks);
-            }
-            return result;
+            return await libraryDataService.scanNetworkDrive(driveId, relativePath);
         } catch (error) {
             console.error('❌ 网络磁盘扫描失败:', error);
             return false;
@@ -62,12 +53,7 @@ export class LibraryBridge {
 
     async addTrackToLibrary(audioFile: Partial<Track> | unknown): Promise<{success: boolean; track?: Track; error?: string; isNew?: boolean}> {
         try {
-            const result = await libraryDataService.addTrackToLibrary(audioFile);
-            if (result && result.success) {
-                const tracks = await libraryDataService.getTracks();
-                this.emit('libraryUpdated', tracks);
-            }
-            return result;
+            return await libraryDataService.addTrackToLibrary(audioFile);
         } catch (error) {
             console.error('❌ [API] 添加文件到音乐库失败:', error);
             return {success: false, error: error instanceof Error ? error.message : String(error)};
@@ -120,12 +106,6 @@ export class LibraryBridge {
     async rebuildLibraryIndex(): Promise<LibraryIndexRebuildResult> {
         try {
             const result = await libraryDataService.rebuildLibraryIndex();
-            if (result.success) {
-                const tracks = await libraryDataService.getTracks();
-                this.emit('libraryUpdated', tracks);
-                return result;
-            }
-
             return result;
         } catch (error) {
             console.error('❌ 重建音乐库索引失败:', error);

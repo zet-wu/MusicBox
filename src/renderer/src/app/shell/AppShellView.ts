@@ -1,17 +1,21 @@
 import type {ScanProgress} from '@api/types/events';
+import type {ContentMountManager} from '@/app/runtime/components/ContentMountManager';
 
 interface AppShellViewOptions {
+    contentMounts: ContentMountManager;
     onScanMusicFolder(): Promise<void>;
     onAddMusicFiles(): Promise<void>;
     onShowHomePage(): Promise<void>;
 }
 
 export class AppShellView {
+    private readonly contentMounts: ContentMountManager;
     private readonly onScanMusicFolder: () => Promise<void>;
     private readonly onAddMusicFiles: () => Promise<void>;
     private readonly onShowHomePage: () => Promise<void>;
 
-    constructor({onScanMusicFolder, onAddMusicFiles, onShowHomePage}: AppShellViewOptions) {
+    constructor({contentMounts, onScanMusicFolder, onAddMusicFiles, onShowHomePage}: AppShellViewOptions) {
+        this.contentMounts = contentMounts;
         this.onScanMusicFolder = onScanMusicFolder;
         this.onAddMusicFiles = onAddMusicFiles;
         this.onShowHomePage = onShowHomePage;
@@ -53,10 +57,7 @@ export class AppShellView {
     }
 
     showWelcomeScreen(): void {
-        const contentArea = document.getElementById('content-area');
-        if (!contentArea) return;
-
-        contentArea.innerHTML = `
+        const shellMount = this.contentMounts.showShell(`
             <div class="welcome-screen">
                 <div class="welcome-content">
                     <h1>欢迎！</h1>
@@ -77,21 +78,18 @@ export class AppShellView {
                     </div>
                 </div>
             </div>
-        `;
+        `);
 
-        document.getElementById('scan-folder-btn')?.addEventListener('click', async () => {
+        shellMount.querySelector('#scan-folder-btn')?.addEventListener('click', async () => {
             await this.onScanMusicFolder();
         });
-        document.getElementById('add-files-btn')?.addEventListener('click', async () => {
+        shellMount.querySelector('#add-files-btn')?.addEventListener('click', async () => {
             await this.onAddMusicFiles();
         });
     }
 
     showScanProgress(): void {
-        const contentArea = document.getElementById('content-area');
-        if (!contentArea) return;
-
-        contentArea.innerHTML = `
+        this.contentMounts.showShell(`
             <div class="scan-progress">
                 <div class="scan-content">
                     <h2>扫描音乐库</h2>
@@ -101,7 +99,11 @@ export class AppShellView {
                     <p id="scan-status">加载中...</p>
                 </div>
             </div>
-        `;
+        `, true);
+    }
+
+    hideScanProgress(): void {
+        this.contentMounts.hideShell();
     }
 
     updateScanProgress(progress: ScanProgress): void {

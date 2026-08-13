@@ -6,6 +6,13 @@ import {librarySourceManagementService} from '@/features/library/service';
 import {folderSourceViewModePreferenceService} from '@/features/settings/service';
 import {Component} from '@ui/base/Component';
 import {TrackCollectionDetail} from '@ui/components/TrackCollectionDetail';
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
+import {
+    AdaptiveCollectionSurface,
+    applyCollectionSearch,
+    MasterDetailViewHost,
+    type CollectionLayout
+} from '@ui/collections';
 
 type FolderViewSize = 's' | 'm' | 'l';
 type FolderSortKey = 'name' | 'tracks' | 'bindings' | 'lastScan';
@@ -19,7 +26,11 @@ const FOLDER_ICON_SIZES: Record<FolderViewSize, number> = {
 
 export class FolderSourcesPage extends Component {
     private readonly container: HTMLElement | null;
+    private readonly listRoot: HTMLElement;
+    private readonly detailRoot: HTMLElement;
+    private readonly scroll: MainContentScrollCoordinator;
     private directories: LibraryDirectoryOverview[] = [];
+    private filteredDirectories: LibraryDirectoryOverview[] = [];
     private viewMode: FolderSourceViewMode;
     private viewSize: FolderViewSize = 'm';
     private sortBy: FolderSortKey = 'name';
@@ -33,15 +44,36 @@ export class FolderSourcesPage extends Component {
     private loading = false;
     private refreshGeneration = 0;
     private detailGeneration = 0;
+    private hasLoaded = false;
+    private renderDirty = true;
     private readonly trackCollectionDetail: TrackCollectionDetail;
+    private readonly masterDetailHost: MasterDetailViewHost;
+    private readonly directorySurface: AdaptiveCollectionSurface<LibraryDirectoryOverview>;
     public isVisible = false;
 
-    constructor(container: string | Element | null) {
+    constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
         this.container = this.element as HTMLElement | null;
+        this.scroll = scroll;
+        const pageRoot = this.element as HTMLElement;
+        this.masterDetailHost = new MasterDetailViewHost(pageRoot, scroll, {
+            listLocationKey: 'folders/list',
+            detailLocationKey: identity => `folders/detail/${encodeURIComponent(identity)}`
+        });
+        this.listRoot = this.masterDetailHost.listRoot;
+        this.listRoot.classList.add('folders-list-root');
+        this.detailRoot = this.masterDetailHost.detailRoot;
+        this.detailRoot.classList.add('folders-detail-root');
         this.viewMode = folderSourceViewModePreferenceService.getMode();
-        this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
-            onBack: () => this.showDirectoryList(),
+        this.directorySurface = new AdaptiveCollectionSurface<LibraryDirectoryOverview>({
+            getKey: source => source.id,
+            renderItem: source => this.renderSource(source)
+        }, {
+            restoreScrollOffset: scrollTop => this.masterDetailHost.restoreListOffset(scrollTop)
+        });
+        this.masterDetailHost.attachSurface(this.directorySurface);
+        this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
+            onBack: () => void this.showDirectoryList(),
             onTrackPlayed: (track, index, tracks, mode) => {
                 this.emit('trackPlayed', track, index, tracks, mode);
             },
@@ -59,8 +91,10 @@ export class FolderSourcesPage extends Component {
                     this.detailTracks
                 );
             }
-        });
+        }, {scroll, scrollKey: 'folder-detail'});
+        this.setupSourceEventDelegation();
         this.removeSourcesUpdatedListener = librarySourceManagementService.onSourcesUpdated(() => {
+            this.renderDirty = true;
             if (this.isVisible && !this.loading) void this.refresh();
         });
         this.addEventListenerManaged(document, 'click', () => this.hideContextMenu());
@@ -74,8 +108,16 @@ export class FolderSourcesPage extends Component {
         if (!this.container) return;
         this.container.style.display = 'block';
         this.isVisible = true;
-        this.renderLoading();
-        await this.refresh();
+        await this.masterDetailHost.resume();
+        if (!this.selectedSource && this.masterDetailHost.getLocation().kind === 'detail') {
+            await this.masterDetailHost.returnToList();
+        }
+        if (!this.hasLoaded || this.renderDirty) {
+            this.renderLoading();
+            await this.refresh();
+        } else if (!this.container.firstElementChild) {
+            this.render();
+        }
     }
 
     hide(): void {
@@ -83,15 +125,20 @@ export class FolderSourcesPage extends Component {
         this.detailGeneration++;
         this.loading = false;
         this.isVisible = false;
+        this.masterDetailHost.suspend();
+        if (this.selectedSource) {
+            this.renderDirty = true;
+        }
         this.selectedSource = null;
         this.detailTracks = [];
         this.trackCollectionDetail.hide();
         this.hideContextMenu();
-        if (this.container) this.container.innerHTML = '';
+        if (this.container) this.container.style.display = 'none';
     }
 
     destroy(): void {
         this.removeSourcesUpdatedListener();
+        this.masterDetailHost.destroy();
         this.trackCollectionDetail.destroy();
         this.sourceMenu?.remove();
         this.sourceMenu = null;
@@ -105,13 +152,14 @@ export class FolderSourcesPage extends Component {
             const directories = await librarySourceManagementService.getDirectories();
             if (!this.isVisible || refreshGeneration !== this.refreshGeneration) return;
             this.directories = directories;
+            this.hasLoaded = true;
             this.sortDirectories();
             if (this.selectedSource) {
                 const selectedSource = this.findSource(this.selectedSource.id);
                 if (selectedSource) {
                     await this.showSourceDetail(selectedSource);
                 } else {
-                    this.showDirectoryList();
+                    await this.showDirectoryList();
                 }
             } else {
                 this.render();
@@ -123,9 +171,12 @@ export class FolderSourcesPage extends Component {
 
     render(): void {
         if (!this.container) return;
+        const snapshot = this.masterDetailHost.getLocation().kind === 'list' && this.listRoot.querySelector('.folder-surface-root')
+            ? this.directorySurface.captureSnapshot()
+            : null;
         this.trackCollectionDetail.hide();
         const iconSize = FOLDER_ICON_SIZES[this.viewSize];
-        this.container.innerHTML = `
+        this.listRoot.innerHTML = `
             <div class="albumsx foldersx page">
                 <div class="albumsx-toolbar">
                     <div class="left cluster">
@@ -162,9 +213,7 @@ export class FolderSourcesPage extends Component {
                     </div>
                 </div>
                 ${this.directories.length > 0 ? `
-                    <div class="${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}" style="--cover:${iconSize}px;">
-                        ${this.directories.map(source => this.renderSource(source)).join('')}
-                    </div>
+                    <div class="album-surface-root folder-surface-root ${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}" style="--cover:${iconSize}px;"></div>
                     <div class="albumsx-empty folder-search-empty" hidden>
                         <h3>没有匹配的文件夹</h3>
                         <p>请尝试搜索其他名称或路径</p>
@@ -173,12 +222,14 @@ export class FolderSourcesPage extends Component {
             </div>
         `;
         this.setupPageListeners();
-        this.applySearchFilter();
+        this.updateDirectorySurface();
+        if (snapshot) void this.directorySurface.resume(snapshot);
+        this.renderDirty = false;
     }
 
     private renderLoading(): void {
-        if (!this.container) return;
-        this.container.innerHTML = `
+        if (!this.container || this.listRoot.firstElementChild) return;
+        this.listRoot.innerHTML = `
             <div class="albumsx foldersx page">
                 <div class="albumsx-empty"><div class="folder-loading"></div><p>正在加载音乐文件夹...</p></div>
             </div>
@@ -222,8 +273,7 @@ export class FolderSourcesPage extends Component {
     }
 
     private setupPageListeners(): void {
-        if (!this.container) return;
-        this.container.querySelectorAll<HTMLElement>('[data-size]').forEach(button => {
+        this.listRoot.querySelectorAll<HTMLElement>('[data-size]').forEach(button => {
             button.addEventListener('click', () => {
                 const size = button.dataset.size;
                 if (isFolderViewSize(size) && size !== this.viewSize) {
@@ -232,7 +282,7 @@ export class FolderSourcesPage extends Component {
                 }
             });
         });
-        this.container.querySelectorAll<HTMLElement>('[data-view]').forEach(button => {
+        this.listRoot.querySelectorAll<HTMLElement>('[data-view]').forEach(button => {
             button.addEventListener('click', () => {
                 const mode = button.dataset.view;
                 if (isFolderViewMode(mode) && mode !== this.viewMode) {
@@ -243,48 +293,60 @@ export class FolderSourcesPage extends Component {
             });
         });
         const addFolder = async (): Promise<void> => {
-            if (await librarySourceManagementService.addDirectories()) await this.refresh();
+            await librarySourceManagementService.addDirectories();
         };
-        this.container.querySelector('#folder-source-add')?.addEventListener('click', () => void addFolder());
-        this.container.querySelector('[data-empty-add]')?.addEventListener('click', () => void addFolder());
-        this.container.querySelector<HTMLSelectElement>('#folder-source-sort')?.addEventListener('change', event => {
+        this.listRoot.querySelector('#folder-source-add')?.addEventListener('click', () => void addFolder());
+        this.listRoot.querySelector('[data-empty-add]')?.addEventListener('click', () => void addFolder());
+        this.listRoot.querySelector<HTMLSelectElement>('#folder-source-sort')?.addEventListener('change', event => {
             this.sortBy = (event.target as HTMLSelectElement).value as FolderSortKey;
             this.sortDirectories();
             this.render();
         });
-        this.container.querySelector('#folder-source-sort-direction')?.addEventListener('click', () => {
+        this.listRoot.querySelector('#folder-source-sort-direction')?.addEventListener('click', () => {
             this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
             this.sortDirectories();
             this.render();
         });
-        this.container.querySelector<HTMLInputElement>('#folder-source-query')?.addEventListener('input', event => {
+        this.listRoot.querySelector<HTMLInputElement>('#folder-source-query')?.addEventListener('input', event => {
             this.searchQuery = (event.target as HTMLInputElement).value;
             this.applySearchFilter();
         });
-        this.container.querySelectorAll<HTMLElement>('.folder-source-item').forEach(item => {
-            item.addEventListener('dblclick', () => {
-                const source = this.findSource(item.dataset.sourceId);
-                if (source) void this.showSourceDetail(source);
-            });
-            item.addEventListener('contextmenu', event => {
-                event.preventDefault();
-                const source = this.findSource(item.dataset.sourceId);
-                if (source) this.showContextMenu(source, event.clientX, event.clientY);
-            });
-            item.addEventListener('keydown', event => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const source = this.findSource(item.dataset.sourceId);
-                    if (source) void this.showSourceDetail(source);
-                    return;
-                }
-                if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
-                event.preventDefault();
-                const source = this.findSource(item.dataset.sourceId);
-                if (!source) return;
-                const rect = item.getBoundingClientRect();
-                this.showContextMenu(source, rect.left + 24, rect.top + 24);
-            });
+    }
+
+    private setupSourceEventDelegation(): void {
+        this.addEventListenerManaged(this.listRoot, 'dblclick', event => {
+            const item = event.target instanceof Element
+                ? event.target.closest<HTMLElement>('.folder-source-item')
+                : null;
+            const source = this.findFilteredSource(item?.dataset.sourceId);
+            if (source) void this.showSourceDetail(source);
+        });
+        this.addEventListenerManaged(this.listRoot, 'contextmenu', event => {
+            const mouseEvent = event as MouseEvent;
+            const item = event.target instanceof Element
+                ? event.target.closest<HTMLElement>('.folder-source-item')
+                : null;
+            const source = this.findFilteredSource(item?.dataset.sourceId);
+            if (!source) return;
+            mouseEvent.preventDefault();
+            this.showContextMenu(source, mouseEvent.clientX, mouseEvent.clientY);
+        });
+        this.addEventListenerManaged(this.listRoot, 'keydown', event => {
+            const keyboardEvent = event as KeyboardEvent;
+            const item = event.target instanceof Element
+                ? event.target.closest<HTMLElement>('.folder-source-item')
+                : null;
+            const source = this.findFilteredSource(item?.dataset.sourceId);
+            if (!item || !source) return;
+            if (keyboardEvent.key === 'Enter') {
+                keyboardEvent.preventDefault();
+                void this.showSourceDetail(source);
+                return;
+            }
+            if (keyboardEvent.key !== 'ContextMenu' && !(keyboardEvent.shiftKey && keyboardEvent.key === 'F10')) return;
+            keyboardEvent.preventDefault();
+            const rect = item.getBoundingClientRect();
+            this.showContextMenu(source, rect.left + 24, rect.top + 24);
         });
     }
 
@@ -337,16 +399,17 @@ export class FolderSourcesPage extends Component {
     }
 
     private async handleRescan(source: LibraryDirectoryOverview): Promise<void> {
-        if (await librarySourceManagementService.rescan(source)) await this.refresh();
+        await librarySourceManagementService.rescan(source);
     }
 
     private async handleRemove(source: LibraryDirectoryOverview): Promise<void> {
-        if (await librarySourceManagementService.remove(source)) await this.refresh();
+        await librarySourceManagementService.remove(source);
     }
 
     private async showSourceDetail(source: LibraryDirectoryOverview): Promise<void> {
         if (!this.container || !this.isVisible) return;
         const detailGeneration = ++this.detailGeneration;
+        this.masterDetailHost.enterDetail(source.id);
         this.selectedSource = source;
         this.detailTracks = [];
         this.renderDetailLoading(source);
@@ -360,6 +423,7 @@ export class FolderSourcesPage extends Component {
 
         this.detailTracks = tracks;
         this.trackCollectionDetail.show({
+            identity: String(source.id),
             title: this.getDisplayName(source.path),
             description: source.path,
             cover: null,
@@ -377,7 +441,7 @@ export class FolderSourcesPage extends Component {
     private renderDetailLoading(source: LibraryDirectoryOverview): void {
         if (!this.container) return;
         this.trackCollectionDetail.hide();
-        this.container.innerHTML = `
+        this.detailRoot.innerHTML = `
             <div class="page-content playlist-page readonly-track-collection foldersx folder-source-detail-loading">
                 <div class="collection-detail-nav">
                     <button class="modern-back-btn collection-back-btn" type="button">
@@ -391,17 +455,17 @@ export class FolderSourcesPage extends Component {
                 </div>
             </div>
         `;
-        this.container.querySelector('.collection-back-btn')?.addEventListener('click', () => {
-            this.showDirectoryList();
+        this.detailRoot.querySelector('.collection-back-btn')?.addEventListener('click', () => {
+            void this.showDirectoryList();
         });
     }
 
-    private showDirectoryList(): void {
+    private async showDirectoryList(): Promise<void> {
         this.detailGeneration++;
         this.selectedSource = null;
         this.detailTracks = [];
         this.trackCollectionDetail.hide();
-        if (this.isVisible) this.render();
+        if (this.isVisible) await this.masterDetailHost.returnToList();
     }
 
     private sortDirectories(): void {
@@ -414,24 +478,55 @@ export class FolderSourcesPage extends Component {
             else result = this.getDisplayName(left.path).localeCompare(this.getDisplayName(right.path), 'zh-CN');
             return result === 0 ? left.path.localeCompare(right.path, 'zh-CN') : result * multiplier;
         });
+        this.applySearchFilter(false);
     }
 
-    private applySearchFilter(): void {
-        if (!this.container) return;
-        const query = this.searchQuery.trim().toLocaleLowerCase();
-        let visibleCount = 0;
-        this.container.querySelectorAll<HTMLElement>('.folder-source-item').forEach(item => {
-            const source = this.findSource(item.dataset.sourceId);
-            const matches = Boolean(source && (!query || source.path.toLocaleLowerCase().includes(query)));
-            item.style.display = matches ? '' : 'none';
-            if (matches) visibleCount++;
+    private applySearchFilter(updateSurface = true): void {
+        applyCollectionSearch({
+            source: this.directories,
+            query: this.searchQuery,
+            getSearchableValues: source => [source.path],
+            commit: results => this.filteredDirectories = results,
+            refresh: updateSurface ? {
+                resetScroll: () => this.scroll.scrollToTop(),
+                updateView: () => this.updateDirectorySurface()
+            } : undefined
         });
-        const empty = this.container.querySelector<HTMLElement>('.folder-search-empty');
-        if (empty) empty.hidden = visibleCount > 0;
     }
 
     private findSource(sourceId?: string): LibraryDirectoryOverview | undefined {
         return this.directories.find(source => source.id === sourceId);
+    }
+
+    private findFilteredSource(sourceId?: string): LibraryDirectoryOverview | undefined {
+        return this.filteredDirectories.find(source => source.id === sourceId);
+    }
+
+    private updateDirectorySurface(): void {
+        const surfaceRoot = this.listRoot.querySelector<HTMLElement>('.folder-surface-root');
+        const empty = this.listRoot.querySelector<HTMLElement>('.folder-search-empty');
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (!surfaceRoot || !scrollElement) return;
+        surfaceRoot.className = `album-surface-root folder-surface-root ${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}`;
+        surfaceRoot.style.setProperty('--cover', `${FOLDER_ICON_SIZES[this.viewSize]}px`);
+        surfaceRoot.style.display = this.filteredDirectories.length === 0 ? 'none' : 'block';
+        if (empty) empty.hidden = this.filteredDirectories.length !== 0;
+        this.directorySurface.mount(surfaceRoot, scrollElement);
+        this.directorySurface.update(this.filteredDirectories, this.getCollectionLayout());
+    }
+
+    private getCollectionLayout(): CollectionLayout {
+        if (this.viewMode === 'list') {
+            return {mode: 'list', estimateRowSize: 80, overscan: 8};
+        }
+        const iconSize = FOLDER_ICON_SIZES[this.viewSize];
+        const gap = 24;
+        return {
+            mode: 'grid',
+            estimateRowSize: iconSize + 104,
+            getColumnCount: width => Math.max(1, Math.floor((width + gap) / (iconSize + 60 + gap))),
+            overscan: 3
+        };
     }
 
     private getDisplayName(sourcePath: string): string {

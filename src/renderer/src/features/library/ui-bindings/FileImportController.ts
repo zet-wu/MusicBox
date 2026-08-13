@@ -9,6 +9,7 @@ export interface FileImportHost {
         options?: boolean | AddEventListenerOptions
     ): void;
     showScanProgress(): void;
+    hideScanProgress(): void;
     showSuccess(message: string): void;
     showError(message: string): void;
     showInfo(message: string): void;
@@ -175,19 +176,23 @@ export class FileImportController {
         if (directories.length === 0) return;
 
         this.app.showScanProgress();
-        let successCount = 0;
-        for (const directory of directories) {
-            if (await libraryDataService.scanDirectory(directory)) {
-                successCount++;
+        try {
+            let successCount = 0;
+            for (const directory of directories) {
+                if (await libraryDataService.scanDirectory(directory)) {
+                    successCount++;
+                }
             }
-        }
 
-        if (successCount === directories.length) {
-            this.app.showSuccess(`已添加并扫描 ${successCount} 个音乐文件夹`);
-        } else if (successCount > 0) {
-            this.app.showError(`已扫描 ${successCount} 个文件夹，${directories.length - successCount} 个失败`);
-        } else {
-            this.app.showError('音乐文件夹扫描失败');
+            if (successCount === directories.length) {
+                this.app.showSuccess(`已添加并扫描 ${successCount} 个音乐文件夹`);
+            } else if (successCount > 0) {
+                this.app.showError(`已扫描 ${successCount} 个文件夹，${directories.length - successCount} 个失败`);
+            } else {
+                this.app.showError('音乐文件夹扫描失败');
+            }
+        } finally {
+            this.app.hideScanProgress();
         }
     }
 

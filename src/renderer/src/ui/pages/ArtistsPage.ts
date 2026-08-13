@@ -2,7 +2,6 @@
  * 艺术家页组件
  */
 
-import {urlValidator} from "@utils/URLValidator";
 import {Component} from "@ui/base/Component";
 import {
     libraryPageDataService,
@@ -15,21 +14,17 @@ import {
     artistViewModePreferenceService,
     trackCoverNetworkPreferenceService
 } from "@/features/settings/service";
-import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
 import {TrackCollectionDetail} from "@ui/components/TrackCollectionDetail";
-import type {VirtualItem} from "@tanstack/virtual-core";
+import {
+    AdaptiveCollectionSurface,
+    applyCollectionSearch,
+    MasterDetailViewHost,
+    type CollectionLayout
+} from '@ui/collections';
 import type {Unsubscribe} from "@api/types/common";
 import type {ArtistViewMode} from "@api/types/settings";
 import type {Track} from "@api/types/track";
-
-interface SourceRectSnapshot {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    radius: string;
-    scrollTop: number;
-}
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 type ArtistViewSize = 's' | 'm' | 'l';
 
@@ -41,6 +36,9 @@ const ARTIST_COVER_SIZES: Record<ArtistViewSize, number> = {
 
 class ArtistsPage extends Component {
     private container: any;
+    private readonly listRoot: HTMLElement;
+    private readonly detailRoot: HTMLElement;
+    private readonly scroll: MainContentScrollCoordinator;
     private tracks: Track[];
     private artists: ArtistInfo[];
     private filteredArtists: ArtistInfo[];
@@ -57,11 +55,25 @@ class ArtistsPage extends Component {
     private coverGeneration: number;
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private isVisible: boolean;
-    private artistVirtualizer: ElementVirtualizer | null;
+    private renderDirty = true;
+    private listRenderDirty = true;
+    private readonly masterDetailHost: MasterDetailViewHost;
+    private readonly artistSurface: AdaptiveCollectionSurface<ArtistInfo>;
     private readonly trackCollectionDetail: TrackCollectionDetail;
 
-    constructor(container: string | Element | null) {
+    constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
+        const pageRoot = this.element as HTMLElement;
+        this.scroll = scroll;
+        this.masterDetailHost = new MasterDetailViewHost(pageRoot, scroll, {
+            listLocationKey: 'artists/list',
+            detailLocationKey: identity => `artists/detail/${encodeURIComponent(identity)}`
+        });
+        this.listRoot = this.masterDetailHost.listRoot;
+        this.listRoot.classList.add('artists-list-root');
+        this.detailRoot = this.masterDetailHost.detailRoot;
+        this.detailRoot.classList.add('artists-detail-root');
+        this.container = this.listRoot;
         this.tracks = [];
         this.artists = [];
         this.filteredArtists = [];
@@ -77,12 +89,22 @@ class ArtistsPage extends Component {
         this._coverFetchingInProgress = false; // 防止重复启动封面获取
         this.coverGeneration = 0;
         this.isVisible = false;
-        this.artistVirtualizer = null;
-        this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
-            onBack: () => {
-                this.selectedArtist = null;
-                this.renderArtistsList();
+        this.setupArtistListEventDelegation();
+        this.artistSurface = new AdaptiveCollectionSurface<ArtistInfo>({
+            getKey: artist => artist.name,
+            renderItem: artist => this.renderArtistLibraryItem(artist)
+        }, {
+            onRenderedRangeChange: keys => {
+                const visibleArtists = keys
+                    .map(key => this.findArtistByKey(String(key)))
+                    .filter((artist): artist is ArtistInfo => artist !== null);
+                this._startCoverFetching(visibleArtists);
             },
+            restoreScrollOffset: scrollTop => this.masterDetailHost.restoreListOffset(scrollTop)
+        });
+        this.masterDetailHost.attachSurface(this.artistSurface);
+        this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
+            onBack: () => void this.closeArtistDetail(),
             onTrackPlayed: (track, index, tracks, mode) => {
                 this.emit('trackPlayed', track, index, tracks, mode);
             },
@@ -104,12 +126,18 @@ class ArtistsPage extends Component {
                     this.selectedArtist?.tracks || []
                 );
             }
+        }, {
+            observeNetworkPreference: false,
+            scroll: this.scroll,
+            scrollKey: 'artists-detail'
         });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverFetchingInProgress = false;
             this._coverLoading.clear();
             this._coverFailures.clear();
+            this.renderDirty = true;
+            if (this.selectedArtist) this.listRenderDirty = true;
             if (!enabled) {
                 const selectedArtistName = this.selectedArtist?.name;
                 this.processArtists();
@@ -119,8 +147,12 @@ class ArtistsPage extends Component {
                 if (this.isVisible) {
                     this.render();
                 }
-            } else if (this.isVisible && !this.selectedArtist) {
-                this._startCoverFetching();
+            } else if (this.isVisible) {
+                if (this.selectedArtist) {
+                    this.render();
+                } else {
+                    this._startCoverFetching();
+                }
             }
         });
     }
@@ -136,6 +168,10 @@ class ArtistsPage extends Component {
             this.element.style.display = 'block';
         }
         this.isVisible = true;
+        await this.masterDetailHost.resume();
+        if (!this.selectedArtist && this.masterDetailHost.getLocation().kind === 'detail') {
+            await this.masterDetailHost.returnToList();
+        }
 
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
@@ -143,10 +179,13 @@ class ArtistsPage extends Component {
             if (!this.isVisible || viewGeneration !== this.coverGeneration) return;
             this.tracks = pageData.tracks as Track[];
             this.artists = pageData.artists as ArtistInfo[];
-            this.filteredArtists = [...this.artists];
+            this.applySearchFilter(false);
+            this.renderDirty = true;
         }
 
-        this.render();
+        if (this.renderDirty || !this.listRoot.firstElementChild) {
+            this.render();
+        }
     }
 
     // 生成tracks的简单哈希值
@@ -159,16 +198,16 @@ class ArtistsPage extends Component {
     hide(): void {
         this.coverGeneration++;
         this.isVisible = false;
-        this.destroyArtistVirtualizer();
+        this.masterDetailHost.suspend();
         this.trackCollectionDetail.hide();
         this.selectedArtist = null;
-        if (this.container) {
-            this.container.innerHTML = '';
+        if (this.element instanceof HTMLElement) {
+            this.element.style.display = 'none';
         }
     }
 
     destroy(): void {
-        this.destroyArtistVirtualizer();
+        this.masterDetailHost.destroy();
         this.trackCollectionDetail.destroy();
 
         this.tracks.length = 0;
@@ -192,7 +231,7 @@ class ArtistsPage extends Component {
     }
 
     setupElements(): void {
-        this.container = this.element;
+        this.container = this.listRoot;
     }
 
     setupAPIListeners(): void {
@@ -204,14 +243,51 @@ class ArtistsPage extends Component {
             this.selectedArtist = selectedArtistName
                 ? this.artists.find((artist) => artist.name === selectedArtistName) || null
                 : null;
+            this.renderDirty = true;
+            if (this.selectedArtist) this.listRenderDirty = true;
             if (this.isVisible) this.render();
         });
+    }
+
+    private setupArtistListEventDelegation(): void {
+        this.addEventListenerManaged(this.listRoot, 'click', (event: Event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.artist-library-item');
+            const artist = this.findArtistByKey(item?.dataset.artist);
+            if (!artist || !item) {
+                return;
+            }
+
+            this.showArtistDetailWithTransition(artist, item);
+        });
+
+        this.addEventListenerManaged(this.listRoot, 'contextmenu', (event: Event) => {
+            const mouseEvent = event as MouseEvent;
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.artist-library-item');
+            const artist = this.findArtistByKey(item?.dataset.artist);
+            if (!artist || !item) {
+                return;
+            }
+
+            mouseEvent.preventDefault();
+            if (artist.tracks.length > 0) {
+                this.emit('collectionRightClick', artist.tracks, mouseEvent.clientX, mouseEvent.clientY);
+            }
+        });
+    }
+
+    private findArtistByKey(key: string | undefined): ArtistInfo | null {
+        if (!key) {
+            return null;
+        }
+        return this.filteredArtists.find((artist) => artist.name === key) || null;
     }
 
     processArtists(): void {
         this.artists = libraryPageDataService.buildArtists(this.tracks as any) as ArtistInfo[];
         libraryPageDataService.sortArtists(this.artists, this.sortBy, this.sortDirection);
-        this.filteredArtists = [...this.artists];
+        this.applySearchFilter(false);
     }
 
     render(): void {
@@ -222,9 +298,13 @@ class ArtistsPage extends Component {
         } else {
             this.renderArtistsList();
         }
+        this.renderDirty = false;
     }
 
     renderArtistsList(): void {
+        this.container = this.listRoot;
+        this.listRoot.style.display = 'block';
+        this.detailRoot.style.display = 'none';
         this.trackCollectionDetail.hide();
         const coverSize = ARTIST_COVER_SIZES[this.viewSize];
         this.container.innerHTML = `
@@ -266,7 +346,8 @@ class ArtistsPage extends Component {
 
                 ${this.artists.length > 0 ? `
                     <div class="artists-browser ${this.viewMode}-view" style="--cover:${coverSize}px;">
-                        <div class="artist-virtual-body"></div>
+                        <div class="artist-surface-root"></div>
+                        <div class="artists-no-results" hidden>没有找到匹配的艺术家</div>
                     </div>
                 ` : `
                     <div class="albumsx-empty">
@@ -281,7 +362,8 @@ class ArtistsPage extends Component {
         `;
 
         this.setupEventListeners();
-        this.mountArtistVirtualizer();
+        this.updateArtistSurface();
+        this.listRenderDirty = false;
     }
 
     // 设置事件监听器
@@ -349,20 +431,10 @@ class ArtistsPage extends Component {
         const srcRect = sourceImg.getBoundingClientRect();
         const srcContainer = sourceImg.closest('.artist-avatar');
 
-        // 记录源位置信息用于可能的返回动画
-        const scrollEl = this.getScrollContainer();
         const srcRadius = srcContainer ? getComputedStyle(srcContainer).borderRadius : '50%';
-        const sourceSnapshot: SourceRectSnapshot = {
-            left: srcRect.left,
-            top: srcRect.top,
-            width: srcRect.width,
-            height: srcRect.height,
-            radius: srcRadius,
-            scrollTop: scrollEl ? scrollEl.scrollTop : (window.scrollY || 0)
-        };
-        void sourceSnapshot;
 
         // 渲染艺术家详情页面
+        this.masterDetailHost.enterDetail(artist.name);
         this.selectedArtist = artist;
         this.render();
 
@@ -467,13 +539,6 @@ class ArtistsPage extends Component {
         };
     }
 
-    // 获取滚动容器
-    getScrollContainer(): any {
-        return this.container.closest('.scrollable') ||
-            this.container.closest('.page-content') ||
-            document.documentElement;
-    }
-
     // 获取艺术家封面
     async _fetchArtistCover(artist: ArtistInfo): Promise<void> {
         const generation = this.coverGeneration;
@@ -509,8 +574,7 @@ class ArtistsPage extends Component {
             ) {
                 // 更新艺术家数据
                 artist.cover = result.imageUrl;
-                // 局部刷新：更新对应卡片的图片src
-                this._updateArtistCardCover(artist.name, result.imageUrl);
+                this.artistSurface.invalidateItem(artist.name);
             } else {
                 this._coverFailures.add(artist.name);
                 console.log('❌ 艺术家封面获取失败:', artistName, result?.error);
@@ -532,7 +596,7 @@ class ArtistsPage extends Component {
 
     // 设置艺术家卡片加载状态
     _setArtistCardLoading(artistName: string, isLoading: boolean): void {
-        const artistCards = this.container.querySelectorAll(`[data-artist="${CSS.escape(artistName)}"]`);
+        const artistCards = this.listRoot.querySelectorAll<HTMLElement>(`[data-artist="${CSS.escape(artistName)}"]`);
         artistCards.forEach((card: HTMLElement) => {
             const img = card.querySelector('img');
             if (img) {
@@ -540,29 +604,6 @@ class ArtistsPage extends Component {
                     img.style.opacity = '0.6';
                     img.style.filter = 'blur(1px)';
                 } else {
-                    img.style.opacity = '';
-                    img.style.filter = '';
-                }
-            }
-        });
-    }
-
-    // 更新艺术家卡片封面
-    _updateArtistCardCover(artistName: string, imageUrl: string): void {
-        const artistCards = this.container.querySelectorAll(`[data-artist="${CSS.escape(artistName)}"]`);
-        artistCards.forEach((card: HTMLElement) => {
-            const img = card.querySelector('img');
-            if (img && imageUrl) {
-                // 使用安全的图片设置方法
-                if (urlValidator) {
-                    urlValidator.safeSetImageSrc(img, imageUrl).then((success: boolean) => {
-                        if (success) {
-                            img.style.opacity = '';
-                            img.style.filter = '';
-                        }
-                    });
-                } else {
-                    img.src = imageUrl;
                     img.style.opacity = '';
                     img.style.filter = '';
                 }
@@ -688,127 +729,75 @@ class ArtistsPage extends Component {
     // 过滤艺术家
     filterArtists(searchTerm: string): void {
         this.searchQuery = searchTerm;
-        if (!searchTerm.trim()) {
-            this.filteredArtists = [...this.artists];
-        } else {
-            const term = searchTerm.toLowerCase();
-            this.filteredArtists = this.artists.filter((artist) =>
-                artist.name.toLowerCase().includes(term)
-            );
-        }
+        this.applySearchFilter();
+    }
 
-        this.updateArtistsDisplay();
+    private applySearchFilter(updateView = true): void {
+        applyCollectionSearch({
+            source: this.artists,
+            query: this.searchQuery,
+            getSearchableValues: artist => [artist.name],
+            commit: results => this.filteredArtists = results,
+            refresh: updateView ? {
+                resetScroll: () => this.scroll.scrollToTop(),
+                updateView: () => this.updateArtistsDisplay()
+            } : undefined
+        });
     }
 
     private applyArtistSort(): void {
         libraryPageDataService.sortArtists(this.artists, this.sortBy, this.sortDirection);
-        libraryPageDataService.sortArtists(this.filteredArtists, this.sortBy, this.sortDirection);
+        this.applySearchFilter(false);
         this.renderArtistsList();
     }
 
     // 更新艺术家显示区域
     updateArtistsDisplay(): void {
-        const browser = this.container.querySelector('.artists-browser');
+        const browser = this.listRoot.querySelector('.artists-browser');
         if (browser) {
             browser.className = `artists-browser ${this.viewMode}-view`;
-            this.mountArtistVirtualizer();
+            this.updateArtistSurface();
         }
     }
 
-    private mountArtistVirtualizer(): void {
-        this.destroyArtistVirtualizer();
-        const container = this.container as HTMLElement | null;
-        const body = container?.querySelector<HTMLElement>('.artist-virtual-body');
+    private updateArtistSurface(): void {
+        const surfaceRoot = this.listRoot.querySelector<HTMLElement>('.artist-surface-root');
+        const noResults = this.listRoot.querySelector<HTMLElement>('.artists-no-results');
         const scrollElement = document.querySelector<HTMLElement>('.main-content');
-        if (!body || !scrollElement) {
+        if (!surfaceRoot || !scrollElement) {
             return;
         }
 
-        if (this.filteredArtists.length === 0) {
-            body.innerHTML = '<div class="artists-no-results">没有找到匹配的艺术家</div>';
-            return;
+        surfaceRoot.style.display = this.filteredArtists.length === 0 ? 'none' : 'block';
+        if (noResults) {
+            noResults.hidden = this.filteredArtists.length !== 0;
         }
+        this.artistSurface.mount(surfaceRoot, scrollElement);
+        this.artistSurface.update(this.filteredArtists, this.getArtistCollectionLayout());
+    }
 
-        const availableWidth = body.clientWidth || this.container.clientWidth || 800;
+    private getArtistCollectionLayout(): CollectionLayout {
         const coverSize = ARTIST_COVER_SIZES[this.viewSize];
+        if (this.viewMode === 'list') {
+            return {
+                mode: 'list',
+                estimateRowSize: 82,
+                overscan: 8
+            };
+        }
         const gridCellWidth = coverSize + 60;
-        const columns = this.viewMode === 'grid'
-            ? Math.max(1, Math.floor((availableWidth + 20) / (gridCellWidth + 20)))
-            : 1;
-        const rowCount = Math.ceil(this.filteredArtists.length / columns);
-        const scrollMargin = this.getArtistScrollMargin(body, scrollElement);
-
-        body.addEventListener('click', (event: MouseEvent) => {
-            const target = event.target instanceof Element ? event.target : null;
-            const item = target?.closest<HTMLElement>('.artist-library-item');
-            const index = Number.parseInt(item?.dataset.artistIndex || '', 10);
-            const artist = Number.isInteger(index) ? this.filteredArtists[index] : null;
-            if (!artist || !item) {
-                return;
-            }
-
-            this.showArtistDetailWithTransition(artist, item);
-        });
-
-        body.addEventListener('contextmenu', (event: MouseEvent) => {
-            const target = event.target instanceof Element ? event.target : null;
-            const item = target?.closest<HTMLElement>('.artist-library-item');
-            const index = Number.parseInt(item?.dataset.artistIndex || '', 10);
-            const artist = Number.isInteger(index) ? this.filteredArtists[index] : null;
-            if (!artist || !item) return;
-            event.preventDefault();
-            if (artist.tracks.length > 0) {
-                this.emit('collectionRightClick', artist.tracks, event.clientX, event.clientY);
-            }
-        });
-
-        this.artistVirtualizer = new ElementVirtualizer({
-            count: rowCount,
-            estimateSize: () => this.viewMode === 'grid' ? coverSize + 94 : 82,
-            getItemKey: (index) => `artist-row-${index}`,
-            getScrollElement: () => scrollElement,
-            scrollMargin,
-            overscan: 3,
-            onChange: (items, totalSize) => {
-                if (!this.isVisible || !this.artistVirtualizer) {
-                    return;
-                }
-
-                body.style.height = `${totalSize}px`;
-                body.innerHTML = items
-                    .map(item => this.renderArtistVirtualRow(item, columns, scrollMargin))
-                    .join('');
-                body.querySelectorAll<HTMLElement>('.artist-virtual-row').forEach((row) => {
-                    this.artistVirtualizer?.measureElement(row);
-                });
-
-                const visibleArtists = items.flatMap((item) => {
-                    const start = item.index * columns;
-                    return this.filteredArtists.slice(start, start + columns);
-                });
-                this._startCoverFetching(visibleArtists);
-            }
-        });
-        this.artistVirtualizer.mount();
+        return {
+            mode: 'grid',
+            estimateRowSize: coverSize + 94,
+            getColumnCount: width => Math.max(1, Math.floor((width + 20) / (gridCellWidth + 20))),
+            overscan: 3
+        };
     }
 
-    private renderArtistVirtualRow(item: VirtualItem, columns: number, scrollMargin: number): string {
-        const start = item.index * columns;
-        const artists = this.filteredArtists.slice(start, start + columns);
-        const translateY = item.start - scrollMargin;
-        return `
-            <div class="artist-virtual-row ${this.viewMode}-row"
-                 data-index="${item.index}"
-                 style="transform: translateY(${translateY}px); --artist-columns:${columns};">
-                ${artists.map((artist, offset) => this.renderArtistLibraryItem(artist, start + offset)).join('')}
-            </div>
-        `;
-    }
-
-    private renderArtistLibraryItem(artist: ArtistInfo, index: number): string {
+    private renderArtistLibraryItem(artist: ArtistInfo): string {
         const cover = artist.cover || 'assets/images/default-cover.svg';
         return `
-            <div class="artist-library-item" data-artist-index="${index}" data-artist="${this.escapeHtml(artist.name)}" tabindex="0">
+            <div class="artist-library-item" data-artist="${this.escapeHtml(artist.name)}" tabindex="0">
                 <div class="artist-avatar">
                     <img src="${cover}" alt="${this.escapeHtml(artist.name)}" loading="lazy">
                 </div>
@@ -823,17 +812,6 @@ class ArtistsPage extends Component {
         `;
     }
 
-    private getArtistScrollMargin(body: HTMLElement, scrollElement: HTMLElement): number {
-        const bodyRect = body.getBoundingClientRect();
-        const scrollRect = scrollElement.getBoundingClientRect();
-        return bodyRect.top - scrollRect.top + scrollElement.scrollTop;
-    }
-
-    private destroyArtistVirtualizer(): void {
-        this.artistVirtualizer?.destroy();
-        this.artistVirtualizer = null;
-    }
-
     // 切换视图模式
     switchViewMode(newMode: ArtistViewMode): void {
         this.viewMode = newMode;
@@ -845,8 +823,9 @@ class ArtistsPage extends Component {
         if (!this.selectedArtist) return;
 
         const artist = this.selectedArtist;
-        this.destroyArtistVirtualizer();
+        this.container = this.detailRoot;
         this.trackCollectionDetail.show({
+            identity: artist.name,
             title: artist.name,
             description: '艺术家歌曲',
             cover: artist.cover,
@@ -860,8 +839,19 @@ class ArtistsPage extends Component {
     }
 
     showArtistDetail(artist: ArtistInfo): void {
+        this.masterDetailHost.enterDetail(artist.name);
         this.selectedArtist = artist;
         this.render();
+    }
+
+    private async closeArtistDetail(): Promise<void> {
+        this.selectedArtist = null;
+        this.trackCollectionDetail.hide();
+        if (this.listRenderDirty || !this.listRoot.firstElementChild) {
+            this.renderArtistsList();
+        }
+        this.container = this.listRoot;
+        await this.masterDetailHost.returnToList();
     }
 
     formatDuration(seconds: number = 0): string {

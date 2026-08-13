@@ -10,10 +10,15 @@ import {
     trackCoverDisplayPreferenceService,
     trackCoverNetworkPreferenceService
 } from "@/features/settings/service";
-import {ElementVirtualizer} from "@ui/virtualization/ElementVirtualizer";
-import type {VirtualItem} from "@tanstack/virtual-core";
+import {
+    AdaptiveCollectionSurface,
+    type CollectionItemKey,
+    type CollectionSurfaceSnapshot
+} from "@ui/collections";
+import type {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 export interface TrackCollectionDetailModel {
+    identity?: string;
     title: string;
     description?: string;
     cover: string | null;
@@ -32,6 +37,12 @@ interface LoadedCover {
     error?: string;
 }
 
+interface TrackCollectionRow {
+    key: string;
+    index: number;
+    track: Track;
+}
+
 export interface TrackCollectionDetailCallbacks {
     onBack(): void;
     onTrackPlayed(track: Track, index: number, tracks: Track[], mode: PlaylistDoubleClickMode): void;
@@ -47,48 +58,78 @@ export interface TrackCollectionDetailCallbacks {
     ): void;
 }
 
+interface TrackCollectionDetailOptions {
+    observeNetworkPreference?: boolean;
+    scroll?: MainContentScrollCoordinator;
+    scrollKey?: string;
+}
+
 /**
  * 为艺术家、专辑等只读歌曲集合提供统一的歌单式详情交互。
  */
 export class TrackCollectionDetail {
     private model: TrackCollectionDetailModel | null = null;
+    private rows: TrackCollectionRow[] = [];
     private readonly selectedTracks = new Set<number>();
     private lastSelectedIndex = -1;
-    private virtualizer: ElementVirtualizer | null = null;
+    private readonly surface: AdaptiveCollectionSurface<TrackCollectionRow>;
     private showCovers = trackCoverDisplayPreferenceService.isEnabled();
     private readonly coverPreferenceUnsubscribe: Unsubscribe;
     private readonly networkPreferenceUnsubscribe: Unsubscribe;
     private readonly coverLoadQueue = new CoverLoadQueue(4);
     private viewGeneration = 0;
+    private readonly scroll: MainContentScrollCoordinator | null;
+    private readonly scrollKey: string;
 
     constructor(
         private readonly container: HTMLElement,
-        private readonly callbacks: TrackCollectionDetailCallbacks
+        private readonly callbacks: TrackCollectionDetailCallbacks,
+        options: TrackCollectionDetailOptions = {}
     ) {
+        this.scroll = options.scroll ?? null;
+        this.scrollKey = options.scrollKey ?? 'readonly-collection';
+        this.surface = new AdaptiveCollectionSurface<TrackCollectionRow>({
+            getKey: row => row.key,
+            renderItem: row => this.renderTrackRow(row)
+        }, {
+            onRenderedRangeChange: keys => this.loadRenderedTrackCovers(keys),
+            restoreScrollOffset: this.scroll
+                ? scrollTop => this.restoreScrollOffset(scrollTop)
+                : undefined
+        });
         this.coverPreferenceUnsubscribe = trackCoverDisplayPreferenceService.onChanged((enabled) => {
             this.showCovers = enabled;
             if (this.model) {
-                this.render();
+                this.render(true);
             }
         });
-        this.networkPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged(() => {
-            if (this.model) {
-                this.render();
-            }
-        });
+        this.networkPreferenceUnsubscribe = options.observeNetworkPreference === false
+            ? () => undefined
+            : trackCoverNetworkPreferenceService.onChanged(() => {
+                if (this.model) {
+                    this.render(true);
+                }
+            });
     }
 
     show(model: TrackCollectionDetailModel): void {
+        const preserveScroll = Boolean(
+            this.model
+            && this.getModelIdentity(this.model) === this.getModelIdentity(model)
+            && this.container.firstElementChild
+        );
         this.model = model;
+        this.rows = this.buildRows(model.tracks);
         this.clearSelection();
-        this.render();
+        this.render(preserveScroll);
     }
 
     hide(): void {
         this.viewGeneration++;
         this.coverLoadQueue.beginBatch();
-        this.destroyVirtualizer();
+        this.surface.destroy();
         this.model = null;
+        this.rows = [];
         this.selectedTracks.clear();
         this.lastSelectedIndex = -1;
     }
@@ -100,14 +141,18 @@ export class TrackCollectionDetail {
         this.coverLoadQueue.destroy();
     }
 
-    private render(): void {
+    private render(preserveScroll = false): void {
         if (!this.model) {
             return;
         }
 
+        const model = this.model;
         const generation = ++this.viewGeneration;
+        const snapshot = preserveScroll && this.rows.length > 0
+            ? this.surface.captureSnapshot()
+            : null;
         this.coverLoadQueue.beginBatch();
-        this.destroyVirtualizer();
+        this.surface.destroy();
         const totalDuration = this.model.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
         const trackCount = this.model.tracks.length;
         this.container.innerHTML = `
@@ -181,8 +226,19 @@ export class TrackCollectionDetail {
         `;
 
         this.bindEvents();
-        this.mountVirtualizer();
+        this.mountSurface();
         this.loadCollectionCover(generation);
+        if (snapshot) {
+            void this.resumeSurface(snapshot, generation, model);
+        }
+    }
+
+    private getModelIdentity(model: TrackCollectionDetailModel): string {
+        return model.identity || `${model.title}|${model.coverArtist || ''}|${model.coverAlbum || ''}`;
+    }
+
+    private getScrollStateKey(model: TrackCollectionDetailModel): string {
+        return `${this.scrollKey}:${this.getModelIdentity(model)}`;
     }
 
     private renderTrackListShell(): string {
@@ -200,7 +256,7 @@ export class TrackCollectionDetail {
                     <div class="header-cell cell-duration">时长</div>
                     <div class="header-cell cell-actions"></div>
                 </div>
-                <div class="tracks-table-body virtual-track-body"></div>
+                <div class="tracks-table-body track-collection-surface-root"></div>
             </div>
         `;
     }
@@ -226,70 +282,51 @@ export class TrackCollectionDetail {
             this.clearSelection();
             this.updateSelectionUI();
         });
-        this.container.querySelector('.virtual-track-body')?.addEventListener('click', (event) => {
+        this.container.querySelector('.track-collection-surface-root')?.addEventListener('click', (event) => {
             void this.handleTrackClick(event as MouseEvent);
         });
-        this.container.querySelector('.virtual-track-body')?.addEventListener('dblclick', (event) => {
+        this.container.querySelector('.track-collection-surface-root')?.addEventListener('dblclick', (event) => {
             this.handleTrackDoubleClick(event as MouseEvent);
         });
-        this.container.querySelector('.virtual-track-body')?.addEventListener('contextmenu', (event) => {
+        this.container.querySelector('.track-collection-surface-root')?.addEventListener('contextmenu', (event) => {
             this.handleTrackContextMenu(event as MouseEvent);
         });
     }
 
-    private mountVirtualizer(): void {
+    private mountSurface(): void {
         if (!this.model?.tracks.length) {
             return;
         }
 
-        const body = this.container.querySelector<HTMLElement>('.virtual-track-body');
+        const body = this.container.querySelector<HTMLElement>('.track-collection-surface-root');
         const scrollElement = document.querySelector<HTMLElement>('.main-content');
         if (!body || !scrollElement) {
             return;
         }
-
-        const bodyRect = body.getBoundingClientRect();
-        const scrollRect = scrollElement.getBoundingClientRect();
-        const scrollMargin = bodyRect.top - scrollRect.top + scrollElement.scrollTop;
-        this.virtualizer = new ElementVirtualizer({
-            count: this.model.tracks.length,
-            estimateSize: () => this.showCovers ? 73 : 65,
-            getItemKey: (index) => this.getTrackIdentity(this.model!.tracks[index]) || index,
-            getScrollElement: () => scrollElement,
-            scrollMargin,
-            overscan: 8,
-            onChange: (items, totalSize) => {
-                if (!this.model || !this.virtualizer) {
-                    return;
-                }
-                body.style.height = `${totalSize}px`;
-                body.innerHTML = items.map(item => this.renderTrackRow(item, scrollMargin)).join('');
-                body.querySelectorAll<HTMLElement>('.track-row').forEach(row => {
-                    this.virtualizer?.measureElement(row);
-                });
-            }
+        this.surface.update(this.rows, {
+            mode: 'list',
+            estimateRowSize: this.showCovers ? 73 : 65,
+            overscan: 8
         });
-        this.virtualizer.mount();
+        this.surface.mount(body, scrollElement);
     }
 
-    private renderTrackRow(item: VirtualItem, scrollMargin: number): string {
-        const track = this.model!.tracks[item.index];
-        const translateY = item.start - scrollMargin;
+    private renderTrackRow(row: TrackCollectionRow): string {
+        const {track, index} = row;
         const liked = favoriteService.isFavorite(track);
         return `
-            <div class="track-row ${this.selectedTracks.has(item.index) ? 'selected' : ''}"
-                 data-track-index="${item.index}"
-                 style="transform:translateY(${translateY}px)">
+            <div class="track-row ${this.selectedTracks.has(index) ? 'selected' : ''}"
+                 data-track-index="${index}">
                 <div class="track-cell cell-number">
                     <div class="track-number-container">
-                        <span class="track-number">${item.index + 1}</span>
+                        <span class="track-number">${index + 1}</span>
                         <div class="play-indicator">
                             <svg class="play-icon" viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg>
                         </div>
                     </div>
                 </div>
                 ${this.showCovers ? `<div class="track-cell cell-cover">
-                    <img class="track-cover" src="${this.getTrackCover(track, item.index)}" alt="封面" loading="lazy">
+                    <img class="track-cover" src="${this.getTrackCover(track)}" alt="封面" loading="lazy">
                 </div>` : ''}
                 <div class="track-cell cell-title">
                     <div class="track-main-info">
@@ -319,9 +356,8 @@ export class TrackCollectionDetail {
 
         if ((event.target as Element).closest('[data-action="like"]')) {
             await favoriteService.toggle(track);
-            this.virtualizer?.destroy();
-            this.virtualizer = null;
-            this.mountVirtualizer();
+            const row = this.rows[index];
+            if (row) this.surface.invalidateItem(row.key);
             return;
         }
 
@@ -439,15 +475,15 @@ export class TrackCollectionDetail {
         return String(track.fileId || track.id || track.filePath || '');
     }
 
-    private getTrackCover(track: Track, index: number): string {
+    private getTrackCover(track: Track): string {
         if (track.cover && typeof track.cover === 'string') {
             return track.cover;
         }
-        this.loadTrackCover(track, index, this.viewGeneration);
         return 'assets/images/default-cover.svg';
     }
 
-    private loadTrackCover(track: Track, index: number, generation: number): void {
+    private loadTrackCover(row: TrackCollectionRow, generation: number): void {
+        const {track, index} = row;
         const key = track.filePath || this.getTrackIdentity(track);
         if (!key) return;
 
@@ -475,10 +511,17 @@ export class TrackCollectionDetail {
             }
 
             track.cover = this.normalizeCoverUrl(result);
-            const row = this.container.querySelector<HTMLElement>(`.track-row[data-track-index="${index}"]`);
-            const image = row?.querySelector<HTMLImageElement>('.track-cover');
-            if (image) {
-                image.src = track.cover;
+            this.surface.invalidateItem(row.key);
+        });
+    }
+
+    private loadRenderedTrackCovers(keys: CollectionItemKey[]): void {
+        if (!this.showCovers || !this.model) return;
+        const renderedKeys = new Set(keys);
+        const generation = this.viewGeneration;
+        this.rows.forEach(row => {
+            if (renderedKeys.has(row.key) && !row.track.cover) {
+                this.loadTrackCover(row, generation);
             }
         });
     }
@@ -528,9 +571,47 @@ export class TrackCollectionDetail {
         return `file://${filePath}`;
     }
 
-    private destroyVirtualizer(): void {
-        this.virtualizer?.destroy();
-        this.virtualizer = null;
+    private buildRows(tracks: Track[]): TrackCollectionRow[] {
+        const occurrences = new Map<string, number>();
+        return tracks.map((track, index) => {
+            const identity = this.getTrackIdentity(track) || `index:${index}`;
+            const occurrence = occurrences.get(identity) || 0;
+            occurrences.set(identity, occurrence + 1);
+            return {
+                key: `track:${identity}:${occurrence}`,
+                index,
+                track
+            };
+        });
+    }
+
+    private async resumeSurface(
+        snapshot: CollectionSurfaceSnapshot,
+        generation: number,
+        model: TrackCollectionDetailModel
+    ): Promise<void> {
+        await this.surface.resume(snapshot);
+        if (generation !== this.viewGeneration || this.model !== model) {
+            return;
+        }
+        this.updateSelectionUI();
+    }
+
+    private restoreScrollOffset(scrollTop: number): Promise<void> {
+        if (!this.scroll || !this.model) return Promise.resolve();
+        const model = this.model;
+        const generation = this.viewGeneration;
+        const key = this.getScrollStateKey(model);
+        this.scroll.remember(key, scrollTop);
+        return this.scroll.restore(key, {
+            scrollTop,
+            whenReady: () => this.surface.whenReady(),
+            isCurrent: () => (
+                generation === this.viewGeneration
+                && this.model === model
+                && this.container.style.display !== 'none'
+            )
+        });
     }
 
     private formatDuration(duration?: number): string {

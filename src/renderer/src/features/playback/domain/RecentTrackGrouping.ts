@@ -12,6 +12,10 @@ export interface RecentTrackEntry {
 
 export type RecentTrackGroups = Record<string, RecentTrackEntry[]>;
 
+export type RecentTrackDisplayRow =
+    | {kind: 'date-header'; key: string; label: string; count: number}
+    | {kind: 'track'; key: string; track: RecentTrack; index: number};
+
 export function groupRecentTracksByDate(tracks: RecentTrack[], now = new Date()): RecentTrackGroups {
     const groups: RecentTrackGroups = {};
 
@@ -41,4 +45,22 @@ export function groupRecentTracksByDate(tracks: RecentTrack[], now = new Date())
     });
 
     return groups;
+}
+
+export function flattenRecentTrackRows(tracks: RecentTrack[], now = new Date()): RecentTrackDisplayRow[] {
+    const groups = groupRecentTracksByDate(tracks, now);
+    return Object.entries(groups).flatMap(([label, entries], groupIndex) => [
+        {
+            kind: 'date-header' as const,
+            key: `date:${groupIndex}:${label}`,
+            label,
+            count: entries.length
+        },
+        ...entries.map(({track, index}) => ({
+            kind: 'track' as const,
+            key: `track:${track.fileId || track.filePath}:${track.playTime || 0}:${index}`,
+            track,
+            index
+        }))
+    ]);
 }

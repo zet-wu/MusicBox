@@ -30,10 +30,14 @@ import {RenamePlaylistDialog} from "@ui/dialogs/RenamePlaylistDialog";
 
 import {cacheManager} from "@/shared/cache";
 import type {ComponentMap} from "@/app/runtime/components/ComponentTypes";
+import {ContentMountManager, type ContentViewKey} from './ContentMountManager';
+import type {MainContentScrollCoordinator} from '../MainContentScrollCoordinator';
 
 interface ComponentRegistryOptions {
     components: ComponentMap;
     setupComponentEvents: (componentName: string) => void;
+    contentMounts: ContentMountManager;
+    mainContentScroll: MainContentScrollCoordinator;
 }
 
 type OnDemandComponentName =
@@ -46,10 +50,14 @@ type OnDemandComponentName =
 export class ComponentRegistry {
     private readonly components: ComponentMap;
     private readonly setupComponentEvents: (componentName: string) => void;
+    private readonly contentMounts: ContentMountManager;
+    private readonly mainContentScroll: MainContentScrollCoordinator;
 
-    constructor({components, setupComponentEvents}: ComponentRegistryOptions) {
+    constructor({components, setupComponentEvents, contentMounts, mainContentScroll}: ComponentRegistryOptions) {
         this.components = components;
         this.setupComponentEvents = setupComponentEvents;
+        this.contentMounts = contentMounts;
+        this.mainContentScroll = mainContentScroll;
     }
 
     initializeComponents(): void {
@@ -71,16 +79,25 @@ export class ComponentRegistry {
         this.components.editTrackInfoDialog = new EditTrackInfoDialog();
         this.components.folderPlaylistBindingDialog = new FolderPlaylistBindingDialog();
 
-        this.components.playlistDetailPage = new PlaylistDetailPage('#content-area');
-        this.components.playlistsPage = new PlaylistsPage('#content-area');
-        this.components.networkDriveDetailPage = new NetworkDriveDetailPage('#content-area');
+        this.components.playlistDetailPage = new PlaylistDetailPage(
+            this.mount('playlist-detail'),
+            this.mainContentScroll
+        );
+        this.components.playlistsPage = new PlaylistsPage(
+            this.mount('playlists'),
+            this.mainContentScroll
+        );
+        this.components.networkDriveDetailPage = new NetworkDriveDetailPage(this.mount('network-drive-detail'));
 
         this.components.updateModal = new UpdateModal();
 
         this.components.networkDiskModal = null;
         this.components.pluginManagerModal = new PluginManagerModal();
-        this.components.homePage = new HomePage('#content-area');
-        this.components.folderSourcesPage = new FolderSourcesPage('#content-area');
+        this.components.homePage = new HomePage(this.mount('home-page'));
+        this.components.folderSourcesPage = new FolderSourcesPage(
+            this.mount('folders'),
+            this.mainContentScroll
+        );
 
         this.initializePageComponentsOnDemand();
     }
@@ -93,28 +110,28 @@ export class ComponentRegistry {
 
         const recentPlayEnabled = getSetting('recentPlay', true);
         if (recentPlayEnabled) {
-            this.components.recentPage = new RecentPage('#content-area');
+            this.components.recentPage = new RecentPage(this.mount('recent'), this.mainContentScroll);
         } else {
             this.components.recentPage = null;
         }
 
         const artistsPageEnabled = getSetting('artistsPage', true);
         if (artistsPageEnabled) {
-            this.components.artistsPage = new ArtistsPage('#content-area');
+            this.components.artistsPage = new ArtistsPage(this.mount('artists'), this.mainContentScroll);
         } else {
             this.components.artistsPage = null;
         }
 
         const albumsPageEnabled = getSetting('albumsPage', true);
         if (albumsPageEnabled) {
-            this.components.albumsPage = new AlbumsPage('#content-area');
+            this.components.albumsPage = new AlbumsPage(this.mount('albums'), this.mainContentScroll);
         } else {
             this.components.albumsPage = null;
         }
 
         const statisticsEnabled = getSetting('statistics', true);
         if (statisticsEnabled) {
-            this.components.statisticsPage = new StatisticsPage('#content-area');
+            this.components.statisticsPage = new StatisticsPage(this.mount('statistics'));
         } else {
             this.components.statisticsPage = null;
         }
@@ -131,25 +148,25 @@ export class ComponentRegistry {
         switch (componentName) {
             case 'recentPage':
                 if (!this.components.recentPage) {
-                    this.components.recentPage = new RecentPage('#content-area');
+                    this.components.recentPage = new RecentPage(this.mount('recent'), this.mainContentScroll);
                     this.setupComponentEvents('recentPage');
                 }
                 break;
             case 'artistsPage':
                 if (!this.components.artistsPage) {
-                    this.components.artistsPage = new ArtistsPage('#content-area');
+                    this.components.artistsPage = new ArtistsPage(this.mount('artists'), this.mainContentScroll);
                     this.setupComponentEvents('artistsPage');
                 }
                 break;
             case 'albumsPage':
                 if (!this.components.albumsPage) {
-                    this.components.albumsPage = new AlbumsPage('#content-area');
+                    this.components.albumsPage = new AlbumsPage(this.mount('albums'), this.mainContentScroll);
                     this.setupComponentEvents('albumsPage');
                 }
                 break;
             case 'statisticsPage':
                 if (!this.components.statisticsPage) {
-                    this.components.statisticsPage = new StatisticsPage('#content-area');
+                    this.components.statisticsPage = new StatisticsPage(this.mount('statistics'));
                     this.setupComponentEvents('statisticsPage');
                 }
                 break;
@@ -170,24 +187,28 @@ export class ComponentRegistry {
                 if (this.components.recentPage) {
                     this.components.recentPage.destroy();
                     this.components.recentPage = null;
+                    this.contentMounts.release('recent');
                 }
                 break;
             case 'artistsPage':
                 if (this.components.artistsPage) {
                     this.components.artistsPage.destroy();
                     this.components.artistsPage = null;
+                    this.contentMounts.release('artists');
                 }
                 break;
             case 'albumsPage':
                 if (this.components.albumsPage) {
                     this.components.albumsPage.destroy();
                     this.components.albumsPage = null;
+                    this.contentMounts.release('albums');
                 }
                 break;
             case 'statisticsPage':
                 if (this.components.statisticsPage) {
                     this.components.statisticsPage.destroy();
                     this.components.statisticsPage = null;
+                    this.contentMounts.release('statistics');
                 }
                 break;
             case 'networkDiskModal':
@@ -216,5 +237,10 @@ export class ComponentRegistry {
         Object.keys(this.components).forEach((key: string) => {
             delete this.components[key];
         });
+        this.contentMounts.destroy();
+    }
+
+    private mount(key: ContentViewKey): HTMLElement {
+        return this.contentMounts.acquire(key);
     }
 }

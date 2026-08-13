@@ -54,6 +54,22 @@ describe('FavoriteService', () => {
         service.destroy();
     });
 
+    it('命令结果与主进程推送相同时只通知一次', async () => {
+        const {gateway, emit} = createGateway();
+        const service = new FavoriteService(gateway);
+        const listener = vi.fn();
+        service.onChanged(listener);
+        gateway.setTrackFavorite.mockResolvedValue({success: true, favorite: true});
+
+        emit({trackIds: ['track-1'], favorite: true});
+        await service.setFavorite({fileId: 'track-1', favorite: false}, true);
+        emit({trackIds: ['track-1'], favorite: true});
+
+        expect(listener).toHaveBeenCalledOnce();
+        expect(listener).toHaveBeenCalledWith({trackIds: ['track-1'], favorite: true});
+        service.destroy();
+    });
+
     it('成功和失败均返回明确的最终状态', async () => {
         const {gateway} = createGateway();
         const service = new FavoriteService(gateway);

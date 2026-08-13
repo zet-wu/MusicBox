@@ -377,7 +377,7 @@ class WasapiEngine {
             const playResult = await this.play();
 
             if (playResult && this.onTrackChanged) {
-                this.onTrackChanged(this.currentTrack);
+                await this.onTrackChanged(this.currentTrack);
             }
 
             return playResult;
@@ -417,7 +417,7 @@ class WasapiEngine {
             const playResult = await this.play();
 
             if (playResult && this.onTrackChanged) {
-                this.onTrackChanged(this.currentTrack);
+                await this.onTrackChanged(this.currentTrack);
             }
 
             return playResult;

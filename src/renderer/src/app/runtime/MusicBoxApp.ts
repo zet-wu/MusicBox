@@ -266,6 +266,10 @@ export class MusicBoxApp extends EventEmitter {
         this.shellView.showScanProgress();
     }
 
+    hideScanProgress(): void {
+        this.shellView.hideScanProgress();
+    }
+
     updateScanProgress(progress: ScanProgress): void {
         this.shellView.updateScanProgress(progress);
     }

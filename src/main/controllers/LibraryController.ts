@@ -949,6 +949,7 @@ export class LibraryController extends BaseController {
                 await this.playlistCoverStorage.remove(previousFileName).catch(error => {
                     console.warn('⚠️ 清理旧歌单封面快照失败:', error);
                 });
+                this.emitPlaylistsUpdated();
                 return {success: true, coverPath: snapshot.filePath};
             }
             await this.playlistCoverStorage.remove(snapshot.fileName);
@@ -1036,6 +1037,7 @@ export class LibraryController extends BaseController {
                 await this.playlistCoverStorage.remove(coverFileName).catch(error => {
                     console.warn('⚠️ 删除歌单封面快照失败:', error);
                 });
+                this.emitPlaylistsUpdated();
                 return {success: true};
             }
             return {success: false, error: '移除歌单封面失败'};

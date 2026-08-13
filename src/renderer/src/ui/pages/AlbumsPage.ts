@@ -18,21 +18,21 @@ import {
 import type {Unsubscribe} from "@api/types/common";
 import type {Track} from "@api/types/library";
 import type {AlbumViewMode} from "@api/types/settings";
+import {escapeHtmlAttribute} from "@utils/html";
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
+import {
+    AdaptiveCollectionSurface,
+    applyCollectionSearch,
+    MasterDetailViewHost,
+    type CollectionLayout
+} from '@ui/collections';
 
 type AlbumViewSize = 's' | 'm' | 'l';
-
-interface SourceRect {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    radius: string;
-    scrollTop: number;
-}
 
 class AlbumsPage extends Component {
     private tracks: Track[];
     private albums: AlbumItem[];
+    private filteredAlbums: AlbumItem[];
     private selectedAlbum: AlbumItem | null;
     private viewSize: AlbumViewSize;
     private viewMode: AlbumViewMode;
@@ -40,9 +40,9 @@ class AlbumsPage extends Component {
     private sortDirection: SortDirection;
     private searchQuery: string;
     private container: any;
-    private _lastSourceRect: SourceRect | null;
-    private _lastSourceKey: string | null;
-    private _lastGridScrollTop: number;
+    private readonly listRoot: HTMLElement;
+    private readonly detailRoot: HTMLElement;
+    private readonly scroll: MainContentScrollCoordinator;
     private _coverRequests: Set<string>;
     private _coverFailures: Set<string>;
     private _coverQueue: string[];
@@ -53,24 +53,36 @@ class AlbumsPage extends Component {
     private coverPreferenceUnsubscribe: Unsubscribe | null;
     private coverGeneration: number;
     private readonly trackCollectionDetail: TrackCollectionDetail;
-    private coverObserver: IntersectionObserver | null;
+    private readonly masterDetailHost: MasterDetailViewHost;
+    private readonly albumSurface: AdaptiveCollectionSurface<AlbumItem>;
+    private glossFrame: number | null = null;
+    private pendingGloss: {art: HTMLElement; x: number; y: number} | null = null;
     isVisible: boolean;
+    private renderDirty = true;
+    private listRenderDirty = true;
 
-    constructor(container: string | Element | null) {
+    constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
+        const pageRoot = this.element as HTMLElement;
+        this.scroll = scroll;
+        this.masterDetailHost = new MasterDetailViewHost(pageRoot, scroll, {
+            listLocationKey: 'albums/list',
+            detailLocationKey: identity => `albums/detail/${encodeURIComponent(identity)}`
+        });
+        this.listRoot = this.masterDetailHost.listRoot;
+        this.listRoot.classList.add('albums-list-root');
+        this.detailRoot = this.masterDetailHost.detailRoot;
+        this.detailRoot.classList.add('albums-detail-root');
         this.tracks = [];
         this.albums = [];
+        this.filteredAlbums = [];
         this.selectedAlbum = null; // { key, name, artist, year, cover, tracks:[], totalDuration }
         this.viewSize = 'm'; // s | m | l
         this.viewMode = albumViewModePreferenceService.getMode();
         this.sortBy = 'name';
         this.sortDirection = 'asc';
         this.searchQuery = '';
-        this.container = this.element;
-        // 共享元素转场：记忆源位置信息与滚动
-        this._lastSourceRect = null;   // {left, top, width, height, radius, scrollTop}
-        this._lastSourceKey = null;    // 专辑 key
-        this._lastGridScrollTop = 0;   // 进入时的滚动位置
+        this.container = this.listRoot;
         // 封面获取去重与队列
         this._coverRequests = new Set();  // in-flight keys
         this._coverFailures = new Set();  // failed keys (避免重复请求)
@@ -83,17 +95,23 @@ class AlbumsPage extends Component {
             this._coverQueue.length = 0;
             this._coverFailures.clear();
             this.processAlbums();
+            this.renderDirty = true;
             if (this.isVisible) {
                 this.render();
             }
         });
         this.coverGeneration = 0;
-        this.coverObserver = null;
-        this.trackCollectionDetail = new TrackCollectionDetail(this.element as HTMLElement, {
-            onBack: () => {
-                this.selectedAlbum = null;
-                this.renderAlbumsList();
-            },
+        this.setupAlbumListEventDelegation();
+        this.albumSurface = new AdaptiveCollectionSurface<AlbumItem>({
+            getKey: album => album.key,
+            renderItem: album => this.renderAlbumTile(album)
+        }, {
+            onRenderedRangeChange: keys => this.scheduleCoversForMissing(keys),
+            restoreScrollOffset: scrollTop => this.masterDetailHost.restoreListOffset(scrollTop)
+        });
+        this.masterDetailHost.attachSurface(this.albumSurface);
+        this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
+            onBack: () => void this.closeAlbumDetail(),
             onTrackPlayed: (track, index, tracks, mode) => {
                 this.emit('trackPlayed', track, index, tracks, mode);
             },
@@ -115,12 +133,18 @@ class AlbumsPage extends Component {
                     this.selectedAlbum?.tracks || []
                 );
             }
+        }, {
+            observeNetworkPreference: false,
+            scroll: this.scroll,
+            scrollKey: 'albums-detail'
         });
         this.coverPreferenceUnsubscribe = trackCoverNetworkPreferenceService.onChanged((enabled) => {
             this.coverGeneration++;
             this._coverQueue.length = 0;
             this._coverRequests.clear();
             this._coverFailures.clear();
+            this.renderDirty = true;
+            if (this.selectedAlbum) this.listRenderDirty = true;
             if (!enabled) {
                 const selectedAlbumKey = this.selectedAlbum?.key;
                 this.processAlbums();
@@ -130,8 +154,12 @@ class AlbumsPage extends Component {
                 if (this.isVisible) {
                     this.render();
                 }
-            } else if (this.isVisible && !this.selectedAlbum) {
-                this.scheduleCoversForMissing();
+            } else if (this.isVisible) {
+                if (this.selectedAlbum) {
+                    this.render();
+                } else {
+                    this.scheduleCoversForMissing();
+                }
             }
         });
         this.isVisible = false;
@@ -145,6 +173,10 @@ class AlbumsPage extends Component {
         }
         if (this.element) (this.element as HTMLElement).style.display = 'block';
         this.isVisible = true;
+        await this.masterDetailHost.resume();
+        if (!this.selectedAlbum && this.masterDetailHost.getLocation().kind === 'detail') {
+            await this.masterDetailHost.returnToList();
+        }
 
         // 只有在没有tracks数据时才获取，避免重复调用
         if (!this.tracks || this.tracks.length === 0) {
@@ -154,43 +186,38 @@ class AlbumsPage extends Component {
             if (!this.isVisible || viewGeneration !== this.coverGeneration) return;
             this.tracks = pageData.tracks;
             this.albums = pageData.albums;
-            this.scheduleCoversForMissing();
+            this.applyAlbumFilter(false);
+            this.renderDirty = true;
         }
 
-        this.render();
-
-        // 记忆共享元素转场所需信息
-        this._lastSourceRect = null;   // {left, top, width, height, radius, scrollTop}
-        this._lastSourceKey = null;    // 对应的专辑 key，返回时用于定位原卡片
-        this._lastGridScrollTop = 0;   // 返回时恢复滚动
+        if (this.renderDirty || !this.listRoot.firstElementChild) {
+            this.render();
+        }
     }
 
     hide(): void {
         this.coverGeneration++;
-        this.coverObserver?.disconnect();
-        this.coverObserver = null;
         this.isVisible = false;
+        this.masterDetailHost.suspend();
         this.selectedAlbum = null;
         this.trackCollectionDetail.hide();
-        if (this.container) this.container.innerHTML = '';
+        if (this.element instanceof HTMLElement) this.element.style.display = 'none';
     }
 
     destroy(): void {
         this.tracks.length = 0;
         this.albums.length = 0;
+        this.filteredAlbums.length = 0;
         this.selectedAlbum = null;
         this._coverRequests.clear();
         this._coverFailures.clear();
         this._coverQueue.length = 0;
-        this._lastSourceRect = null;
-        this._lastSourceKey = null;
         this.listenersSetup = false;
         this.albumGroupingUnsubscribe?.();
         this.albumGroupingUnsubscribe = null;
         this.coverPreferenceUnsubscribe?.();
         this.coverPreferenceUnsubscribe = null;
-        this.coverObserver?.disconnect();
-        this.coverObserver = null;
+        this.masterDetailHost.destroy();
         this.trackCollectionDetail.destroy();
         super.destroy();
     }
@@ -203,8 +230,51 @@ class AlbumsPage extends Component {
             this.selectedAlbum = selectedAlbumKey
                 ? this.albums.find((album) => album.key === selectedAlbumKey) || null
                 : null;
+            this.renderDirty = true;
+            if (this.selectedAlbum) this.listRenderDirty = true;
             if (this.isVisible) this.render();
         });
+    }
+
+    private setupAlbumListEventDelegation(): void {
+        this.addEventListenerManaged(this.listRoot, 'dblclick', (event: Event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const tile = target?.closest<HTMLElement>('.albumsx-tile');
+            const album = this.findFilteredAlbum(tile?.dataset.albumKey);
+            if (tile && album) {
+                this.animateToDetail(tile, album);
+            }
+        });
+        this.addEventListenerManaged(this.listRoot, 'contextmenu', (event: Event) => {
+            const mouseEvent = event as MouseEvent;
+            const target = event.target instanceof Element ? event.target : null;
+            const tile = target?.closest<HTMLElement>('.albumsx-tile');
+            const album = this.findFilteredAlbum(tile?.dataset.albumKey);
+            if (!album) return;
+            mouseEvent.preventDefault();
+            if (album.tracks.length > 0) {
+                this.emit('collectionRightClick', album.tracks, mouseEvent.clientX, mouseEvent.clientY);
+            }
+        });
+        this.addEventListenerManaged(this.listRoot, 'pointermove', (event: Event) => {
+            const pointerEvent = event as PointerEvent;
+            const target = event.target instanceof Element ? event.target : null;
+            const art = target?.closest<HTMLElement>('.albumsx-tile .art');
+            if (art) this.updateGloss(art, pointerEvent.clientX, pointerEvent.clientY);
+        });
+        this.addEventListenerManaged(this.listRoot, 'pointerout', (event: Event) => {
+            const pointerEvent = event as PointerEvent;
+            const target = event.target instanceof Element ? event.target : null;
+            const art = target?.closest<HTMLElement>('.albumsx-tile .art');
+            if (art && !(pointerEvent.relatedTarget instanceof Node && art.contains(pointerEvent.relatedTarget))) {
+                art.style.setProperty('--gloss', '0');
+            }
+        });
+    }
+
+    private findFilteredAlbum(key: string | undefined): AlbumItem | null {
+        if (!key) return null;
+        return this.filteredAlbums.find(album => album.key === key) || null;
     }
 
     // 生成tracks的简单哈希值
@@ -221,38 +291,24 @@ class AlbumsPage extends Component {
             splitByArtist: albumGroupingPreferenceService.shouldSplitByArtist()
         });
         this.sortAlbums(this.sortBy, this.sortDirection);
-        // 补全缺失封面
-        this.scheduleCoversForMissing();
     }
 
     // 将缺失封面的专辑加入获取队列
-    scheduleCoversForMissing(): void {
+    scheduleCoversForMissing(keys: Array<string | number> = this.albumSurface.getRenderedKeys()): void {
         if (!this.albums || this.albums.length === 0) return;
-        const container = this.container as HTMLElement | null;
-        const tiles = container?.querySelectorAll<HTMLElement>('.albumsx-tile');
-        if (!tiles?.length) return;
-
-        this.coverObserver?.disconnect();
-        this.coverObserver = new IntersectionObserver((entries, observer) => {
-            entries.forEach((entry) => {
-                if (!entry.isIntersecting) return;
-                const tile = entry.target as HTMLElement;
-                const key = tile.dataset.albumKey;
-                const album = key ? this.albums.find(item => item.key === key) : null;
-                if (
-                    album
-                    && !album.cover
-                    && !this._coverRequests.has(album.key)
-                    && !this._coverFailures.has(album.key)
-                    && !this._coverQueue.includes(album.key)
-                ) {
-                    this._coverQueue.push(album.key);
-                    void this._drainCoverQueue();
-                }
-                observer.unobserve(tile);
-            });
-        }, {root: document.querySelector('.main-content'), rootMargin: '240px'});
-        tiles.forEach((tile: HTMLElement) => this.coverObserver?.observe(tile));
+        keys.forEach((key) => {
+            const album = this.findFilteredAlbum(String(key));
+            if (
+                album
+                && !album.cover
+                && !this._coverRequests.has(album.key)
+                && !this._coverFailures.has(album.key)
+                && !this._coverQueue.includes(album.key)
+            ) {
+                this._coverQueue.push(album.key);
+            }
+        });
+        void this._drainCoverQueue();
     }
 
     async _drainCoverQueue(): Promise<void> {
@@ -301,8 +357,7 @@ class AlbumsPage extends Component {
             ) {
                 // 更新专辑数据
                 album.cover = result.imageUrl;
-                // 局部刷新：更新对应卡片的图片src
-                this._updateAlbumCardCover(album.key, result.imageUrl);
+                this.albumSurface.invalidateItem(album.key);
             } else {
                 this._coverFailures.add(album.key);
             }
@@ -320,34 +375,18 @@ class AlbumsPage extends Component {
     }
 
     _setAlbumCardLoading(key: string, loading: boolean): void {
-        const tile = this.container && this.container.querySelector(`.albumsx-tile[data-album-key="${CSS.escape(key)}"]`);
+        const tile = this.listRoot.querySelector<HTMLElement>(`.albumsx-tile[data-album-key="${CSS.escape(key)}"]`);
         if (!tile) return;
         const art = tile.querySelector('.art');
         if (!art) return;
         if (loading) art.classList.add('loading'); else art.classList.remove('loading');
     }
 
-    _updateAlbumCardCover(key: string, url: string): void {
-        const tile = this.container && this.container.querySelector(`.albumsx-tile[data-album-key="${CSS.escape(key)}"]`);
-        if (!tile) return;
-        const img = tile.querySelector('.art img');
-        if (!img) return;
-        // 平滑淡入替换
-        const fadeOut = img.animate([{opacity: 1}, {opacity: 0.1}], {duration: 140, fill: 'forwards'});
-        fadeOut.finished.catch(() => {
-        }).finally(() => {
-            img.src = url;
-            img.decode?.().catch(() => {
-            }).finally(() => {
-                img.animate([{opacity: 0.1}, {opacity: 1}], {duration: 160, fill: 'forwards'});
-            });
-        });
-    }
-
     sortAlbums(sortBy: AlbumSortKey, direction: SortDirection): void {
         this.sortBy = sortBy;
         this.sortDirection = direction;
         libraryPageDataService.sortAlbums(this.albums, sortBy, direction);
+        this.applyAlbumFilter(false);
     }
 
     render(): void {
@@ -357,10 +396,17 @@ class AlbumsPage extends Component {
         } else {
             this.renderAlbumsList();
         }
+        this.renderDirty = false;
     }
 
     // 专辑墙
     renderAlbumsList(): void {
+        const snapshot = this.masterDetailHost.getLocation().kind === 'list' && this.listRoot.firstElementChild
+            ? this.albumSurface.captureSnapshot()
+            : null;
+        this.container = this.listRoot;
+        this.listRoot.style.display = 'block';
+        this.detailRoot.style.display = 'none';
         this.trackCollectionDetail.hide();
         const sizes = {s: 110, m: 150, l: 200};
         const coverSize = sizes[this.viewSize] || sizes.m;
@@ -395,7 +441,7 @@ class AlbumsPage extends Component {
                             ${this.sortDirection === 'asc' ? '↑' : '↓'}
                         </button>
                         <div class="search-inline">
-                            <input type="text" id="album-query" value="${this.escapeHtml(this.searchQuery)}" placeholder="搜索专辑或艺术家…" />
+                            <input type="text" id="album-query" value="${escapeHtmlAttribute(this.searchQuery)}" placeholder="搜索专辑或艺术家…" />
                         </div>
                         <div class="segmented" role="tablist" aria-label="视图模式">
                             <button class="seg-btn ${this.viewMode === 'grid' ? 'active' : ''}" data-view="grid">方格</button>
@@ -404,13 +450,17 @@ class AlbumsPage extends Component {
                     </div>
                 </div>
                 ${total ? `
-                <div class="${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}" style="--cover:${coverSize}px;">
-                    ${this.albums.map(a => this.renderAlbumTile(a)).join('')}
+                <div class="album-surface-root ${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}" style="--cover:${coverSize}px;"></div>
+                <div class="albumsx-empty albumsx-no-results" hidden>
+                    <h3>没有匹配的专辑</h3>
+                    <p>请尝试其他专辑名或艺术家</p>
                 </div>` : this.renderEmptyState()}
             </div>`;
 
         this.setupListEventListeners();
-        this.scheduleCoversForMissing();
+        this.updateAlbumSurface();
+        if (snapshot) void this.albumSurface.resume(snapshot);
+        this.listRenderDirty = false;
     }
 
     renderEmptyState(): string {
@@ -430,11 +480,12 @@ class AlbumsPage extends Component {
         const title = this.escapeHtml(album.name);
         const artist = this.escapeHtml(album.artist);
         const subtitle = `${artist} · ${album.year || '年份未知'} · ${trackCount} 首`;
+        const tooltip = `${album.name}\n${album.artist} · ${album.year || '年份未知'} · ${trackCount} 首`;
         return `
             <div class="albumsx-tile ${this.viewMode === 'list' ? 'albumsx-list-item' : ''}"
-                 data-album-key="${this.escapeHtml(album.key)}" title="${title}\n${subtitle}">
+                 data-album-key="${escapeHtmlAttribute(album.key)}" title="${escapeHtmlAttribute(tooltip)}">
                 <div class="art shadow">
-                    <img src="${cover}" alt="${title}" loading="lazy"/>
+                    <img src="${escapeHtmlAttribute(cover)}" alt="${escapeHtmlAttribute(album.name)}" loading="lazy"/>
                 </div>
                 <div class="meta">
                     <div class="name clamp-1">${title}</div>
@@ -456,7 +507,9 @@ class AlbumsPage extends Component {
         if (!this.selectedAlbum) return;
         const album = this.selectedAlbum;
         const tracks = [...album.tracks].sort((a, b) => ((a as any).disc || 0) - ((b as any).disc || 0) || ((a as any).track || 0) - ((b as any).track || 0));
+        this.container = this.detailRoot;
         this.trackCollectionDetail.show({
+            identity: album.key,
             title: album.name,
             description: album.artist,
             cover: album.cover,
@@ -512,46 +565,62 @@ class AlbumsPage extends Component {
                 this.applyAlbumFilter();
             });
         }
-        this.applyAlbumFilter();
-        // 专辑卡事件
-        this.container.querySelectorAll('.albumsx-tile').forEach((tile: any) => {
-            const key = tile.dataset.albumKey;
-            const album = this.albums.find(a => a.key === key);
-            if (!album) return;
-            const art = tile.querySelector('.art');
-
-
-            // 双击进入详情
-            // 飞入动画
-            tile.addEventListener('dblclick', () => this.animateToDetail(tile, album));
-            tile.addEventListener('contextmenu', (event: MouseEvent) => {
-                event.preventDefault();
-                if (album.tracks.length > 0) {
-                    this.emit('collectionRightClick', album.tracks, event.clientX, event.clientY);
-                }
-            });
-
-            // 方向性高光，指针事件
-            if (art) this.attachGlossHandlers(art);
-        });
     }
 
     showAlbumDetail(album: AlbumItem): void {
+        this.masterDetailHost.enterDetail(album.key);
         this.selectedAlbum = album;
         this.render();
     }
 
-    private applyAlbumFilter(): void {
-        const query = this.searchQuery.trim().toLocaleLowerCase();
-        this.container.querySelectorAll('.albumsx-tile').forEach((tile: HTMLElement) => {
-            const key = tile.dataset.albumKey;
-            const album = this.albums.find(item => item.key === key);
-            if (!album) return;
-            const matches = !query
-                || album.name.toLocaleLowerCase().includes(query)
-                || album.artist.toLocaleLowerCase().includes(query);
-            tile.style.display = matches ? '' : 'none';
+    private async closeAlbumDetail(): Promise<void> {
+        this.selectedAlbum = null;
+        this.trackCollectionDetail.hide();
+        if (this.listRenderDirty || !this.listRoot.firstElementChild) {
+            this.renderAlbumsList();
+        }
+        this.container = this.listRoot;
+        await this.masterDetailHost.returnToList();
+    }
+
+    private applyAlbumFilter(updateSurface = true): void {
+        applyCollectionSearch({
+            source: this.albums,
+            query: this.searchQuery,
+            getSearchableValues: album => [album.name, album.artist],
+            commit: results => this.filteredAlbums = results,
+            refresh: updateSurface ? {
+                resetScroll: () => this.scroll.scrollToTop(),
+                updateView: () => this.updateAlbumSurface()
+            } : undefined
         });
+    }
+
+    private updateAlbumSurface(): void {
+        const surfaceRoot = this.listRoot.querySelector<HTMLElement>('.album-surface-root');
+        const noResults = this.listRoot.querySelector<HTMLElement>('.albumsx-no-results');
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (!surfaceRoot || !scrollElement) return;
+        surfaceRoot.className = `album-surface-root ${this.viewMode === 'grid' ? 'albumsx-grid' : 'albumsx-list'}`;
+        surfaceRoot.style.setProperty('--cover', `${{s: 110, m: 150, l: 200}[this.viewSize]}px`);
+        surfaceRoot.style.display = this.filteredAlbums.length === 0 ? 'none' : 'block';
+        if (noResults) noResults.hidden = this.filteredAlbums.length !== 0;
+        this.albumSurface.mount(surfaceRoot, scrollElement);
+        this.albumSurface.update(this.filteredAlbums, this.getAlbumCollectionLayout());
+    }
+
+    private getAlbumCollectionLayout(): CollectionLayout {
+        if (this.viewMode === 'list') {
+            return {mode: 'list', estimateRowSize: 80, overscan: 8};
+        }
+        const coverSize = {s: 110, m: 150, l: 200}[this.viewSize];
+        const gap = 24;
+        return {
+            mode: 'grid',
+            estimateRowSize: coverSize + 104,
+            getColumnCount: width => Math.max(1, Math.floor((width + gap) / (coverSize + 60 + gap))),
+            overscan: 3
+        };
     }
 
     formatDuration(seconds?: number): string {
@@ -573,35 +642,26 @@ class AlbumsPage extends Component {
         return div.innerHTML;
     }
 
-    // 方向性高光跟随：利用 CSS 变量驱动，节流到 rAF
-    attachGlossHandlers(artEl: HTMLElement): void {
-        let raf = 0;
-        const onMove = (e: MouseEvent) => {
-            if (raf) return; // rAF 节流
-            raf = requestAnimationFrame(() => {
-                raf = 0;
-                const rect = artEl.getBoundingClientRect();
-                const x = (e.clientX - rect.left) / rect.width;  // 0..1
-                const y = (e.clientY - rect.top) / rect.height;  // 0..1
-                // 将坐标映射到 CSS 变量：用于渐变方向与强度
-                artEl.style.setProperty('--mx', x.toFixed(4));
-                artEl.style.setProperty('--my', y.toFixed(4));
-                // 强度：靠近中心更亮，靠边更弱
-                const cx = Math.abs(x - 0.5) * 2; // 0..1
-                const cy = Math.abs(y - 0.5) * 2; // 0..1
-                const dist = Math.sqrt(cx * cx + cy * cy); // 0..~1.4
-                const strength = Math.max(0, 1 - dist); // 1..0
-                artEl.style.setProperty('--gloss', (0.25 + 0.55 * strength).toFixed(3));
-                // 方向角度：以鼠标向量确定
-                const angle = Math.atan2(y - 0.5, x - 0.5) * 180 / Math.PI; // -180..180
-                artEl.style.setProperty('--ang', angle.toFixed(2));
-            });
-        };
-        const onLeave = () => {
-            artEl.style.setProperty('--gloss', '0');
-        };
-        artEl.addEventListener('mousemove', onMove);
-        artEl.addEventListener('mouseleave', onLeave);
+    // 方向性高光跟随：在稳定根上委托，并统一节流到一帧一次。
+    private updateGloss(art: HTMLElement, clientX: number, clientY: number): void {
+        this.pendingGloss = {art, x: clientX, y: clientY};
+        if (this.glossFrame !== null) return;
+        this.glossFrame = this.requestAnimationFrameManaged(() => {
+            this.glossFrame = null;
+            const pending = this.pendingGloss;
+            this.pendingGloss = null;
+            if (!pending) return;
+            const rect = pending.art.getBoundingClientRect();
+            const x = (pending.x - rect.left) / rect.width;
+            const y = (pending.y - rect.top) / rect.height;
+            pending.art.style.setProperty('--mx', x.toFixed(4));
+            pending.art.style.setProperty('--my', y.toFixed(4));
+            const cx = Math.abs(x - 0.5) * 2;
+            const cy = Math.abs(y - 0.5) * 2;
+            const strength = Math.max(0, 1 - Math.sqrt(cx * cx + cy * cy));
+            pending.art.style.setProperty('--gloss', (0.25 + 0.55 * strength).toFixed(3));
+            pending.art.style.setProperty('--ang', (Math.atan2(y - 0.5, x - 0.5) * 180 / Math.PI).toFixed(2));
+        });
     }
 
     // 封面飞入过渡：共享元素转场
@@ -611,19 +671,9 @@ class AlbumsPage extends Component {
         const srcArt = tileEl.querySelector('.art');
         if (!srcArtImg || !srcArt) return this.showAlbumDetail(album);
         const srcRect = srcArtImg.getBoundingClientRect();
-
-        // 预渲染详情页用于定位目标元素
-        // 记忆源卡片位置信息 & 当前滚动位置
-        // 反向转场与滚动恢复
-        const scrollEl = this.getScrollContainer();
         const srcRadius = getComputedStyle(srcArt).borderRadius;
-        this._lastSourceRect = {
-            left: srcRect.left, top: srcRect.top, width: srcRect.width, height: srcRect.height,
-            radius: srcRadius, scrollTop: scrollEl ? scrollEl.scrollTop : (window.scrollY || 0)
-        };
-        this._lastSourceKey = album.key;
-        this._lastGridScrollTop = this._lastSourceRect.scrollTop;
 
+        this.masterDetailHost.enterDetail(album.key);
         this.selectedAlbum = album;
         this.render();
         const dstCover = this.container.querySelector('.detail-hero .cover');
@@ -745,112 +795,6 @@ class AlbumsPage extends Component {
         phase(tracks, 280); // 列表逐个延迟 24ms，整体节奏轻快
     }
 
-    // 反向共享元素转场：从详情页封面飞回网格卡片
-    animateBackToGrid(): void {
-        const dstCover = this.container.querySelector('.detail-hero .cover');
-        const dstImg = dstCover ? dstCover.querySelector('img') : null;
-        if (!dstCover || !dstImg) {
-            this.selectedAlbum = null;
-            this.render();
-            return;
-        }
-        const dstRect = dstCover.getBoundingClientRect();
-        const src = this._lastSourceRect;
-
-        // 先淡出详情的文本内容
-        const title = this.container.querySelector('.detail-hero .info .name');
-        const stats = this.container.querySelector('.detail-hero .info .stats');
-        const actions = this.container.querySelector('.detail-hero .info .actions');
-        const tracks = this.container.querySelectorAll('.detail-tracks .trackx');
-        const fadeOut = (els: any) => {
-            const list = els instanceof NodeList ? Array.from(els) : [els];
-            return list.map(el => el ? el.animate([
-                {opacity: 1, transform: 'translateY(0px)'},
-                {opacity: 0, transform: 'translateY(6px)'}
-            ], {duration: 150, easing: 'ease-in', fill: 'forwards'}).finished : Promise.resolve());
-        };
-        Promise.allSettled([
-            ...fadeOut(title), ...fadeOut(stats), ...fadeOut(actions), ...fadeOut(tracks)
-        ]).finally(() => {
-            // 创建 ghost 做反向飞行
-            const ghostWrap = document.createElement('div');
-            const ghost = dstImg.cloneNode(true);
-            const dstRadius = getComputedStyle(dstCover).borderRadius;
-            Object.assign(ghostWrap.style, {
-                position: 'fixed', left: `${dstRect.left}px`, top: `${dstRect.top}px`,
-                width: `${dstRect.width}px`, height: `${dstRect.height}px`,
-                borderRadius: dstRadius, overflow: 'hidden',
-                boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: '9999',
-                transformOrigin: 'top left', willChange: 'transform, border-radius', pointerEvents: 'none'
-            });
-            Object.assign(ghost.style, {width: '100%', height: '100%', objectFit: 'cover'});
-            document.body.appendChild(ghostWrap);
-            ghostWrap.appendChild(ghost);
-
-            // 切换视图到网格，但先隐藏网格中可能的目标卡片以避免闪烁
-            const key = this._lastSourceKey;
-            this.selectedAlbum = null;
-            this.render();
-            const gridTile = key ? this.container.querySelector(`.albumsx-tile[data-album-key="${CSS.escape(key)}"]`) : null;
-            const gridArt = gridTile ? gridTile.querySelector('.art') : null;
-            if (gridArt) gridArt.style.visibility = 'hidden';
-
-            // 恢复网格滚动到进入时的位置
-            const scrollEl = this.getScrollContainer();
-            if (scrollEl) scrollEl.scrollTop = this._lastGridScrollTop || 0; else window.scrollTo(0, this._lastGridScrollTop || 0);
-
-            // 强制布局后获取源卡片（网格）目标 rect
-            let targetRect;
-            if (gridArt) {
-                void gridArt.offsetHeight;
-                const img = gridArt.querySelector('img') || gridArt;
-                targetRect = img.getBoundingClientRect();
-            }
-
-            // 若无法找到原卡片，使用淡出收场
-            if (!src || !targetRect) {
-                ghostWrap.animate([{opacity: 1}, {opacity: 0}], {duration: 160, easing: 'ease-out', fill: 'forwards'})
-                    .onfinish = () => {
-                    ghostWrap.remove();
-                    if (gridArt) gridArt.style.visibility = '';
-                };
-                return;
-            }
-
-            const dx = (src.left ?? targetRect.left) - dstRect.left;
-            const dy = (src.top ?? targetRect.top) - dstRect.top;
-            const sx = (src.width ?? targetRect.width) / dstRect.width;
-            const sy = (src.height ?? targetRect.height) / dstRect.height;
-            const finalRadius = src.radius || getComputedStyle(gridArt).borderRadius;
-
-            const anim = ghostWrap.animate([
-                {transform: 'translate(0px, 0px) scale(1, 1)', borderRadius: dstRadius},
-                {transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, borderRadius: finalRadius}
-            ], {duration: 420, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)', fill: 'forwards'});
-
-            anim.onfinish = () => {
-                requestAnimationFrame(() => {
-                    if (gridArt) gridArt.style.visibility = '';
-                    // 交叉淡入淡出，保证无缝
-                    const fadeInGrid = gridArt ? gridArt.animate([{opacity: 0}, {opacity: 1}], {
-                        duration: 140,
-                        fill: 'forwards'
-                    }) : null;
-                    ghostWrap.animate([{opacity: 1}, {opacity: 0}], {duration: 140, fill: 'forwards'})
-                        .onfinish = () => {
-                        ghostWrap.remove();
-                    };
-                    if (fadeInGrid && fadeInGrid.finished) fadeInGrid.finished.catch(() => {
-                    });
-                });
-            };
-        });
-    }
-
-    // 获取可滚动容器
-    getScrollContainer(): HTMLElement | null {
-        return document.querySelector('.main-content');
-    }
 }
 
 export { AlbumsPage };

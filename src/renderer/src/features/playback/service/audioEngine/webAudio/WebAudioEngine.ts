@@ -150,9 +150,6 @@ class WebAudioEngine {
             const loadedTrack = await this.trackLoader.load(filePath, this.mediaElement);
             this.currentTrackStore.setLoadedTrack(loadedTrack);
 
-            // 触发事件
-            this.notifyTrackChanged();
-
             // 若启用无间隙播放，预加载下一首歌曲
             if (this.getGaplessPlayback() && this.playlist.length > 1) {
                 setTimeout(() => this.preloadNextTrack(), 2000);
@@ -351,9 +348,9 @@ class WebAudioEngine {
         }
     }
 
-    notifyTrackChanged(): void {
+    async notifyTrackChanged(): Promise<void> {
         if (this.onTrackChanged) {
-            this.onTrackChanged(this.currentTrack);
+            await this.onTrackChanged(this.currentTrack);
         }
     }
 

@@ -3,32 +3,57 @@
  */
 
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
-import {localCoverManager} from "@/features/mediaAssets/service/LocalCoverManager";
 import {recentPlaybackHistoryService} from "@/features/playback/service/RecentPlaybackHistoryService";
 import {
-    groupRecentTracksByDate,
+    flattenRecentTrackRows,
     type RecentTrack,
-    type RecentTrackGroups
+    type RecentTrackDisplayRow,
+    type RecentTrackGroups,
+    groupRecentTracksByDate
 } from "@/features/playback/domain/RecentTrackGrouping";
 import {trackCoverNetworkPreferenceService} from "@/features/settings/service";
 import {formatTime} from "@utils/index.js";
 import {Component} from "@ui/base/Component";
+import {AdaptiveCollectionSurface, type CollectionSurfaceSnapshot} from '@ui/collections';
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 class RecentPage extends Component {
     private container: Element | null;
     private recentTracks: RecentTrack[];
+    private displayRows: RecentTrackDisplayRow[] = [];
     private listenersSetup: boolean;
     private historyUnsubscribe: (() => void) | null;
     isVisible: boolean;
     private viewGeneration = 0;
+    private renderDirty = true;
+    private readonly scroll: MainContentScrollCoordinator;
+    private readonly recentSurface: AdaptiveCollectionSurface<RecentTrackDisplayRow>;
+    private surfaceSnapshot: CollectionSurfaceSnapshot | null = null;
+    private readonly coverLoading = new Set<string>();
 
-    constructor(container: string | Element | null) {
+    constructor(container: string | Element | null, scroll: MainContentScrollCoordinator) {
         super(container);
         this.container = this.element;
+        this.scroll = scroll;
         this.recentTracks = [];
         this.listenersSetup = false; // 事件监听器是否已设置
         this.historyUnsubscribe = null;
         this.isVisible = false;
+        this.recentSurface = new AdaptiveCollectionSurface<RecentTrackDisplayRow>({
+            getKey: row => row.key,
+            renderItem: row => this.renderDisplayRow(row)
+        }, {
+            onRenderedRangeChange: keys => this.loadRenderedCovers(keys),
+            restoreScrollOffset: scrollTop => {
+                this.scroll.remember('recent/list', scrollTop);
+                return this.scroll.restore('recent/list', {
+                    scrollTop,
+                    whenReady: () => this.recentSurface.whenReady(),
+                    isCurrent: () => this.isVisible
+                });
+            }
+        });
+        this.setupCollectionEventDelegation();
     }
 
     async show(): Promise<void> {
@@ -43,14 +68,23 @@ class RecentPage extends Component {
         }
         this.isVisible = true;
         this.loadPlayHistory();
-        this.render();
+        if (this.surfaceSnapshot) {
+            await this.recentSurface.resume(this.surfaceSnapshot);
+            this.surfaceSnapshot = null;
+        }
+        if (this.renderDirty || !this.container?.firstElementChild) {
+            this.render();
+        }
     }
 
     hide(): void {
         this.viewGeneration++;
         this.isVisible = false;
-        if (this.container) {
-            this.container.innerHTML = '';
+        if (this.container?.querySelector('.recent-surface-root')) {
+            this.surfaceSnapshot = this.recentSurface.suspend();
+        }
+        if (this.element instanceof HTMLElement) {
+            this.element.style.display = 'none';
         }
     }
 
@@ -58,6 +92,9 @@ class RecentPage extends Component {
         this.historyUnsubscribe?.();
         this.historyUnsubscribe = null;
         this.recentTracks.length = 0;
+        this.displayRows.length = 0;
+        this.coverLoading.clear();
+        this.recentSurface.destroy();
         this.listenersSetup = false;
         super.destroy();
     }
@@ -69,6 +106,7 @@ class RecentPage extends Component {
     setupAPIListeners(): void {
         this.historyUnsubscribe = recentPlaybackHistoryService.subscribe(() => {
             this.loadPlayHistory();
+            this.renderDirty = true;
             if (this.isVisible) {
                 this.render();
             }
@@ -77,6 +115,7 @@ class RecentPage extends Component {
 
     loadPlayHistory(): void {
         this.recentTracks = recentPlaybackHistoryService.loadHistory() as RecentTrack[];
+        this.displayRows = flattenRecentTrackRows(this.recentTracks);
     }
 
     // 清空播放历史
@@ -92,8 +131,9 @@ class RecentPage extends Component {
     render(): void {
         if (!this.container) return;
 
-        // 按日期分组
-        const groupedTracks = this.groupTracksByDate();
+        const snapshot = this.container.querySelector('.recent-surface-root')
+            ? this.recentSurface.captureSnapshot()
+            : null;
 
         this.container.innerHTML = `
             <div class="page-content recent-page">
@@ -129,17 +169,7 @@ class RecentPage extends Component {
                     </div>
 
                     <div class="recent-content">
-                        ${Object.entries(groupedTracks).map(([date, entries]) => `
-                            <div class="date-group">
-                                <div class="date-header">
-                                    <h3 class="date-title">${date}</h3>
-                                    <span class="date-count">${entries.length} 首</span>
-                                </div>
-                                <div class="recent-track-list">
-                                    ${entries.map(({track, index}) => this.renderTrackItem(track, index)).join('')}
-                                </div>
-                            </div>
-                        `).join('')}
+                        <div class="recent-surface-root"></div>
                     </div>
                 ` : `
                     <div class="empty-state">
@@ -157,16 +187,28 @@ class RecentPage extends Component {
         `;
 
         this.setupPageEventListeners();
-
-        // 预加载当前显示的歌曲封面
-        this.preloadVisibleCovers();
+        this.updateRecentSurface();
+        if (snapshot) void this.recentSurface.resume(snapshot);
+        this.renderDirty = false;
     }
 
     groupTracksByDate(): RecentTrackGroups {
         return groupRecentTracksByDate(this.recentTracks);
     }
 
-    renderTrackItem(track: RecentTrack, index: number): string {
+    private renderDisplayRow(row: RecentTrackDisplayRow): string {
+        if (row.kind === 'date-header') {
+            return `
+                <div class="date-header recent-date-row">
+                    <h3 class="date-title">${row.label}</h3>
+                    <span class="date-count">${row.count} 首</span>
+                </div>
+            `;
+        }
+        return this.renderTrackItem(row.track, row.index, row.key);
+    }
+
+    renderTrackItem(track: RecentTrack, index: number, rowKey = ''): string {
         const playTime = new Date(track.playTime || Date.now());
         const timeStr = playTime.toLocaleTimeString('zh-CN', {
             hour: '2-digit',
@@ -174,11 +216,11 @@ class RecentPage extends Component {
         });
 
         return `
-            <div class="recent-track-item" data-track-path="${track.filePath}" data-index="${index}">
+            <div class="recent-track-item" data-track-path="${this.escapeHtml(track.filePath)}" data-track-row-key="${this.escapeHtml(rowKey)}" data-index="${index}">
                 <div class="track-cover">
                     <img src="${this.getTrackCover(track)}" alt="封面" loading="lazy" onerror="this.src='assets/images/default-cover.svg'">
                     <div class="track-overlay">
-                        <button class="play-btn">
+                        <button class="play-btn" data-action="play">
                             <svg viewBox="0 0 24 24">
                                 <path d="M8,5.14V19.14L19,12.14L8,5.14Z"/>
                             </svg>
@@ -198,12 +240,12 @@ class RecentPage extends Component {
                     <span class="track-duration">${formatTime(track.duration || 0)}</span>
                 </div>
                 <div class="track-actions">
-                    <button class="action-btn small" title="添加到播放列表">
+                    <button class="action-btn small" data-action="add" title="添加到播放列表">
                         <svg viewBox="0 0 24 24">
                             <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
                         </svg>
                     </button>
-                    <button class="action-btn small">
+                    <button class="action-btn small" data-action="remove">
                         <svg viewBox="0 0 24 24">
                             <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
                         </svg>
@@ -219,83 +261,109 @@ class RecentPage extends Component {
             return track.cover;
         }
 
-        // 异步获取封面，先返回默认封面
-        this.loadTrackCoverAsync(track);
         return 'assets/images/default-cover.svg';
     }
 
     async loadTrackCoverAsync(track: RecentTrack): Promise<void> {
         const viewGeneration = this.viewGeneration;
         try {
-            // 使用requestIdleCallback优化性能，在浏览器空闲时加载封面
-            const loadCover = async () => {
-                const coverResult = await coverLookupService.getCover(
-                    track.title,
-                    track.artist,
-                    track.album,
-                    track.filePath,
-                    false,
-                    {allowNetwork: trackCoverNetworkPreferenceService.isEnabled()}
-                );
+            const coverResult = await coverLookupService.getCover(
+                track.title,
+                track.artist,
+                track.album,
+                track.filePath,
+                false,
+                {allowNetwork: trackCoverNetworkPreferenceService.isEnabled()}
+            );
 
-                if (coverResult.success && coverResult.imageUrl && typeof coverResult.imageUrl === 'string') {
-                    if (!this.isVisible || viewGeneration !== this.viewGeneration) return;
-                    // 确保路径格式正确，处理路径
-                    let coverUrl = coverResult.imageUrl;
-
-                    // 处理本地文件路径格式
-                    if (coverResult.type === 'local-file' && coverResult.filePath) {
-                        if (!coverUrl.startsWith('file://')) {
-                            coverUrl = coverResult.filePath.replace(/\\/g, '/');
-                            if (!coverUrl.startsWith('/')) {
-                                coverUrl = '/' + coverUrl;
-                            }
-                            coverUrl = `file://${coverUrl}`;
+            if (coverResult.success && coverResult.imageUrl && typeof coverResult.imageUrl === 'string') {
+                if (!this.isVisible || viewGeneration !== this.viewGeneration) return;
+                let coverUrl = coverResult.imageUrl;
+                if (coverResult.type === 'local-file' && coverResult.filePath) {
+                    if (!coverUrl.startsWith('file://')) {
+                        coverUrl = coverResult.filePath.replace(/\\/g, '/');
+                        if (!coverUrl.startsWith('/')) {
+                            coverUrl = '/' + coverUrl;
                         }
+                        coverUrl = `file://${coverUrl}`;
                     }
-
-                    track.cover = coverUrl;
-
-                    // 使用requestAnimationFrame确保DOM更新在下一帧进行
-                    this.requestAnimationFrameManaged(() => {
-                        if (!this.container || !this.isVisible || viewGeneration !== this.viewGeneration) return;
-
-                        const trackItems = this.container.querySelectorAll<HTMLElement>('.recent-track-item');
-                        trackItems.forEach((item, _index) => {
-                            const itemIndex = parseInt(item.dataset.index || '-1', 10);
-                            if (this.recentTracks[itemIndex] === track) {
-                                const coverImg = item.querySelector<HTMLImageElement>('.track-cover img');
-                                if (coverImg) {
-                                    coverImg.src = track.cover || 'assets/images/default-cover.svg';
-                                }
-                            }
-                        });
-                    });
-                } else {
-                    console.warn(`⚠️ RecentPage: 封面加载失败 - ${track.title}:`, coverResult.error || '未知错误');
                 }
-            };
-
-            this.requestIdleCallbackManaged(() => {
-                void loadCover();
-            });
+                track.cover = coverUrl;
+                const row = this.displayRows.find(candidate => candidate.kind === 'track' && candidate.track === track);
+                if (row) this.recentSurface.invalidateItem(row.key);
+            } else {
+                console.warn(`⚠️ RecentPage: 封面加载失败 - ${track.title}:`, coverResult.error || '未知错误');
+            }
         } catch (error) {
             console.warn('RecentPage: 加载封面失败:', error);
         }
     }
 
-    preloadVisibleCovers(): void {
-        // 预加载当前页面显示的所有歌曲封面
-        if (this.recentTracks.length > 0 && localCoverManager) {
-            console.log(`🖼️ RecentPage: 开始预加载 ${this.recentTracks.length} 首最近播放歌曲的封面`);
+    private loadRenderedCovers(keys: Array<string | number>): void {
+        keys.forEach(key => {
+            const row = this.displayRows.find(candidate => candidate.key === key);
+            if (row?.kind !== 'track' || row.track.cover || this.coverLoading.has(row.key)) return;
+            this.coverLoading.add(row.key);
+            this.requestIdleCallbackManaged(() => {
+                void this.loadTrackCoverAsync(row.track).finally(() => this.coverLoading.delete(row.key));
+            }, {timeout: 100});
+        });
+    }
 
-            // 为每首歌曲触发封面加载
-            this.recentTracks.forEach(track => {
-                if (!track.cover) {
-                    this.loadTrackCoverAsync(track);
-                }
-            });
+    private updateRecentSurface(): void {
+        if (!(this.container instanceof HTMLElement)) return;
+        const root = this.container.querySelector<HTMLElement>('.recent-surface-root');
+        const scrollElement = document.querySelector<HTMLElement>('.main-content');
+        if (!root || !scrollElement) return;
+        this.recentSurface.mount(root, scrollElement);
+        this.recentSurface.update(
+            this.displayRows,
+            {mode: 'list', estimateRowSize: 84, overscan: 8},
+            this.recentTracks.length
+        );
+    }
+
+    private setupCollectionEventDelegation(): void {
+        if (!(this.container instanceof HTMLElement)) return;
+        this.addEventListenerManaged(this.container, 'click', event => {
+            const target = event.target instanceof Element ? event.target : null;
+            const item = target?.closest<HTMLElement>('.recent-track-item');
+            const row = this.findTrackRow(item?.dataset.trackRowKey);
+            if (!row) return;
+            const action = target?.closest<HTMLElement>('[data-action]')?.dataset.action;
+            if (action === 'play') {
+                this.emit('trackPlayed', row.track, row.index, this.recentTracks);
+            } else if (action === 'add') {
+                this.emit('addToPlaylist', row.track);
+            } else if (action === 'remove') {
+                void this.confirmRemoveTrack(row);
+            }
+        });
+        this.addEventListenerManaged(this.container, 'dblclick', event => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target?.closest('[data-action]')) return;
+            const item = target?.closest<HTMLElement>('.recent-track-item');
+            const row = this.findTrackRow(item?.dataset.trackRowKey);
+            if (row) this.emit('trackPlayed', row.track, row.index, this.recentTracks);
+        });
+    }
+
+    private findTrackRow(key: string | undefined): Extract<RecentTrackDisplayRow, {kind: 'track'}> | null {
+        if (!key) return null;
+        const row = this.displayRows.find(candidate => candidate.key === key);
+        return row?.kind === 'track' ? row : null;
+    }
+
+    private async confirmRemoveTrack(row: Extract<RecentTrackDisplayRow, {kind: 'track'}>): Promise<void> {
+        if (await recentPlaybackHistoryService.confirmRemoveHistoryItem(row.track.title)) {
+            this.removeHistoryItem(row.track.filePath);
         }
+    }
+
+    private escapeHtml(value: unknown): string {
+        const element = document.createElement('div');
+        element.textContent = value == null ? '' : String(value);
+        return element.innerHTML;
     }
 
     setupPageEventListeners(): void {
@@ -331,48 +399,6 @@ class RecentPage extends Component {
             });
         }
 
-        // 歌曲项目事件
-        this.container.querySelectorAll('.recent-track-item').forEach(item => {
-            const index = parseInt((item as HTMLElement).dataset.index || '-1', 10);
-            const track = this.recentTracks[index];
-
-            if (!track) return;
-
-            // 播放按钮
-            const playBtn = item.querySelector('.play-btn');
-            if (playBtn) {
-                playBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.emit('trackPlayed', track, index, this.recentTracks);
-                });
-            }
-
-            // 双击播放
-            item.addEventListener('dblclick', () => {
-                this.emit('trackPlayed', track, index, this.recentTracks);
-            });
-
-            // 添加到播放列表
-            const addBtn = item.querySelector('.track-actions .action-btn:first-child');
-            if (addBtn) {
-                addBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.emit('addToPlaylist', track);
-                });
-            }
-
-            // 从历史中移除
-            const removeBtn = item.querySelector('.track-actions .action-btn:last-child');
-            if (removeBtn) {
-                removeBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const track = this.recentTracks[index];
-                    if (track && await recentPlaybackHistoryService.confirmRemoveHistoryItem(track.title)) {
-                        this.removeHistoryItem(track.filePath);
-                    }
-                });
-            }
-        });
     }
 }
 

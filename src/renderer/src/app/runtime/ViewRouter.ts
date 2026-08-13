@@ -1,19 +1,24 @@
 import type {ViewRouterHost} from './AppRuntimePorts';
 import type {AppView} from '@/shared/types/AppContracts';
 import type {ContentUIFacade} from './ui/ContentUIFacade';
+import {MainContentScrollCoordinator} from './MainContentScrollCoordinator';
 
 interface ViewRouterOptions {
     app: ViewRouterHost;
     content: ContentUIFacade;
+    scroll: MainContentScrollCoordinator;
 }
 
 export class ViewRouter {
     private readonly app: ViewRouterHost;
     private readonly content: ContentUIFacade;
+    private readonly scroll: MainContentScrollCoordinator;
+    private activeView: AppView | null = null;
 
-    constructor({app, content}: ViewRouterOptions) {
+    constructor({app, content, scroll}: ViewRouterOptions) {
         this.app = app;
         this.content = content;
+        this.scroll = scroll;
     }
 
     async handleViewChange(view: AppView): Promise<void> {
@@ -22,6 +27,14 @@ export class ViewRouter {
         if (!this.isNavigableCoreView(view)) {
             console.warn('🎵 App: 未注册的视图，保持当前页面:', view);
             return;
+        }
+
+        if (this.activeView === view && app.currentView === view) {
+            return;
+        }
+
+        if (!this.isSurfaceManagedView(app.currentView)) {
+            this.scroll.capture(app.currentView);
         }
 
         this.hideAllPages();
@@ -62,6 +75,11 @@ export class ViewRouter {
             default:
                 break;
         }
+
+        this.activeView = view;
+        if (!this.isSurfaceManagedView(view)) {
+            this.scroll.restore(view, () => this.activeView === view && app.currentView === view);
+        }
     }
 
     hideAllPages(): void {
@@ -85,4 +103,9 @@ export class ViewRouter {
             'statistics'
         ].includes(view);
     }
+
+    private isSurfaceManagedView(view: AppView): boolean {
+        return view === 'artists' || view === 'albums' || view === 'playlists' || view === 'folders' || view === 'recent';
+    }
+
 }

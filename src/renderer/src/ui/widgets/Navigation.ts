@@ -81,8 +81,10 @@ class Navigation extends Component {
     }
 
     setupPlaylistsUpdateListener(): void {
-        this.removePlaylistsUpdatedListener = navigationDataService.onPlaylistsUpdated(async () => {
-            await this.refreshPlaylists();
+        this.removePlaylistsUpdatedListener = navigationDataService.onPlaylistsUpdated((playlists) => {
+            this.userPlaylists = playlists as SidebarPlaylist[];
+            this.renderUserPlaylists();
+            this.emit('playlistsChanged', playlists);
         });
     }
 
@@ -551,7 +553,6 @@ class Navigation extends Component {
         try {
             const result = await navigationDataService.deletePlaylist(playlist.id);
             if (result.success) {
-                await this.refreshPlaylists();
                 appNotificationService.showInfo(`歌单 "${playlist.name}" 已删除`);
             } else {
                 console.error('❌ Navigation: 歌单删除失败', result.error);

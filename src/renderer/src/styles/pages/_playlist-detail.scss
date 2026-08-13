@@ -1283,11 +1283,6 @@
   }
 
   .tracks-table-body {
-    &.virtual-track-body {
-      position: relative;
-      width: 100%;
-    }
-
     .track-row {
       display: grid;
       grid-template-columns: 60px 1fr 200px 80px 120px;
@@ -1514,14 +1509,6 @@
           }
         }
       }
-    }
-
-    &.virtual-track-body .track-row {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      box-sizing: border-box;
     }
   }
 }

@@ -624,14 +624,9 @@ export class MusicBoxAPI extends EventEmitter {
                     // 更新API状态
                     await this.playbackStateSynchronizer.syncFromEngine({position: 0});
 
-                    // 手动切换时，onTrackChanged回调已经在nextTrack()内部被触发
-                    // 由于回调中会检查索引是否变化，这里的emit不会导致重复的trackIndexChanged
-                    // 但trackChanged会重复触发，这是可以接受的（UI更新是幂等的）
-                    this.emit('trackIndexChanged', this.currentIndex);
-                    this.emit('trackChanged', this.currentTrack);
+                    // 曲目和索引由音频引擎的 onTrackChanged 回调统一发布。
                     this.emit('durationChanged', this.duration);
                     this.publishPositionChanged(0, 'commit');
-                    this.emit('playbackStateChanged', this.isPlaying ? 'playing' : 'paused');
                     this.emitPlaybackStarted(this.currentTrack, true);
 
                     // 释放切换锁
@@ -693,11 +688,9 @@ export class MusicBoxAPI extends EventEmitter {
                     // 更新API状态
                     await this.playbackStateSynchronizer.syncFromEngine({position: 0});
 
-                    this.emit('trackIndexChanged', this.currentIndex);
-                    this.emit('trackChanged', this.currentTrack);
+                    // 曲目和索引由音频引擎的 onTrackChanged 回调统一发布。
                     this.emit('durationChanged', this.duration);
                     this.publishPositionChanged(0, 'commit');
-                    this.emit('playbackStateChanged', this.isPlaying ? 'playing' : 'paused');
                     this.emitPlaybackStarted(this.currentTrack, true);
 
                     // 释放切换锁
@@ -875,7 +868,7 @@ export class MusicBoxAPI extends EventEmitter {
         // 更新当前播放列表中的时长信息
         if (this.playlist && this.playlist.length > 0) {
             const track = this.playlist.find(t => t.filePath === filePath);
-            if (track) {
+            if (track && track.duration !== duration) {
                 track.duration = duration;
                 this.emit('playlistChanged', this.playlist);
             }

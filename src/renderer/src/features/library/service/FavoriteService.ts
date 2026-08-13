@@ -128,9 +128,13 @@ export class FavoriteService {
     private applyChangedData(data: FavoritesChangedData): void {
         const trackIds = [...new Set(data.trackIds.filter(Boolean))];
         if (typeof data.favorite === 'boolean') {
-            trackIds.forEach((trackId) => {
-                this.states.set(trackId, data.favorite as boolean);
-            });
+            const changedTrackIds = trackIds.filter((trackId) => this.states.get(trackId) !== data.favorite);
+            changedTrackIds.forEach((trackId) => this.states.set(trackId, data.favorite as boolean));
+            if (changedTrackIds.length === 0) {
+                return;
+            }
+            this.notify({trackIds: changedTrackIds, favorite: data.favorite});
+            return;
         }
         this.notify({trackIds, favorite: data.favorite});
     }

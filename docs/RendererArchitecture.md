@@ -41,6 +41,7 @@ src/renderer/src/features/
 
 src/renderer/src/ui/
   base/                    基础 Component
+  collections/             集合 Surface、主从宿主和生命周期类型
   pages/                   页面级组件
   widgets/                 播放器、导航、列表、歌词等常驻组件
   dialogs/                 轻量对话框
@@ -86,6 +87,8 @@ extensions -> public Extension API
 
 当新功能需要跨模块协作时，应优先在组合根注入一个明确端口，而不是在模块内部读取全局对象。
 
+共享 `#content-area` 不由页面直接覆盖。`ContentMountManager` 为核心视图分配稳定、隔离的挂载根，UI facade 只负责激活或隐藏；普通视图的像素滚动由 `MainContentScrollCoordinator` 按视图 key 保存，集合 Surface 管理的视图则由自身快照恢复。
+
 目录来源管理由 `FolderSourcesPage` 经 library feature service 调用类型化 Electron gateway；文件夹卡片只消费目录概览，不直接接触完整来源文件清单。双击卡片后，页面按来源 ID 延迟查询歌曲，并在 `folders` 路由内部复用 `TrackCollectionDetail` 展示详情，因此选择、播放、收藏和上下文菜单与艺术家、专辑详情保持一致，同时由页面 generation 防止过期查询回写。
 
 文件夹与歌单的反向绑定使用独立弹窗，并通过页面组件绑定层接入 Dialog facade，避免页面直接访问全局应用对象。“从文件夹创建歌单”同样复用标准 `CreatePlaylistDialog`，通过类型化 options 传递预填名称和来源上下文；创建动作服务先创建歌单，再调用现有来源绑定 API。普通创建和从歌曲创建歌单继续走同一弹窗，但不会携带来源上下文。
@@ -95,6 +98,22 @@ extensions -> public Extension API
 `app/runtime/MusicBoxApp.ts` 仍然暴露很多应用级方法，例如 `scanMusicFolder()`、`handleViewChange()`、`playTrackFromPlaylist()`。这些方法主要用于兼容旧 UI 绑定和插件调用，真实实现已经下沉到 `features/*`。
 
 新增代码不要继续扩大 `MusicBoxApp` 的职责，除非它是应用级 facade 必须暴露的兼容入口。
+
+## 集合页面生命周期
+
+艺术家、专辑、歌单、文件夹来源、最近播放和歌曲集合详情统一组合 `AdaptiveCollectionSurface`。Surface 以 50 个业务项目为边界：较小集合直接渲染，达到边界后使用虚拟渲染；页面只提供稳定项目 key、布局和项目模板，不自行计算虚拟行、总高度、`scrollMargin` 或 overscan。
+
+新增可能持续增长的集合页必须遵循以下约定：
+
+- 业务事件绑定在不会随项目更新而替换的页面根或集合根上，并通过事件委托解析当前项目；项目重绘和虚拟化器重建不得重复增加监听器。
+- 项目身份使用领域稳定 key。歌曲优先使用 `fileId`，其次使用规范化路径；数组下标只作为当前显示序号和回调参数，不能作为业务身份。
+- 封面只为 Surface 报告的已渲染项目调度。封面完成后更新模型并调用 `invalidateItem()`，不得为普通封面更新执行整页 `render()`。
+- 数据过滤、排序、添加和删除通过 `update()` 交给 Surface。页面不得根据 49/50 项边界维护两套渲染器或事件逻辑。
+- 页面隐藏或跨路由切换时使用 Surface 的 `suspend()` / `resume()` 快照；滚动恢复由 `MainContentScrollCoordinator` 按完整 location key 协调，过期恢复任务必须失效。
+
+拥有列表和详情两个位置的页面还必须使用 `MasterDetailViewHost` 保留稳定的 `listRoot` 与 `detailRoot`。进入详情、返回列表和路由恢复都通过 Host 切换 location；列表锚点由项目 key 快照恢复，详情滚动使用包含集合 identity 的 location key。找不到旧锚点或目标项目时应安全回退到像素位置，不能阻止正常导航。
+
+艺术家、专辑、歌单和文件夹的本地搜索复用 `CollectionSearch`，页面只声明可搜索字段；音乐库歌曲的全局异步搜索仍由 `LibraryAppController` 处理。
 
 ## Feature 模块约定
 
@@ -196,6 +215,8 @@ npm run lint
 - 是否放在 canonical 目录，而不是 deprecated `core/` / `services/`。
 - 是否通过 gateway 访问 preload API。
 - 是否把跨模块依赖显式注入到组合根或端口对象。
+- 可增长集合是否复用了 `AdaptiveCollectionSurface`，主从页面是否复用了 `MasterDetailViewHost`。
+- 集合事件是否绑定在稳定根，封面更新是否只失效对应项目。
 - 是否清理 DOM listener、API listener、timer、plugin disposable。
 - 是否运行 `npm run typecheck:renderer`。
 - 是否运行 `cd src/renderer && npm run lint`。

@@ -24,8 +24,8 @@ export function bindNavigationComponentEvents({
         await app.handlePlaylistSelected(playlist);
     });
 
-    components.navigation.on('playlistsChanged', async () => {
-        await components.playlistsPage?.refresh();
+    components.navigation.on('playlistsChanged', async (playlists: Playlist[]) => {
+        await components.playlistsPage?.refresh(playlists);
     });
 
     components.navigation.on('networkDriveSelected', async (drive: unknown) => {

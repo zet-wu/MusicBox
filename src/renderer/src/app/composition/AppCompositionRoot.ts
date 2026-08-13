@@ -35,6 +35,8 @@ import {trackCoverNetworkPreferenceService} from '@/features/settings/service';
 import {systemMediaKeysGateway} from '@/infrastructure/electron';
 import {appShellRuntimeHost} from '@/features/appShell/service';
 import type {AudioEngineManagerBridge} from '@/features/equalizer/service';
+import {ContentMountManager} from '@/app/runtime/components/ContentMountManager';
+import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
 
 interface AppCompositionRootOptions {
     app: MusicBoxCompositionHost;
@@ -74,10 +76,14 @@ export function createAppComposition({
 }: AppCompositionRootOptions): AppComposition {
     const hostPorts = createAppHostPorts(app);
     const componentPort = hostPorts.components;
-    const ui = createAppUIPorts(hostPorts.components);
+    const contentMounts = new ContentMountManager();
+    const mainContentScroll = new MainContentScrollCoordinator();
+    const ui = createAppUIPorts(hostPorts.components, contentMounts);
     const componentRegistry = new ComponentRegistry({
         components,
-        setupComponentEvents: (componentName: string) => app.setupComponentEvents(componentName)
+        setupComponentEvents: (componentName: string) => app.setupComponentEvents(componentName),
+        contentMounts,
+        mainContentScroll
     });
     const domEventBinder = new DOMEventBinder({
         app: hostPorts.domEvents,
@@ -89,6 +95,7 @@ export function createAppComposition({
         playbackUI: ui.playback
     });
     const shellView = new AppShellView({
+        contentMounts,
         onScanMusicFolder: () => app.scanMusicFolder(),
         onAddMusicFiles: () => app.addMusicFiles(),
         onShowHomePage: () => app.handleViewChange('home-page')
@@ -106,7 +113,11 @@ export function createAppComposition({
         components: componentPort,
         ui
     });
-    const viewRouter = new ViewRouter({app: hostPorts.viewRouter, content: ui.content});
+    const viewRouter = new ViewRouter({
+        app: hostPorts.viewRouter,
+        content: ui.content,
+        scroll: mainContentScroll
+    });
     const notifier = new AppNotifier(shellView);
     const desktopLyricsButtonSync = new DesktopLyricsButtonSync(ui.playback);
     const playbackQueueSyncService = new PlaybackQueueSyncService({
@@ -237,8 +248,7 @@ export function createAppComposition({
             showPlaylistDetail: (playlist) => ui.content.showPlaylistDetail(playlist),
             reloadPlaylistDetailTracks: () => ui.content.reloadPlaylistDetailTracks(),
             updatePlaylistDetailInfo: (playlist) => ui.content.updatePlaylistDetailInfo(playlist),
-            updateNavigationPlaylistInfo: (playlist) => ui.content.updateNavigationPlaylistInfo(playlist),
-            refreshNavigationPlaylists: () => ui.content.refreshNavigationPlaylists()
+            updateNavigationPlaylistInfo: (playlist) => ui.content.updateNavigationPlaylistInfo(playlist)
         }
     });
     const networkDriveRouteController = new NetworkDriveRouteController({
