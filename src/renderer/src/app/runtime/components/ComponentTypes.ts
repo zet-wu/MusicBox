@@ -73,8 +73,6 @@ export interface LyricsLike {
     isFullscreen?: boolean;
     show?: (track: Track | null) => Promise<void> | void;
     hide?: () => void;
-    updateProgress?: (position: number, duration: number) => void;
-    updatePlayButton?: (isPlaying: boolean) => void;
     exitFullscreen?: () => void;
     toggleFullscreen?: () => void;
 }

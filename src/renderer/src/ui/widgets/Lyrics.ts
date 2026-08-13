@@ -94,14 +94,6 @@ class Lyrics extends Component {
         await this.composition.togglePlayPause();
     }
 
-    updateProgress(currentTime: number, duration: number): void {
-        this.composition.updateProgress(currentTime, duration);
-    }
-
-    updatePlayButton(): void {
-        this.composition.updatePlayButton();
-    }
-
     formatTime(seconds: number): string {
         return formatTime(seconds);
     }

@@ -180,15 +180,6 @@ class LyricsWidgetComposition {
         await this.playbackControls.togglePlayPause();
     }
 
-    updateProgress(currentTime: number, duration: number): void {
-        this.playbackControls.updateProgress(currentTime, duration);
-    }
-
-    updatePlayButton(): void {
-        this.playbackControls.setPlaying(playbackUiStateService.getState().isPlaying);
-        this.renderController.setPlaying(playbackUiStateService.getState().isPlaying);
-    }
-
     async setVolume(volume: number): Promise<void> {
         await this.playbackControls.setVolume(volume);
     }

@@ -1,5 +1,4 @@
 import {appEventService} from "@/features/events/service/AppEventService";
-import {playbackUiStateService} from "@/features/playback/service/PlaybackUiStateService";
 import type {MusicBoxAPIEvents} from '@api/types/events';
 import type {APIEventBindingHost} from './AppRuntimePorts';
 import type {ManagedAPIListener} from '@/shared/types/AppContracts';
@@ -59,22 +58,6 @@ export class APIEventBinder {
 
         this.addManagedAPIEventListener('playModeChanged', (mode) => {
             this.playbackUI.updatePlayModeDisplay(mode);
-        });
-
-        this.addManagedAPIEventListener('trackChanged', async (track) => {
-            await this.playbackUI.showLyricsForTrack(track);
-        });
-
-        this.addManagedAPIEventListener('positionChanged', (position) => {
-            if (this.playbackUI.isLyricsVisible()) {
-                const currentTrack = playbackUiStateService.getCurrentTrackSnapshot();
-                const duration = currentTrack?.duration || playbackUiStateService.getDuration();
-                this.playbackUI.updateLyricsProgress(position, duration);
-            }
-        });
-
-        this.addManagedAPIEventListener('playbackStateChanged', (_state) => {
-            this.playbackUI.updateLyricsPlayButton();
         });
 
         this.addManagedAPIEventListener('scanProgress', (progress) => {
