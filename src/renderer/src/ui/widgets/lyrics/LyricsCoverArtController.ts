@@ -14,12 +14,14 @@ interface LyricsCoverArtElements {
 class LyricsCoverArtController {
     private readonly elements: LyricsCoverArtElements;
     private backgroundObjectUrl: string | null = null;
+    private updateGeneration = 0;
 
     constructor(elements: LyricsCoverArtElements) {
         this.elements = elements;
     }
 
     async updateCoverArt(track: LyricsCoverTrack): Promise<void> {
+        const generation = ++this.updateGeneration;
         this.elements.trackCover.src = 'assets/images/default-cover.svg';
         this.elements.trackCover.classList.add('loading');
         await this.setBackgroundImage(null);
@@ -28,6 +30,7 @@ class LyricsCoverArtController {
             let finalImageUrl: string | null = null;
             if (track.title && track.artist) {
                 const coverResult = await lyricsCoverArtService.loadTrackCover(track);
+                if (!this.isCurrentUpdate(generation)) return;
                 if (coverResult.success && coverResult.imageUrl) {
                     finalImageUrl = coverResult.imageUrl;
                 } else {
@@ -36,29 +39,40 @@ class LyricsCoverArtController {
             }
 
             if (finalImageUrl) {
-                await this.setCoverAndBackground(finalImageUrl);
+                await this.setCoverAndBackground(finalImageUrl, generation);
             }
         } catch (error) {
             console.error('❌ Lyrics: 封面更新失败:', error);
         } finally {
-            this.elements.trackCover.classList.remove('loading');
+            if (this.isCurrentUpdate(generation)) {
+                this.elements.trackCover.classList.remove('loading');
+            }
         }
     }
 
     destroy(): void {
+        this.updateGeneration++;
         this.setBackgroundImageUrl(null);
         this.elements.trackCover.src = 'assets/images/default-cover.svg';
         this.elements.trackCover.classList.remove('loading');
     }
 
-    private async setBackgroundImage(imageUrl: string | null): Promise<void> {
+    private async setBackgroundImage(imageUrl: string | null, generation?: number): Promise<void> {
         if (imageUrl) {
             try {
                 const processedUrl = await lyricsCoverArtService.normalizeImageUrl(imageUrl);
+                if (generation !== undefined && !this.isCurrentUpdate(generation)) {
+                    if (this.shouldOwnProcessedUrl(imageUrl, processedUrl)) {
+                        URL.revokeObjectURL(processedUrl as string);
+                    }
+                    return;
+                }
                 this.setBackgroundImageUrl(processedUrl, this.shouldOwnProcessedUrl(imageUrl, processedUrl));
             } catch (error) {
                 console.error('❌ Lyrics: 背景图片设置失败:', error);
-                this.setBackgroundImageUrl(null);
+                if (generation === undefined || this.isCurrentUpdate(generation)) {
+                    this.setBackgroundImageUrl(null);
+                }
             }
         } else {
             this.setBackgroundImageUrl(null);
@@ -86,19 +100,29 @@ class LyricsCoverArtController {
         return Boolean(processedUrl?.startsWith('blob:') && !originalUrl.startsWith('blob:'));
     }
 
-    private async setCoverAndBackground(imageUrl: string): Promise<void> {
+    private async setCoverAndBackground(imageUrl: string, generation: number): Promise<void> {
         try {
-            const success = await urlValidator.safeSetImageSrc(this.elements.trackCover, imageUrl);
-            if (!success) {
+            const success = await urlValidator.isValidUrl(imageUrl);
+            if (!this.isCurrentUpdate(generation)) return;
+
+            if (success) {
+                this.elements.trackCover.src = imageUrl;
+            } else {
                 this.elements.trackCover.src = 'assets/images/default-cover.svg';
             }
 
-            await this.setBackgroundImage(imageUrl);
+            if (!this.isCurrentUpdate(generation)) return;
+            await this.setBackgroundImage(imageUrl, generation);
         } catch (error) {
+            if (!this.isCurrentUpdate(generation)) return;
             console.error('❌ Lyrics: 封面和背景设置失败:', error);
             this.elements.trackCover.src = 'assets/images/default-cover.svg';
             await this.setBackgroundImage(null);
         }
+    }
+
+    private isCurrentUpdate(generation: number): boolean {
+        return generation === this.updateGeneration;
     }
 }
 

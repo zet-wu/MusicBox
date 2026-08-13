@@ -1,4 +1,4 @@
-import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
+import {getLyricsTrackIdentity, type LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 
 interface LyricsTrackInfoElements {
     trackTitle: HTMLElement;
@@ -17,8 +17,8 @@ class LyricsTrackInfoController {
     private readonly updateTrackDuration: (duration: number | undefined) => void;
     private readonly loadLyrics: (track: LyricsTrack) => Promise<void>;
     private readonly updateCoverArt: (track: LyricsTrack) => Promise<void>;
-    private lastTrackPath: string | null = null;
-    private updateInProgress = false;
+    private lastTrackIdentity: string | null = null;
+    private updateGeneration = 0;
     private pendingUpdatePromise: Promise<void> | null = null;
 
     constructor(options: LyricsTrackInfoControllerOptions) {
@@ -29,38 +29,36 @@ class LyricsTrackInfoController {
     }
 
     reset(): void {
-        this.lastTrackPath = null;
-        this.updateInProgress = false;
+        this.updateGeneration++;
+        this.lastTrackIdentity = null;
         this.pendingUpdatePromise = null;
     }
 
     async updateTrackInfo(track: LyricsTrack | null): Promise<void> {
         if (!track) return;
 
-        const trackPath = this.getTrackPath(track);
-
-        if (this.pendingUpdatePromise) {
+        const trackIdentity = getLyricsTrackIdentity(track);
+        if (this.lastTrackIdentity === trackIdentity && this.pendingUpdatePromise) {
             await this.pendingUpdatePromise;
-        }
-
-        if (this.lastTrackPath === trackPath || this.updateInProgress) {
             return;
         }
 
-        this.updateInProgress = true;
-        this.lastTrackPath = trackPath;
-        this.pendingUpdatePromise = this.doUpdateTrackInfo(track);
+        if (this.lastTrackIdentity === trackIdentity) {
+            return;
+        }
+
+        const generation = ++this.updateGeneration;
+        this.lastTrackIdentity = trackIdentity;
+        const updatePromise = this.doUpdateTrackInfo(track);
+        this.pendingUpdatePromise = updatePromise;
 
         try {
-            await this.pendingUpdatePromise;
+            await updatePromise;
         } finally {
-            this.pendingUpdatePromise = null;
-            this.updateInProgress = false;
+            if (generation === this.updateGeneration) {
+                this.pendingUpdatePromise = null;
+            }
         }
-    }
-
-    private getTrackPath(track: LyricsTrack): string {
-        return track.filePath || track.path || `${track.title}_${track.artist}`;
     }
 
     private async doUpdateTrackInfo(track: LyricsTrack): Promise<void> {
@@ -71,8 +69,10 @@ class LyricsTrackInfoController {
             this.elements.trackArtist.textContent = track.artist || '未知艺术家';
 
             this.updateTrackDuration(track.duration);
-            await this.loadLyrics(track);
-            await this.updateCoverArt(track);
+            await Promise.all([
+                this.loadLyrics(track),
+                this.updateCoverArt(track)
+            ]);
         } catch (error) {
             console.error('❌ Lyrics: 歌曲信息更新失败:', error);
             throw error;
