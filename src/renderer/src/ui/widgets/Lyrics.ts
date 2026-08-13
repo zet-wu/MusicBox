@@ -59,10 +59,7 @@ class Lyrics extends Component {
         if (track) {
             await this.updateTrackInfo(track);
         }
-
-        this.setTimeoutManaged(() => {
-            this.composition.elements.lyricsDisplay.scrollTop = 0;
-        }, 50);
+        this.composition.syncCurrentPlaybackState(true);
     }
 
     hide(): void {

@@ -54,8 +54,9 @@ class LyricsPlaybackControlsController {
         playbackUiStateService.syncStateFromRuntime();
         const playbackState = playbackUiStateService.getState();
         this.playbackButtons.setPlaying(playbackState.isPlaying);
-        await this.volumeController.setVolume(playbackState.volume * 100);
+        this.volumeController.setVolumeFromRuntime(playbackState.volume);
         this.playbackButtons.updatePlayModeDisplay(playbackState.playMode);
+        this.progressController.updateProgress(playbackState.position, playbackState.duration);
     }
 
     setPlaying(isPlaying: boolean): void {

@@ -5,7 +5,7 @@ import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 
 interface LyricsPlaybackStateControllerOptions {
     isVisible: () => boolean;
-    onPositionChanged: (position: number) => void;
+    onPositionChanged: (position: number, duration: number) => void;
     onPlaybackStateChanged: (isPlaying: boolean) => void;
     onDurationChanged: (duration: number) => void;
     onTrackChanged: (track: LyricsTrack | null) => Promise<void>;
@@ -15,7 +15,7 @@ interface LyricsPlaybackStateControllerOptions {
 
 class LyricsPlaybackStateController {
     private readonly isVisible: () => boolean;
-    private readonly onPositionChanged: (position: number) => void;
+    private readonly onPositionChanged: (position: number, duration: number) => void;
     private readonly onPlaybackStateChanged: (isPlaying: boolean) => void;
     private readonly onDurationChanged: (duration: number) => void;
     private readonly onTrackChanged: (track: LyricsTrack | null) => Promise<void>;
@@ -62,7 +62,7 @@ class LyricsPlaybackStateController {
     ): Promise<void> {
         switch (change.type) {
             case 'positionChanged':
-                this.onPositionChanged(state.position);
+                this.onPositionChanged(state.position, state.duration);
                 break;
 
             case 'playbackStateChanged':

@@ -7,6 +7,11 @@ interface LyricsRenderControllerOptions {
     seek: (time: number) => Promise<void>;
 }
 
+interface PlaybackPositionSyncOptions {
+    forceScroll?: boolean;
+    behavior?: 'instant' | 'smooth';
+}
+
 class LyricsRenderController {
     private readonly lyricsDisplay: HTMLElement;
     private readonly isVisible: () => boolean;
@@ -114,13 +119,13 @@ class LyricsRenderController {
         return spacer;
     }
 
-    handlePlaybackPositionChanged(position: number): void {
+    handlePlaybackPositionChanged(position: number, options: PlaybackPositionSyncOptions = {}): void {
         const updateResult = this.wordHighlightController.updatePlaybackPosition(position);
         if (updateResult.seeked) {
             this.resetWordHighlightStates(position);
         }
 
-        this.updateLyricHighlight(updateResult.position);
+        this.updateLyricHighlight(updateResult.position, options);
     }
 
     resetPlaybackPosition(): void {
@@ -138,7 +143,7 @@ class LyricsRenderController {
         this.currentLyricIndex = -1;
     }
 
-    private updateLyricHighlight(currentTime: number): void {
+    private updateLyricHighlight(currentTime: number, options: PlaybackPositionSyncOptions): void {
         if (!this.lyrics || this.lyrics.length === 0 || !this.isVisible()) {
             return;
         }
@@ -162,8 +167,8 @@ class LyricsRenderController {
                 if (currentLine) {
                     currentLine.classList.add('highlight');
 
-                    if (currentTime > 0 && this.currentLyricIndex >= 0) {
-                        this.scrollLineIntoView(currentLine);
+                    if (currentTime > 0 && (options.forceScroll || this.currentLyricIndex >= 0)) {
+                        this.scrollLineIntoView(currentLine, options.behavior ?? 'smooth');
                     }
                 }
             }
@@ -177,13 +182,19 @@ class LyricsRenderController {
         }
     }
 
-    private scrollLineIntoView(line: HTMLElement): void {
+    private scrollLineIntoView(line: HTMLElement, behavior: 'instant' | 'smooth'): void {
         const containerRect = this.lyricsDisplay.getBoundingClientRect();
         const lineRect = line.getBoundingClientRect();
         const lineCenter = lineRect.top - containerRect.top + this.lyricsDisplay.scrollTop + lineRect.height / 2;
         const targetScrollTop = lineCenter - this.lyricsDisplay.clientHeight / 2;
         const maxScrollTop = Math.max(0, this.lyricsDisplay.scrollHeight - this.lyricsDisplay.clientHeight);
         const clampedTarget = Math.max(0, Math.min(maxScrollTop, targetScrollTop));
+
+        if (behavior === 'instant') {
+            this.cancelScrollAnimation();
+            this.lyricsDisplay.scrollTop = clampedTarget;
+            return;
+        }
 
         this.animateScrollTop(clampedTarget);
     }

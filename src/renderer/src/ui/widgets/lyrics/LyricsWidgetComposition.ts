@@ -87,8 +87,9 @@ class LyricsWidgetComposition {
 
         this.playbackStateController = new LyricsPlaybackStateController({
             isVisible: this.isVisible,
-            onPositionChanged: (position) => {
+            onPositionChanged: (position, duration) => {
                 this.renderController.handlePlaybackPositionChanged(position);
+                this.playbackControls.updateProgress(position, duration);
             },
             onPlaybackStateChanged: (isPlaying) => {
                 this.playbackControls.setPlaying(isPlaying);
@@ -99,7 +100,7 @@ class LyricsWidgetComposition {
             },
             onTrackChanged: (track) => {
                 this.setCurrentTrack(track);
-                return this.updateTrackInfo(track);
+                return this.updateTrackAndPlaybackState(track);
             },
             onVolumeChanged: (volume) => {
                 this.playbackControls.setVolumeFromRuntime(volume);
@@ -165,6 +166,16 @@ class LyricsWidgetComposition {
         this.renderController.setPlaying(playbackUiStateService.getState().isPlaying);
     }
 
+    syncCurrentPlaybackState(forceScroll = false): void {
+        const state = playbackUiStateService.getState();
+        this.playbackControls.updateProgress(state.position, state.duration);
+        this.renderController.setPlaying(state.isPlaying);
+        this.renderController.handlePlaybackPositionChanged(state.position, {
+            forceScroll,
+            behavior: forceScroll ? 'instant' : 'smooth'
+        });
+    }
+
     async togglePlayPause(): Promise<void> {
         await this.playbackControls.togglePlayPause();
     }
@@ -208,6 +219,11 @@ class LyricsWidgetComposition {
 
     resetLayoutState(): void {
         this.layoutController.resetLayoutState();
+    }
+
+    private async updateTrackAndPlaybackState(track: LyricsTrack | null): Promise<void> {
+        await this.updateTrackInfo(track);
+        this.syncCurrentPlaybackState(true);
     }
 }
 
