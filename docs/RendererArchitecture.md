@@ -87,6 +87,8 @@ extensions -> public Extension API
 
 当新功能需要跨模块协作时，应优先在组合根注入一个明确端口，而不是在模块内部读取全局对象。
 
+共享 `#content-area` 不由页面直接覆盖。`ContentMountManager` 为核心视图分配稳定、隔离的挂载根，UI facade 只负责激活或隐藏；普通视图的像素滚动由 `MainContentScrollCoordinator` 按视图 key 保存，集合 Surface 管理的视图则由自身快照恢复。
+
 目录来源管理由 `FolderSourcesPage` 经 library feature service 调用类型化 Electron gateway；文件夹卡片只消费目录概览，不直接接触完整来源文件清单。双击卡片后，页面按来源 ID 延迟查询歌曲，并在 `folders` 路由内部复用 `TrackCollectionDetail` 展示详情，因此选择、播放、收藏和上下文菜单与艺术家、专辑详情保持一致，同时由页面 generation 防止过期查询回写。
 
 文件夹与歌单的反向绑定使用独立弹窗，并通过页面组件绑定层接入 Dialog facade，避免页面直接访问全局应用对象。“从文件夹创建歌单”同样复用标准 `CreatePlaylistDialog`，通过类型化 options 传递预填名称和来源上下文；创建动作服务先创建歌单，再调用现有来源绑定 API。普通创建和从歌曲创建歌单继续走同一弹窗，但不会携带来源上下文。
@@ -110,6 +112,8 @@ extensions -> public Extension API
 - 页面隐藏或跨路由切换时使用 Surface 的 `suspend()` / `resume()` 快照；滚动恢复由 `MainContentScrollCoordinator` 按完整 location key 协调，过期恢复任务必须失效。
 
 拥有列表和详情两个位置的页面还必须使用 `MasterDetailViewHost` 保留稳定的 `listRoot` 与 `detailRoot`。进入详情、返回列表和路由恢复都通过 Host 切换 location；列表锚点由项目 key 快照恢复，详情滚动使用包含集合 identity 的 location key。找不到旧锚点或目标项目时应安全回退到像素位置，不能阻止正常导航。
+
+艺术家、专辑、歌单和文件夹的本地搜索复用 `CollectionSearch`，页面只声明可搜索字段；音乐库歌曲的全局异步搜索仍由 `LibraryAppController` 处理。
 
 ## Feature 模块约定
 
