@@ -1,4 +1,5 @@
 import type {Track} from "@api/types/track";
+import {getLyricsSourcePicker} from '@/features/lyrics/ui/LyricsSourcePicker';
 
 interface ComponentEventSource {
     on(event: string, handler: (...args: any[]) => void | Promise<void>): void;
@@ -127,5 +128,9 @@ export function bindPlaybackComponentEvents({
 
     components.contextMenu.on('editInfo', async ({track, index}: ContextMenuPayload) => {
         await app.handleEditTrackInfo(track, index);
+    });
+
+    components.contextMenu.on('selectLyrics', async ({track}: ContextMenuPayload) => {
+        if (track) await getLyricsSourcePicker().open(track);
     });
 }

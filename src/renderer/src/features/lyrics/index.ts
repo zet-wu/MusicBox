@@ -12,3 +12,4 @@ export * from './service/defaultLyricsServices';
 export * from './sources/EmbeddedLyricsSource';
 export * from './sources/LocalLyricsSource';
 export * from './ui/AmllLyricsView';
+export * from './ui/LyricsSourcePicker';

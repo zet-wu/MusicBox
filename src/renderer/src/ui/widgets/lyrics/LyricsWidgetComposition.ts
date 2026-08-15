@@ -11,6 +11,8 @@ import type {PlayMode} from "@api/types/playback";
 import type {AddLyricsDomListener} from "@ui/widgets/lyrics/LyricsDomEvents";
 import type {LyricsElements} from "@ui/widgets/lyrics/LyricsElementRegistry";
 import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
+import type {LyricsDocument} from '@/features/lyrics/domain/types';
+import {getLyricsSourcePicker} from '@/features/lyrics/ui/LyricsSourcePicker';
 
 interface LyricsWidgetCompositionOptions {
     root: Element | null;
@@ -132,6 +134,11 @@ class LyricsWidgetComposition {
         this.addDomListener(this.elements.closeBtn, 'click', () => {
             this.onClose();
         });
+        this.addDomListener(this.elements.lyricsDisplay, 'contextmenu', event => {
+            event.preventDefault();
+            const track = this.getCurrentTrack();
+            if (track) void getLyricsSourcePicker().open(track);
+        });
 
         this.layoutController.bind();
         this.playbackControls.bind();
@@ -208,6 +215,11 @@ class LyricsWidgetComposition {
 
     resetLayoutState(): void {
         this.layoutController.resetLayoutState();
+    }
+
+    applyDocument(document: LyricsDocument): void {
+        this.lyricsView.setDocument(document, playbackUiStateService.getState().position);
+        this.syncCurrentPlaybackState(true);
     }
 
     private async updateTrackAndPlaybackState(track: LyricsTrack | null): Promise<void> {

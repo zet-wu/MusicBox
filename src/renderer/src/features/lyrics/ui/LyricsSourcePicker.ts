@@ -1,0 +1,374 @@
+import type {Track} from '@api/types/track';
+import {lyricsGateway} from '@/infrastructure/electron';
+import {getLyricsService, lyricsProviderRegistry, lyricsSearchService} from '../service/defaultLyricsServices';
+import {toTrackLyricsQuery} from '../service/LyricsService';
+import type {LyricsCandidate, LyricsDocument, TrackLyricsQuery} from '../domain/types';
+import type {ProviderSearchResult} from '../service/LyricsSearchService';
+
+type PickerTab = 'current' | 'embedded' | 'local' | string;
+
+export interface LyricsDocumentAppliedDetail {
+    trackId: string;
+    document: LyricsDocument;
+}
+
+export class LyricsSourcePicker {
+    private readonly root: HTMLElement;
+    private readonly tabs: HTMLElement;
+    private readonly content: HTMLElement;
+    private readonly preview: HTMLElement;
+    private readonly status: HTMLElement;
+    private track: Track | null = null;
+    private query: TrackLyricsQuery | null = null;
+    private activeTab: PickerTab = 'current';
+    private searchController: AbortController | null = null;
+    private previewController: AbortController | null = null;
+    private readonly searchResults = new Map<string, ProviderSearchResult>();
+    private readonly previewCache = new Map<string, LyricsDocument>();
+    private selectedCandidate: LyricsCandidate | null = null;
+
+    constructor() {
+        this.root = document.createElement('div');
+        this.root.className = 'lyrics-source-picker';
+        this.root.hidden = true;
+        this.root.innerHTML = `
+            <div class="lyrics-source-picker__backdrop" data-action="close"></div>
+            <section class="lyrics-source-picker__dialog" role="dialog" aria-modal="true" aria-label="选择歌词">
+                <header class="lyrics-source-picker__header">
+                    <div><h2>选择歌词</h2><p class="lyrics-source-picker__track"></p></div>
+                    <button type="button" data-action="close" aria-label="关闭">×</button>
+                </header>
+                <nav class="lyrics-source-picker__tabs" aria-label="歌词来源"></nav>
+                <div class="lyrics-source-picker__body">
+                    <div class="lyrics-source-picker__results"></div>
+                    <aside class="lyrics-source-picker__preview"><p>选择候选后预览</p></aside>
+                </div>
+                <footer class="lyrics-source-picker__footer">
+                    <span class="lyrics-source-picker__status"></span>
+                    <div>
+                        <button type="button" data-action="auto">重新自动匹配</button>
+                        <button type="button" data-action="clear">清除手动绑定</button>
+                        <button type="button" data-action="refresh">刷新当前来源</button>
+                        <button type="button" class="primary" data-action="apply" disabled>使用此歌词</button>
+                    </div>
+                </footer>
+            </section>`;
+        document.body.appendChild(this.root);
+        this.tabs = this.requireElement('.lyrics-source-picker__tabs');
+        this.content = this.requireElement('.lyrics-source-picker__results');
+        this.preview = this.requireElement('.lyrics-source-picker__preview');
+        this.status = this.requireElement('.lyrics-source-picker__status');
+        this.root.addEventListener('click', event => void this.handleClick(event));
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !this.root.hidden) this.close();
+        });
+    }
+
+    async open(track: Track): Promise<void> {
+        this.closeRequests();
+        this.track = track;
+        this.query = toTrackLyricsQuery(track);
+        this.activeTab = 'current';
+        this.selectedCandidate = null;
+        this.searchResults.clear();
+        this.previewCache.clear();
+        this.root.hidden = false;
+        this.requireElement('.lyrics-source-picker__track').textContent = `${track.title} · ${track.artist}`;
+        this.renderTabs();
+        await this.renderCurrent();
+        this.startProviderSearches();
+    }
+
+    close(): void {
+        this.closeRequests();
+        this.root.hidden = true;
+        this.track = null;
+        this.query = null;
+    }
+
+    destroy(): void {
+        this.close();
+        this.root.remove();
+    }
+
+    private startProviderSearches(): void {
+        if (!this.query) return;
+        this.searchController = new AbortController();
+        for (const provider of lyricsProviderRegistry.list()) {
+            this.searchResults.set(provider.id, {
+                providerId: provider.id,
+                displayName: provider.displayName,
+                state: 'loading',
+                candidates: []
+            });
+            void lyricsSearchService.searchProvider(provider.id, this.query, this.searchController.signal)
+                .then(result => {
+                    this.searchResults.set(provider.id, result);
+                    if (this.activeTab === provider.id) this.renderActiveTab();
+                })
+                .catch(() => undefined);
+        }
+    }
+
+    private renderTabs(): void {
+        const tabs = [
+            {id: 'current', label: '当前'},
+            {id: 'embedded', label: '内嵌'},
+            {id: 'local', label: '本地'},
+            ...lyricsProviderRegistry.list().map(provider => ({id: provider.id, label: provider.displayName}))
+        ];
+        this.tabs.replaceChildren(...tabs.map(tab => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.tab = tab.id;
+            button.textContent = tab.label;
+            button.classList.toggle('active', tab.id === this.activeTab);
+            return button;
+        }));
+    }
+
+    private async renderCurrent(): Promise<void> {
+        if (!this.query) return;
+        this.content.innerHTML = '<div class="lyrics-source-picker__loading">正在读取当前绑定...</div>';
+        const result = await lyricsGateway.getBinding(this.query.trackId);
+        if (!result.success || !result.binding) {
+            this.content.innerHTML = '<div class="lyrics-source-picker__empty">当前没有歌词绑定</div>';
+            return;
+        }
+        const source = result.binding.source;
+        const description = source.kind === 'provider'
+            ? `${source.providerId} · ${source.manuallySelected ? '手动选择' : '自动匹配'}`
+            : source.kind === 'local' ? `本地 · ${source.path}` : '音频内嵌';
+        this.content.innerHTML = `<article class="lyrics-candidate current"><strong>当前使用</strong><p></p><span class="badge">已绑定</span></article>`;
+        const paragraph = this.content.querySelector('p');
+        if (paragraph) paragraph.textContent = description;
+    }
+
+    private renderActiveTab(): void {
+        this.renderTabs();
+        this.setStatus('');
+        if (this.activeTab === 'current') {
+            void this.renderCurrent();
+            return;
+        }
+        if (this.activeTab === 'local' || this.activeTab === 'embedded') {
+            const label = this.activeTab === 'local' ? '本地外置歌词' : '音频内嵌歌词';
+            this.content.innerHTML = `<div class="lyrics-source-picker__empty">${label}会在“重新自动匹配”时参与匹配，并优先于在线来源。</div>`;
+            return;
+        }
+
+        const result = this.searchResults.get(this.activeTab);
+        if (!result || result.state === 'loading') {
+            this.content.innerHTML = '<div class="lyrics-source-picker__loading">正在搜索...</div>';
+            return;
+        }
+        if (result.state === 'error') {
+            this.content.innerHTML = `<div class="lyrics-source-picker__empty"><p></p><button type="button" data-action="retry">重试</button></div>`;
+            const paragraph = this.content.querySelector('p');
+            if (paragraph) paragraph.textContent = result.error ?? '搜索失败';
+            return;
+        }
+        if (result.candidates.length === 0) {
+            this.content.innerHTML = '<div class="lyrics-source-picker__empty">没有搜索到候选歌词</div>';
+            return;
+        }
+        this.content.replaceChildren(...result.candidates.map(candidate => this.createCandidateRow(candidate)));
+    }
+
+    private createCandidateRow(candidate: LyricsCandidate): HTMLElement {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'lyrics-candidate';
+        row.dataset.candidateId = candidate.candidateId;
+        const duration = candidate.durationMs ? formatDuration(candidate.durationMs) : '--:--';
+        row.innerHTML = `<strong></strong><p></p><div class="lyrics-candidate__badges"></div><span class="lyrics-candidate__score"></span>`;
+        row.querySelector('strong')!.textContent = candidate.title;
+        row.querySelector('p')!.textContent = `${candidate.artists.join(' / ') || '未知艺术家'} · ${candidate.album || '未知专辑'} · ${duration}`;
+        row.querySelector('.lyrics-candidate__score')!.textContent = `匹配度 ${candidate.matchScore}%`;
+        const badges = row.querySelector('.lyrics-candidate__badges')!;
+        const labels = [
+            candidate.capabilities?.wordTimed && '逐字',
+            candidate.capabilities?.translation && '翻译',
+            candidate.capabilities?.romanization && '音译',
+            candidate.capabilities?.ttml && 'TTML'
+        ].filter(Boolean) as string[];
+        labels.forEach(label => {
+            const badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.textContent = label;
+            badges.appendChild(badge);
+        });
+        return row;
+    }
+
+    private async selectCandidate(candidateId: string): Promise<void> {
+        const result = this.searchResults.get(this.activeTab);
+        const candidate = result?.candidates.find(item => item.candidateId === candidateId);
+        if (!candidate || !this.query) return;
+        this.selectedCandidate = candidate;
+        this.content.querySelectorAll('.lyrics-candidate').forEach(row => {
+            row.classList.toggle('selected', (row as HTMLElement).dataset.candidateId === candidateId);
+        });
+        this.getActionButton('apply').disabled = true;
+        this.preview.innerHTML = '<p>正在获取预览...</p>';
+
+        const cacheKey = `${candidate.providerId}:${candidate.candidateId}`;
+        let document = this.previewCache.get(cacheKey);
+        if (!document) {
+            this.previewController?.abort();
+            this.previewController = new AbortController();
+            try {
+                document = await getLyricsService().previewCandidate(this.query, candidate, this.previewController.signal);
+                this.previewCache.set(cacheKey, document);
+            } catch (error) {
+                if (!this.previewController.signal.aborted) {
+                    this.preview.textContent = error instanceof Error ? error.message : String(error);
+                }
+                return;
+            }
+        }
+        if (this.selectedCandidate !== candidate) return;
+        this.preview.replaceChildren(...document.render.lines.slice(0, 6).map(line => {
+            const block = documentNode('div', line.words.map(word => word.word).join(''));
+            if (line.translatedLyric) block.appendChild(documentNode('small', line.translatedLyric));
+            if (line.romanLyric) block.appendChild(documentNode('small', line.romanLyric));
+            return block;
+        }));
+        this.getActionButton('apply').disabled = false;
+    }
+
+    private async applySelected(): Promise<void> {
+        if (!this.query || !this.selectedCandidate) return;
+        this.getActionButton('apply').disabled = true;
+        this.setStatus('正在应用歌词...');
+        const controller = new AbortController();
+        try {
+            const result = await getLyricsService().applyCandidate(this.query, this.selectedCandidate, true, controller.signal);
+            if (!result.document) throw new Error(result.error ?? '应用歌词失败');
+            window.dispatchEvent(new CustomEvent<LyricsDocumentAppliedDetail>('lyrics:document-applied', {
+                detail: {trackId: this.query.trackId, document: result.document}
+            }));
+            this.setStatus('歌词已应用');
+            await this.renderCurrent();
+        } catch (error) {
+            this.setStatus(error instanceof Error ? error.message : String(error));
+            this.getActionButton('apply').disabled = false;
+        }
+    }
+
+    private async rerunAutomaticMatch(): Promise<void> {
+        if (!this.track || !this.query) return;
+        this.setStatus('正在重新匹配...');
+        await getLyricsService().clearBinding(this.track);
+        const controller = new AbortController();
+        const result = await getLyricsService().load(this.track, controller.signal);
+        if (result.document) {
+            window.dispatchEvent(new CustomEvent<LyricsDocumentAppliedDetail>('lyrics:document-applied', {
+                detail: {trackId: this.query.trackId, document: result.document}
+            }));
+            this.setStatus('自动匹配完成');
+            await this.renderCurrent();
+        } else {
+            this.setStatus(result.error ?? '未找到歌词');
+        }
+    }
+
+    private async clearBinding(): Promise<void> {
+        if (!this.track) return;
+        await getLyricsService().clearBinding(this.track);
+        this.setStatus('已清除绑定，外置歌词文件未被删除');
+        await this.renderCurrent();
+    }
+
+    private retryActiveProvider(): void {
+        if (!this.query || ['current', 'local', 'embedded'].includes(this.activeTab)) return;
+        const provider = lyricsProviderRegistry.get(this.activeTab);
+        if (!provider) return;
+        const controller = this.searchController ?? new AbortController();
+        this.searchController = controller;
+        this.searchResults.set(provider.id, {providerId: provider.id, displayName: provider.displayName, state: 'loading', candidates: []});
+        this.renderActiveTab();
+        void lyricsSearchService.searchProvider(provider.id, this.query, controller.signal).then(result => {
+            this.searchResults.set(provider.id, result);
+            this.renderActiveTab();
+        });
+    }
+
+    private async refreshCurrentSource(): Promise<void> {
+        if (!this.query) return;
+        if (this.activeTab !== 'current') {
+            this.retryActiveProvider();
+            return;
+        }
+        const result = await lyricsGateway.getBinding(this.query.trackId);
+        const source = result.binding?.source;
+        if (source?.kind === 'provider') {
+            this.activeTab = source.providerId;
+            this.renderActiveTab();
+            this.retryActiveProvider();
+            return;
+        }
+        await this.rerunAutomaticMatch();
+    }
+
+    private async handleClick(event: Event): Promise<void> {
+        const target = event.target as HTMLElement;
+        const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
+        if (action === 'close') this.close();
+        else if (action === 'apply') await this.applySelected();
+        else if (action === 'auto') await this.rerunAutomaticMatch();
+        else if (action === 'clear') await this.clearBinding();
+        else if (action === 'refresh') await this.refreshCurrentSource();
+        else if (action === 'retry') this.retryActiveProvider();
+
+        const tab = target.closest<HTMLElement>('[data-tab]')?.dataset.tab;
+        if (tab) {
+            this.activeTab = tab;
+            this.selectedCandidate = null;
+            this.getActionButton('apply').disabled = true;
+            this.preview.innerHTML = '<p>选择候选后预览</p>';
+            this.renderActiveTab();
+        }
+        const candidateId = target.closest<HTMLElement>('[data-candidate-id]')?.dataset.candidateId;
+        if (candidateId) await this.selectCandidate(candidateId);
+    }
+
+    private getActionButton(action: string): HTMLButtonElement {
+        return this.root.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!;
+    }
+
+    private setStatus(message: string): void {
+        this.status.textContent = message;
+    }
+
+    private closeRequests(): void {
+        this.searchController?.abort();
+        this.previewController?.abort();
+        this.searchController = null;
+        this.previewController = null;
+    }
+
+    private requireElement(selector: string): HTMLElement {
+        const element = this.root.querySelector<HTMLElement>(selector);
+        if (!element) throw new Error(`歌词选择器缺少元素: ${selector}`);
+        return element;
+    }
+}
+
+let picker: LyricsSourcePicker | null = null;
+
+export function getLyricsSourcePicker(): LyricsSourcePicker {
+    picker ??= new LyricsSourcePicker();
+    return picker;
+}
+
+function formatDuration(milliseconds: number): string {
+    const totalSeconds = Math.round(milliseconds / 1000);
+    return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+}
+
+function documentNode(tagName: string, text: string): HTMLElement {
+    const element = document.createElement(tagName);
+    element.textContent = text;
+    return element;
+}

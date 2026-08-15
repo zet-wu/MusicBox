@@ -103,6 +103,23 @@ export class LyricsService {
         return this.persist(query.trackId, document);
     }
 
+    async previewCandidate(
+        query: TrackLyricsQuery,
+        candidate: LyricsCandidate,
+        signal: AbortSignal
+    ): Promise<LyricsDocument> {
+        const provider = this.providers.get(candidate.providerId);
+        if (!provider) throw new Error('未知歌词来源');
+        const payload = await provider.fetch(candidate, signal);
+        const source: LyricsSourceRef = {
+            kind: 'provider',
+            providerId: candidate.providerId,
+            candidateId: candidate.candidateId,
+            manuallySelected: true
+        };
+        return this.normalizer.fromPayload(payload, this.createContext(query, source));
+    }
+
     async clearBinding(track: Track): Promise<void> {
         const result = await lyricsGateway.clearBinding(toTrackLyricsQuery(track).trackId);
         if (!result.success) throw new Error(result.error ?? '清除歌词绑定失败');

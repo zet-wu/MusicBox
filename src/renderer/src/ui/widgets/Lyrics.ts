@@ -7,6 +7,8 @@ import {formatTime} from "@/utils";
 import {LyricsWidgetComposition} from "@ui/widgets/lyrics/LyricsWidgetComposition";
 import type {PlayMode} from "@api/types/playback";
 import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
+import type {LyricsDocumentAppliedDetail} from '@/features/lyrics/ui/LyricsSourcePicker';
+import {toTrackLyricsQuery} from '@/features/lyrics/service/LyricsService';
 
 class Lyrics extends Component {
     public isVisible: boolean;
@@ -36,6 +38,11 @@ class Lyrics extends Component {
             onClose: () => {
                 this.hide();
             }
+        });
+        this.addEventListenerManaged(window, 'lyrics:document-applied', event => {
+            const detail = (event as CustomEvent<LyricsDocumentAppliedDetail>).detail;
+            if (!this.currentTrack || toTrackLyricsQuery(this.currentTrack).trackId !== detail.trackId) return;
+            this.composition.applyDocument(detail.document);
         });
     }
 
