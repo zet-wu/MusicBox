@@ -132,7 +132,9 @@ export class LyricsService {
         };
         return {
             document: this.normalizer.fromPayload(payload, this.createContext(query, source)),
-            format: payload.kind
+            format: payload.kind,
+            ...(payload.fallbackFrom ? {fallbackFrom: payload.fallbackFrom} : {}),
+            ...(payload.fallbackReason ? {fallbackReason: payload.fallbackReason} : {})
         };
     }
 

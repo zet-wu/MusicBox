@@ -166,7 +166,12 @@ export class KugouLyricsProvider implements LyricsProvider {
         const download = await fetchJson<KugouDownloadResponse>(this.request, downloadUrl.toString(), signal, {headers});
         if (!download.content) throw new Error('酷狗歌词内容为空');
         if (download.fmt?.toLowerCase() === 'lrc') {
-            return {kind: 'lrc', lyrics: new TextDecoder().decode(decodeBase64Bytes(download.content))};
+            return {
+                kind: 'lrc',
+                lyrics: new TextDecoder().decode(decodeBase64Bytes(download.content)),
+                fallbackFrom: 'krc',
+                fallbackReason: 'source-unavailable'
+            };
         }
         return {kind: 'krc', bytes: decodeBase64Bytes(download.content)};
     }

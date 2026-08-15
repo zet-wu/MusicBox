@@ -30,12 +30,18 @@ export interface LyricsCandidate {
     providerData?: unknown;
 }
 
-export type ProviderLyricsPayload =
+export interface LyricsPayloadFallback {
+    fallbackFrom?: 'ttml' | 'yrc' | 'qrc' | 'krc';
+    fallbackReason?: 'source-unavailable';
+}
+
+export type ProviderLyricsPayload = (
     | {kind: 'ttml'; ttml: string}
     | {kind: 'lrc'; lyrics: string; translation?: string; romanization?: string}
     | {kind: 'yrc'; lyrics: string; translation?: string; romanization?: string}
     | {kind: 'qrc'; lyrics: string; translation?: string; romanization?: string; romanizationQrc?: string}
-    | {kind: 'krc'; bytes: Uint8Array};
+    | {kind: 'krc'; bytes: Uint8Array}
+) & LyricsPayloadFallback;
 
 export type LyricsSourceRef =
     | {kind: 'local'; path: string}
@@ -57,6 +63,8 @@ export interface LyricsDocument {
 export interface LyricsCandidatePreview {
     document: LyricsDocument;
     format: ProviderLyricsPayload['kind'];
+    fallbackFrom?: LyricsPayloadFallback['fallbackFrom'];
+    fallbackReason?: LyricsPayloadFallback['fallbackReason'];
 }
 
 export interface NormalizeContext {

@@ -76,7 +76,9 @@ export class NeteaseLyricsProvider implements LyricsProvider {
                 kind: 'lrc',
                 lyrics: result.lrc.lyric,
                 translation: result.tlyric?.lyric,
-                romanization: result.romalrc?.lyric
+                romanization: result.romalrc?.lyric,
+                fallbackFrom: 'yrc',
+                fallbackReason: 'source-unavailable'
             };
         }
         throw new Error('网易云音乐候选不包含可用歌词');

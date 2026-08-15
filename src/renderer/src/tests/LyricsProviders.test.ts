@@ -85,19 +85,61 @@ describe('bundled lyrics providers', () => {
         expect(request).toHaveBeenCalledTimes(2);
     });
 
-    it('QQ 在 musicu 无结果时回退网页 LRC 接口', async () => {
+    it('QQ 仅在 musicu 成功响应无歌词时回退网页 LRC 接口', async () => {
         const request = vi.fn(async (input: RequestInfo | URL) => {
             const url = String(input);
             if (url.includes('client_search')) {
                 return jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}]}]}}});
             }
-            if (url.includes('musicu.fcg')) return jsonResponse({code: 0, req_0: {code: 1}});
+            if (url.includes('musicu.fcg')) return jsonResponse({code: 0, req_0: {code: 0, data: null}});
             return jsonResponse({lyric: '[00:00.000]Song'});
         });
         const provider = new QqMusicLyricsProvider(request);
         const candidates = await provider.search(query, new AbortController().signal);
         await expect(provider.fetch(candidates[0], new AbortController().signal))
-            .resolves.toMatchObject({kind: 'lrc', lyrics: '[00:00.000]Song'});
+            .resolves.toMatchObject({
+                kind: 'lrc',
+                lyrics: '[00:00.000]Song',
+                fallbackFrom: 'qrc',
+                fallbackReason: 'source-unavailable'
+            });
+    });
+
+    it('QQ musicu 业务错误重试后仍优先返回 QRC', async () => {
+        let musicuAttempts = 0;
+        const request = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes('client_search')) {
+                return jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}]}]}}});
+            }
+            musicuAttempts++;
+            return musicuAttempts === 1
+                ? jsonResponse({code: 0, req_0: {code: 24001}})
+                : jsonResponse({code: 0, req_0: {code: 0, data: {
+                    qrc: 1,
+                    lyric: toBase64('<LyricInfo LyricContent="[0,100]S(0,100)"/>')
+                }}});
+        });
+        const provider = new QqMusicLyricsProvider(request);
+        const signal = new AbortController().signal;
+        const candidates = await provider.search(query, signal);
+
+        await expect(provider.fetch(candidates[0], signal)).resolves.toMatchObject({kind: 'qrc'});
+        expect(musicuAttempts).toBe(2);
+        expect(request.mock.calls.some(call => String(call[0]).includes('fcg_query_lyric_new'))).toBe(false);
+    });
+
+    it('QQ musicu 持续受限时不伪装成 LRC 降级', async () => {
+        const request = vi.fn(async (input: RequestInfo | URL) => String(input).includes('client_search')
+            ? jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}]}]}}})
+            : jsonResponse({code: 0, req_0: {code: 24001}}));
+        const provider = new QqMusicLyricsProvider(request);
+        const signal = new AbortController().signal;
+        const candidates = await provider.search(query, signal);
+
+        await expect(provider.fetch(candidates[0], signal)).rejects.toThrow('24001');
+        expect(request).toHaveBeenCalledTimes(4);
+        expect(request.mock.calls.some(call => String(call[0]).includes('fcg_query_lyric_new'))).toBe(false);
     });
 
     it('酷狗分离 metadata search 与 KRC fetch', async () => {
