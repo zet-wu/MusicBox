@@ -116,6 +116,10 @@ export class LyricsService {
         return this.persist(query.trackId, document);
     }
 
+    async applyPreview(query: TrackLyricsQuery, preview: LyricsCandidatePreview): Promise<LyricsLoadResult> {
+        return this.persist(query.trackId, preview.document);
+    }
+
     async previewCandidate(
         query: TrackLyricsQuery,
         candidate: LyricsCandidate,

@@ -310,9 +310,10 @@ export class LyricsSourcePicker {
         if (!this.query || !this.selectedCandidate) return;
         this.getActionButton('apply').disabled = true;
         this.setStatus('正在应用歌词...');
-        const controller = new AbortController();
         try {
-            const result = await getLyricsService().applyCandidate(this.query, this.selectedCandidate, true, controller.signal);
+            const preview = this.previewCache.get(candidateKey(this.selectedCandidate));
+            if (!preview) throw new Error('候选预览已失效，请重新选择');
+            const result = await getLyricsService().applyPreview(this.query, preview);
             if (!result.document) throw new Error(result.error ?? '应用歌词失败');
             window.dispatchEvent(new CustomEvent<LyricsDocumentAppliedDetail>('lyrics:document-applied', {
                 detail: {trackId: this.query.trackId, document: result.document}
@@ -354,6 +355,9 @@ export class LyricsSourcePicker {
         const provider = lyricsProviderRegistry.get(this.activeTab);
         if (!provider) return;
         this.resetCandidateInspections();
+        this.selectedCandidate = null;
+        this.getActionButton('apply').disabled = true;
+        this.preview.innerHTML = '<p>选择候选后预览</p>';
         const controller = this.searchController ?? new AbortController();
         this.searchController = controller;
         this.searchResults.set(provider.id, {providerId: provider.id, displayName: provider.displayName, state: 'loading', candidates: []});

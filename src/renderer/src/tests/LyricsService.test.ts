@@ -112,6 +112,26 @@ describe('LyricsService', () => {
         expect(result).toEqual({document, format: 'qrc'});
     });
 
+    it('应用候选预览时直接保存已解析文档而不再请求来源', async () => {
+        const provider = {id: 'test', displayName: 'Test', search: vi.fn(), fetch: vi.fn()};
+        const registry = new LyricsProviderRegistry();
+        registry.register(provider);
+        const service = new LyricsService({
+            providers: registry,
+            localSource: {find: vi.fn()} as never,
+            normalizer: normalizer as never
+        });
+
+        const result = await service.applyPreview(
+            {trackId: 'track-1', title: 'Song', artists: ['Artist']},
+            {document, format: 'qrc'}
+        );
+
+        expect(result.document).toBe(document);
+        expect(provider.fetch).not.toHaveBeenCalled();
+        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source);
+    });
+
     it('高匹配在线逐字歌词优先于本地逐行歌词', async () => {
         gateway.readCanonical.mockResolvedValue({success: false});
         const localDocument = {

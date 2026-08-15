@@ -35,4 +35,12 @@ describe('describeLyricsCandidatePreview', () => {
     it('不使用搜索阶段的能力声明推测逐字歌词', () => {
         expect(describeLyricsCandidatePreview(preview(1, 'lrc'))).toEqual(['LRC', '逐行']);
     });
+
+    it('展示来源成功响应中的真实格式降级', () => {
+        const result = preview(1, 'lrc');
+        result.fallbackFrom = 'qrc';
+        result.fallbackReason = 'source-unavailable';
+
+        expect(describeLyricsCandidatePreview(result)).toEqual(['LRC', '逐行', '来源无 QRC']);
+    });
 });
