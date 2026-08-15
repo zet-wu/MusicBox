@@ -92,7 +92,7 @@ class LyricsGateway extends ElectronNamespaceAdapter<'lyrics'> {
                 status: number;
                 statusText: string;
                 body: string;
-                contentType: string;
+                headers: Record<string, string>;
             }>('providerRequest', requestId, String(input), {
                 method: init.method,
                 headers: headersToRecord(init.headers),
@@ -102,7 +102,7 @@ class LyricsGateway extends ElectronNamespaceAdapter<'lyrics'> {
             return new Response(result.body, {
                 status: result.status,
                 statusText: result.statusText,
-                headers: {'Content-Type': result.contentType}
+                headers: result.headers ?? {}
             });
         } finally {
             signal?.removeEventListener('abort', cancel);

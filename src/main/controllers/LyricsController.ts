@@ -99,7 +99,10 @@ export class LyricsController extends BaseController {
                 status: response.status,
                 statusText: response.statusText,
                 body,
-                contentType: response.headers.get('content-type') ?? 'text/plain'
+                headers: {
+                    'content-type': response.headers.get('content-type') ?? 'text/plain',
+                    ...(response.headers.get('retry-after') ? {'retry-after': response.headers.get('retry-after')!} : {})
+                }
             };
         } finally {
             this.providerRequests.delete(requestId);

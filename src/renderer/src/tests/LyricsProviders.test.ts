@@ -137,6 +137,6 @@ describe('bundled lyrics providers', () => {
         const candidates = await provider.search(query, new AbortController().signal);
 
         expect(candidates[0].providerData).toMatchObject({hash: 'fallback'});
-        expect(request).toHaveBeenCalledTimes(2);
+        expect(request).toHaveBeenCalledTimes(4);
     });
 });
