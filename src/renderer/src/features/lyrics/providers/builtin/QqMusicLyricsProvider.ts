@@ -5,6 +5,7 @@ import {decodeBase64Text, fetchJson, providerFetch, rankProviderCandidates, type
 
 interface QqSong {
     songmid: string;
+    songid?: number;
     songname: string;
     singer?: Array<{name: string}>;
     albumname?: string;
@@ -22,6 +23,16 @@ interface QqLyricResponse {
     roma?: string;
 }
 
+interface QqMusicuResponse {
+    code?: number;
+    req_0?: {code?: number; data?: QqLyricResponse};
+}
+
+interface QqProviderData {
+    songmid: string;
+    songid?: number;
+}
+
 export class QqMusicLyricsProvider implements LyricsProvider {
     readonly id = 'qqmusic';
     readonly displayName = 'QQ 音乐';
@@ -30,9 +41,24 @@ export class QqMusicLyricsProvider implements LyricsProvider {
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
         const url = new URL('https://c.y.qq.com/soso/fcgi-bin/client_search_cp');
-        url.search = new URLSearchParams({format: 'json', p: '1', n: '20', w: query.title}).toString();
+        url.search = new URLSearchParams({
+            format: 'json',
+            outCharset: 'utf-8',
+            ct: '24',
+            qqmusic_ver: '1298',
+            remoteplace: 'txt.yqq.song',
+            t: '0',
+            aggr: '1',
+            cr: '1',
+            lossless: '0',
+            flag_qc: '0',
+            platform: 'yqq.json',
+            w: [query.title, ...query.artists].join(' '),
+            p: '1',
+            n: '20'
+        }).toString();
         const response = await fetchJson<QqSearchResponse>(this.request, url.toString(), signal, {
-            headers: {Accept: 'application/json'}
+            headers: qqHeaders('https://y.qq.com/')
         });
 
         return rankProviderCandidates(query, (response.data?.song?.list ?? []).map(song => ({
@@ -43,38 +69,97 @@ export class QqMusicLyricsProvider implements LyricsProvider {
             album: song.albumname,
             durationMs: song.interval ? song.interval * 1000 : undefined,
             capabilities: {lineTimed: true, wordTimed: true, translation: true, romanization: true},
-            providerData: {songmid: song.songmid}
+            providerData: {songmid: song.songmid, songid: song.songid} satisfies QqProviderData
         })));
     }
 
     async fetch(candidate: LyricsCandidate, signal: AbortSignal): Promise<ProviderLyricsPayload> {
-        const songmid = (candidate.providerData as {songmid?: string} | undefined)?.songmid ?? candidate.candidateId;
-        const url = new URL('https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg');
-        url.search = new URLSearchParams({songmid, format: 'json', nobase64: '0'}).toString();
-        const result = await fetchJson<QqLyricResponse>(this.request, url.toString(), signal, {
-            headers: {Accept: 'application/json'}
-        });
-        const translation = decodeOptional(result.trans);
-        const romanization = decodeOptional(result.roma);
+        const data = candidate.providerData as QqProviderData | undefined;
+        const songmid = data?.songmid ?? candidate.candidateId;
+        let musicu: QqLyricResponse | null = null;
+        try {
+            musicu = await this.fetchMusicu(songmid, data?.songid, signal);
+        } catch (error) {
+            if (signal.aborted) throw error;
+            console.warn('⚠️ Lyrics: QQ musicu 歌词请求失败，尝试网页接口', error);
+        }
+        if (musicu) return toQqPayload(musicu);
 
-        if (result.qrc) {
-            const decoded = decodeOptional(result.qrc) ?? result.qrc;
-            return {kind: 'qrc', lyrics: normalizeQrc(decoded), translation, romanization};
-        }
-        if (result.lyric) {
-            return {kind: 'lrc', lyrics: decodeOptional(result.lyric) ?? result.lyric, translation, romanization};
-        }
-        throw new Error('QQ 音乐候选不包含可用歌词');
+        const url = new URL('https://i.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg');
+        url.search = new URLSearchParams({
+            songmid,
+            g_tk: '5381',
+            format: 'json',
+            inCharset: 'utf8',
+            outCharset: 'utf-8',
+            notice: '0',
+            platform: 'yqq.json',
+            needNewCode: '0',
+            nobase64: '1'
+        }).toString();
+        const result = await fetchJson<QqLyricResponse>(this.request, url.toString(), signal, {
+            headers: qqHeaders('https://y.qq.com/')
+        });
+        return toQqPayload(result);
+    }
+
+    private async fetchMusicu(songmid: string, songid: number | undefined, signal: AbortSignal): Promise<QqLyricResponse | null> {
+        const body = {
+            req_0: {
+                module: 'music.musichallSong.PlayLyricInfo',
+                method: 'GetPlayLyricInfo',
+                param: {
+                    songMID: songmid,
+                    songID: songid ?? 0,
+                    trans_t: 1,
+                    roma_t: 1,
+                    qrc_t: 1,
+                    crypt: 1,
+                    lrc_t: 1,
+                    interval: 0
+                }
+            },
+            loginUin: '0',
+            comm: {uin: '0', format: 'json', ct: 24, cv: 0}
+        };
+        const response = await fetchJson<QqMusicuResponse>(this.request, 'https://u.y.qq.com/cgi-bin/musicu.fcg', signal, {
+            method: 'POST',
+            headers: {...qqHeaders('https://y.qq.com/portal/player.html'), 'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        return response.code === 0 && response.req_0?.code === 0 ? response.req_0.data ?? null : null;
     }
 }
 
-function decodeOptional(value: string | undefined): string | undefined {
+function decodeQqText(value: string | undefined): string | undefined {
     if (!value) return undefined;
+    const trimmed = value.trim();
+    if (/^[0-9a-f]+$/i.test(trimmed)) return decryptQrcHex(trimmed);
+    if (trimmed.startsWith('[') || trimmed.startsWith('<')) return trimmed;
     try {
-        return decodeBase64Text(value);
+        return decodeBase64Text(trimmed);
     } catch {
-        return value;
+        return trimmed;
     }
+}
+
+function toQqPayload(result: QqLyricResponse): ProviderLyricsPayload {
+    const translation = decodeQqText(result.trans);
+    const romanization = decodeQqText(result.roma);
+    const decoded = decodeQqText(result.qrc) ?? decodeQqText(result.lyric);
+    if (!decoded?.trim()) throw new Error('QQ 音乐候选不包含可用歌词');
+    const lyrics = normalizeQrc(decoded);
+    return looksLikeQrc(lyrics)
+        ? {kind: 'qrc', lyrics, translation, romanization}
+        : {kind: 'lrc', lyrics, translation, romanization};
+}
+
+function looksLikeQrc(value: string): boolean {
+    return /^\[\d+,\d+\].*\(\d+,\d+\)/m.test(value);
+}
+
+function qqHeaders(referer: string): Record<string, string> {
+    return {Accept: 'application/json', Referer: referer, Origin: 'https://y.qq.com'};
 }
 
 function normalizeQrc(value: string): string {
