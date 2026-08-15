@@ -15,6 +15,9 @@
     "build:css": "sass src/styles/main.scss public/styles/main.css --style=compressed"
   },
   "dependencies": {
+    "@applemusic-like-lyrics/core": "0.5.2",
+    "@applemusic-like-lyrics/lyric": "1.0.2",
+    "@applemusic-like-lyrics/ttml": "1.0.1",
     "@tanstack/virtual-core": "3.17.7",
     "dayjs": "^1.11.7",
     "fuse.js": "^6.6.2",
