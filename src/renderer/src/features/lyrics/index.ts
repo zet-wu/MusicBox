@@ -6,3 +6,7 @@ export * from './format/TtmlDocumentService';
 export * from './providers/LyricsProvider';
 export * from './providers/LyricsProviderRegistry';
 export * from './providers/builtin';
+export * from './service/LyricsSearchService';
+export * from './service/LyricsService';
+export * from './sources/EmbeddedLyricsSource';
+export * from './sources/LocalLyricsSource';
