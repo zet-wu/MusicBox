@@ -392,6 +392,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.invoke('lyrics:searchLocalFiles', lyricsDir, title, artist, album, extension),
         saveToLocal: (lyricsDir: string, title: string, artist: string, album: string, content: string, format: string) =>
             ipcRenderer.invoke('lyrics:saveToLocal', lyricsDir, title, artist, album, content, format),
+        readCanonical: (trackId: string) => ipcRenderer.invoke('lyrics:readCanonical', trackId),
+        getBinding: (trackId: string) => ipcRenderer.invoke('lyrics:getBinding', trackId),
+        saveCanonical: (trackId: string, ttml: string, source: unknown) =>
+            ipcRenderer.invoke('lyrics:saveCanonical', trackId, ttml, source),
+        clearBinding: (trackId: string) => ipcRenderer.invoke('lyrics:clearBinding', trackId),
 
         // 内嵌歌词
         getEmbedded: (filePath: string) => ipcRenderer.invoke('lyrics:getEmbedded', filePath),

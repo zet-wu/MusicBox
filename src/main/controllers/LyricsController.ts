@@ -6,6 +6,10 @@ import {BaseController, Controller, IpcHandle} from '../decorators/IpcHandler';
 import {extractEmbeddedLyrics, getMimeTypeFromExtension} from '../utils/metadata';
 import {generateLyricsSearchPatterns, findBestLyricsMatch} from '../utils/FileSearch';
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
+import {
+    LyricsPersistenceService,
+    type PersistedLyricsSource
+} from '../services/lyrics/LyricsPersistenceService';
 
 interface DirCache {
     files: string[];
@@ -18,8 +22,49 @@ const DIR_CACHE_TTL = 60_000; // 60 秒
 export class LyricsController extends BaseController {
     private dirCache = new Map<string, DirCache>();
 
-    constructor(private networkFileAdapter: NetworkFileAdapter) {
+    constructor(
+        private networkFileAdapter: NetworkFileAdapter,
+        private lyricsPersistence: LyricsPersistenceService
+    ) {
         super();
+    }
+
+    @IpcHandle('lyrics:readCanonical')
+    async readCanonical(trackId: string) {
+        try {
+            const result = await this.lyricsPersistence.read(trackId);
+            return result ? {success: true, ...result} : {success: false, error: '未找到已绑定歌词'};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('lyrics:getBinding')
+    async getBinding(trackId: string) {
+        try {
+            return {success: true, binding: await this.lyricsPersistence.getBinding(trackId)};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('lyrics:saveCanonical')
+    async saveCanonical(trackId: string, ttml: string, source: PersistedLyricsSource) {
+        try {
+            const binding = await this.lyricsPersistence.save(trackId, ttml, source);
+            return {success: true, binding};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('lyrics:clearBinding')
+    async clearBinding(trackId: string) {
+        try {
+            return {success: true, cleared: await this.lyricsPersistence.clearBinding(trackId)};
+        } catch (error: any) {
+            return {success: false, error: error.message};
+        }
     }
 
     private async getCachedDir(lyricsDir: string): Promise<string[]> {

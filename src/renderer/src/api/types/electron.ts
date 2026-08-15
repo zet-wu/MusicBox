@@ -1,6 +1,7 @@
 import type {Result, Unsubscribe} from './common';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from './library';
 import type {LyricLine} from './lyrics';
+import type {LyricsBinding, LyricsSourceRef} from '@/features/lyrics/domain/types';
 import type {DesktopLyricsPlaybackState} from './playback';
 import type {DesktopLyricsSettings, MusicBoxSettings, WasapiShareMode} from './settings';
 import type {CacheValidationResult, ScanProgress} from './events';
@@ -284,6 +285,19 @@ export interface ElectronLyricsAPI {
         content: string,
         format: string
     ): Promise<{success: boolean; filePath?: string; fileName?: string; error?: string}>;
+    readCanonical(trackId: string): Promise<{
+        success: boolean;
+        binding?: LyricsBinding;
+        ttml?: string;
+        error?: string;
+    }>;
+    getBinding(trackId: string): Promise<{success: boolean; binding?: LyricsBinding | null; error?: string}>;
+    saveCanonical(
+        trackId: string,
+        ttml: string,
+        source: LyricsSourceRef
+    ): Promise<{success: boolean; binding?: LyricsBinding; error?: string}>;
+    clearBinding(trackId: string): Promise<{success: boolean; cleared?: boolean; error?: string}>;
     getEmbedded(filePath: string): Promise<{success: boolean; lyrics?: EmbeddedLyricsData; source?: string; error?: string}>;
 }
 
