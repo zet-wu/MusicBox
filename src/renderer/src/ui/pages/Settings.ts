@@ -177,8 +177,8 @@ class Settings extends Component {
 
         // 歌词颜色设置
         this.lyricsColorMode = this.element.querySelector('#lyrics-color-mode');
-        this.lyricsTextColor = this.element.querySelector('#lyrics-text-color');
-        this.lyricsTextColorValue = this.element.querySelector('#lyrics-text-color-value');
+        this.lyricsColor = this.element.querySelector('#lyrics-color');
+        this.lyricsColorValue = this.element.querySelector('#lyrics-color-value');
         this.lyricsShowTranslation = this.element.querySelector('#lyrics-show-translation');
         this.lyricsShowRomanization = this.element.querySelector('#lyrics-show-romanization');
         this.lyricsShowRuby = this.element.querySelector('#lyrics-show-ruby');
@@ -696,8 +696,8 @@ class Settings extends Component {
             cacheStatsDescription: this.cacheStatsDescription,
             testEmbeddedLyricsButton: this.testEmbeddedLyricsBtn,
             lyricsColorModeSelect: this.lyricsColorMode,
-            lyricsTextColorInput: this.lyricsTextColor,
-            lyricsTextColorValue: this.lyricsTextColorValue,
+            lyricsColorInput: this.lyricsColor,
+            lyricsColorValue: this.lyricsColorValue,
             lyricsShowTranslationToggle: this.lyricsShowTranslation,
             lyricsShowRomanizationToggle: this.lyricsShowRomanization,
             lyricsShowRubyToggle: this.lyricsShowRuby

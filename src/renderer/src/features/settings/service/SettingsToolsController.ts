@@ -25,8 +25,8 @@ export interface SettingsToolsElements {
     cacheStatsDescription: HTMLElement | null;
     testEmbeddedLyricsButton: HTMLButtonElement | null;
     lyricsColorModeSelect: HTMLSelectElement | null;
-    lyricsTextColorInput: HTMLInputElement | null;
-    lyricsTextColorValue: HTMLElement | null;
+    lyricsColorInput: HTMLInputElement | null;
+    lyricsColorValue: HTMLElement | null;
     lyricsShowTranslationToggle: HTMLInputElement | null;
     lyricsShowRomanizationToggle: HTMLInputElement | null;
     lyricsShowRubyToggle: HTMLInputElement | null;
@@ -266,16 +266,16 @@ class SettingsToolsController {
     private bindLyricsAppearanceEvents(elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks, scope: SettingsListenerScope): void {
         scope.listen(elements.lyricsColorModeSelect, 'change', () => {
             const mode = elements.lyricsColorModeSelect?.value === 'custom' ? 'custom' : 'auto';
-            const textColor = elements.lyricsTextColorInput?.value || '#335eea';
+            const textColor = elements.lyricsColorInput?.value || '#335eea';
             callbacks.updateSetting('lyricsColorMode', mode);
             lyricsAppearanceSettingsRenderer.updateAvailability(this.toLyricsAppearanceElements(elements), mode);
             lyricsAppearanceSettingsService.applyTextColor({colorMode: mode, textColor});
         });
 
-        scope.listen(elements.lyricsTextColorInput, 'input', () => {
-            const color = elements.lyricsTextColorInput?.value || '#335eea';
+        scope.listen(elements.lyricsColorInput, 'input', () => {
+            const color = elements.lyricsColorInput?.value || '#335eea';
             lyricsAppearanceSettingsRenderer.updateTextColor(this.toLyricsAppearanceElements(elements), color);
-            callbacks.updateSetting('lyricsTextColor', color);
+            callbacks.updateSetting('lyricsColor', color);
             this.applyCustomLyricsColor(elements);
         });
 
@@ -287,7 +287,7 @@ class SettingsToolsController {
     private applyCustomLyricsColor(elements: SettingsToolsElements): void {
         lyricsAppearanceSettingsService.applyTextColor({
             colorMode: 'custom',
-            textColor: elements.lyricsTextColorInput?.value || '#335eea'
+            textColor: elements.lyricsColorInput?.value || '#335eea'
         });
     }
 
@@ -329,8 +329,8 @@ class SettingsToolsController {
     private toLyricsAppearanceElements(elements: SettingsToolsElements) {
         return {
             colorModeSelect: elements.lyricsColorModeSelect,
-            textColorInput: elements.lyricsTextColorInput,
-            textColorValue: elements.lyricsTextColorValue,
+            textColorInput: elements.lyricsColorInput,
+            textColorValue: elements.lyricsColorValue,
             showTranslationToggle: elements.lyricsShowTranslationToggle,
             showRomanizationToggle: elements.lyricsShowRomanizationToggle,
             showRubyToggle: elements.lyricsShowRubyToggle

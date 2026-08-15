@@ -14,13 +14,7 @@ class LyricsAppearanceSettingsService {
     getSettings(settings: MusicBoxSettings): LyricsAppearanceSettings {
         return {
             colorMode: settings.lyricsColorMode === 'custom' ? 'custom' : 'auto',
-            textColor: typeof settings.lyricsTextColor === 'string'
-                ? settings.lyricsTextColor
-                : typeof settings.lyricsSungColor === 'string'
-                    ? settings.lyricsSungColor
-                    : typeof settings.lyricsHighlightColor === 'string'
-                        ? settings.lyricsHighlightColor
-                        : '#335eea',
+            textColor: typeof settings.lyricsColor === 'string' ? settings.lyricsColor : '#335eea',
             showTranslation: settings.lyricsShowTranslation !== false,
             showRomanization: settings.lyricsShowRomanization !== false,
             showRuby: settings.lyricsShowRuby !== false

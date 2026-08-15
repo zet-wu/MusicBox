@@ -9,7 +9,7 @@ describe('LyricsAppearanceSettingsService', () => {
     it('读取单色设置', () => {
         const settings = lyricsAppearanceSettingsService.getSettings({
             lyricsColorMode: 'custom',
-            lyricsTextColor: '#123456'
+            lyricsColor: '#123456'
         });
 
         expect(settings).toMatchObject({
@@ -42,15 +42,5 @@ describe('LyricsAppearanceSettingsService', () => {
         });
 
         expect(document.documentElement.style.getPropertyValue('--lyrics-text-color')).toBe('');
-    });
-
-    it('将上一版已唱颜色迁移为单色设置', () => {
-        const settings = lyricsAppearanceSettingsService.getSettings({
-            lyricsColorMode: 'custom',
-            lyricsSungColor: '#abcdef',
-            lyricsUnsungColor: '#123456'
-        });
-
-        expect(settings.textColor).toBe('#abcdef');
     });
 });
