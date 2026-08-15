@@ -175,13 +175,10 @@ class Settings extends Component {
         // 开发者工具按钮
         this.developerToolsBtn = this.element.querySelector('#developer-tools');
 
-        // 歌词高亮透明度设置
-        this.lyricsHighlightOpacitySlider = this.element.querySelector('#lyrics-highlight-opacity-slider');
-        this.lyricsHighlightOpacityValue = this.element.querySelector('#lyrics-highlight-opacity-value');
-
-        // 歌词高亮颜色设置
-        this.lyricsHighlightColor = this.element.querySelector('#lyrics-highlight-color');
-        this.lyricsHighlightColorValue = this.element.querySelector('#lyrics-highlight-color-value');
+        // 歌词颜色设置
+        this.lyricsColorMode = this.element.querySelector('#lyrics-color-mode');
+        this.lyricsTextColor = this.element.querySelector('#lyrics-text-color');
+        this.lyricsTextColorValue = this.element.querySelector('#lyrics-text-color-value');
 
         // 桌面歌词设置元素
         this.dlDisplayModeSelect = this.element.querySelector('#dl-display-mode-select');
@@ -695,10 +692,9 @@ class Settings extends Component {
             clearCoverCacheButton: this.clearCoverCacheBtn,
             cacheStatsDescription: this.cacheStatsDescription,
             testEmbeddedLyricsButton: this.testEmbeddedLyricsBtn,
-            lyricsHighlightOpacitySlider: this.lyricsHighlightOpacitySlider,
-            lyricsHighlightOpacityValue: this.lyricsHighlightOpacityValue,
-            lyricsHighlightColorInput: this.lyricsHighlightColor,
-            lyricsHighlightColorValue: this.lyricsHighlightColorValue
+            lyricsColorModeSelect: this.lyricsColorMode,
+            lyricsTextColorInput: this.lyricsTextColor,
+            lyricsTextColorValue: this.lyricsTextColorValue
         };
     }
 

@@ -24,10 +24,9 @@ export interface SettingsToolsElements {
     clearCoverCacheButton: HTMLButtonElement | null;
     cacheStatsDescription: HTMLElement | null;
     testEmbeddedLyricsButton: HTMLButtonElement | null;
-    lyricsHighlightOpacitySlider: HTMLInputElement | null;
-    lyricsHighlightOpacityValue: HTMLElement | null;
-    lyricsHighlightColorInput: HTMLInputElement | null;
-    lyricsHighlightColorValue: HTMLElement | null;
+    lyricsColorModeSelect: HTMLSelectElement | null;
+    lyricsTextColorInput: HTMLInputElement | null;
+    lyricsTextColorValue: HTMLElement | null;
 }
 
 interface SettingsToolsCallbacks {
@@ -43,11 +42,10 @@ class SettingsToolsController {
         this.bindLyricsAppearanceEvents(elements, callbacks, scope);
     }
 
-    initializeLyricsAppearance(settings: MusicBoxSettings, elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks): void {
+    initializeLyricsAppearance(settings: MusicBoxSettings, elements: SettingsToolsElements, _callbacks: SettingsToolsCallbacks): void {
         const lyricsAppearanceSettings = lyricsAppearanceSettingsService.getSettings(settings);
         lyricsAppearanceSettingsRenderer.initialize(this.toLyricsAppearanceElements(elements), lyricsAppearanceSettings);
-        this.applyLyricsHighlightOpacity(lyricsAppearanceSettings.highlightOpacity, callbacks);
-        this.applyLyricsHighlightColor(lyricsAppearanceSettings.highlightColor);
+        lyricsAppearanceSettingsService.applyTextColor(lyricsAppearanceSettings);
     }
 
     initializeLyricsDirectory(settings: MusicBoxSettings, elements: SettingsToolsElements): void {
@@ -263,28 +261,20 @@ class SettingsToolsController {
     }
 
     private bindLyricsAppearanceEvents(elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks, scope: SettingsListenerScope): void {
-        scope.listen(elements.lyricsHighlightOpacitySlider, 'input', () => {
-            const value = parseFloat(elements.lyricsHighlightOpacitySlider?.value || '1');
-            lyricsAppearanceSettingsRenderer.updateOpacity(this.toLyricsAppearanceElements(elements), value);
-            callbacks.updateSetting('lyricsHighlightOpacity', value);
-            this.applyLyricsHighlightOpacity(value, callbacks);
+        scope.listen(elements.lyricsColorModeSelect, 'change', () => {
+            const mode = elements.lyricsColorModeSelect?.value === 'custom' ? 'custom' : 'auto';
+            const textColor = elements.lyricsTextColorInput?.value || '#335eea';
+            callbacks.updateSetting('lyricsColorMode', mode);
+            lyricsAppearanceSettingsRenderer.updateAvailability(this.toLyricsAppearanceElements(elements), mode);
+            lyricsAppearanceSettingsService.applyTextColor({colorMode: mode, textColor});
         });
 
-        scope.listen(elements.lyricsHighlightColorInput, 'input', () => {
-            const color = elements.lyricsHighlightColorInput?.value || '#335eea';
+        scope.listen(elements.lyricsTextColorInput, 'input', () => {
+            const color = elements.lyricsTextColorInput?.value || '#335eea';
             lyricsAppearanceSettingsRenderer.updateColor(this.toLyricsAppearanceElements(elements), color);
-            callbacks.updateSetting('lyricsHighlightColor', color);
-            this.applyLyricsHighlightColor(color);
+            callbacks.updateSetting('lyricsTextColor', color);
+            lyricsAppearanceSettingsService.applyTextColor({colorMode: 'custom', textColor: color});
         });
-    }
-
-    private applyLyricsHighlightOpacity(opacity: number, callbacks: SettingsToolsCallbacks): void {
-        lyricsAppearanceSettingsService.applyHighlightOpacity(opacity);
-        callbacks.emit('lyricsHighlightOpacityChanged', opacity);
-    }
-
-    private applyLyricsHighlightColor(color: string): void {
-        lyricsAppearanceSettingsService.applyHighlightColor(color);
     }
 
     private toMediaDirectoryElements(elements: SettingsToolsElements) {
@@ -312,10 +302,9 @@ class SettingsToolsController {
 
     private toLyricsAppearanceElements(elements: SettingsToolsElements) {
         return {
-            highlightOpacitySlider: elements.lyricsHighlightOpacitySlider,
-            highlightOpacityValue: elements.lyricsHighlightOpacityValue,
-            highlightColorInput: elements.lyricsHighlightColorInput,
-            highlightColorValue: elements.lyricsHighlightColorValue
+            colorModeSelect: elements.lyricsColorModeSelect,
+            textColorInput: elements.lyricsTextColorInput,
+            textColorValue: elements.lyricsTextColorValue
         };
     }
 }

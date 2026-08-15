@@ -1,36 +1,25 @@
 import type {LyricsAppearanceSettings} from "./LyricsAppearanceSettingsService";
 
 export interface LyricsAppearanceSettingsElements {
-    highlightOpacitySlider: HTMLInputElement | null;
-    highlightOpacityValue: HTMLElement | null;
-    highlightColorInput: HTMLInputElement | null;
-    highlightColorValue: HTMLElement | null;
+    colorModeSelect: HTMLSelectElement | null;
+    textColorInput: HTMLInputElement | null;
+    textColorValue: HTMLElement | null;
 }
 
 class LyricsAppearanceSettingsRenderer {
     initialize(elements: LyricsAppearanceSettingsElements, settings: LyricsAppearanceSettings): void {
-        this.updateOpacity(elements, settings.highlightOpacity);
-        this.updateColor(elements, settings.highlightColor);
-    }
-
-    updateOpacity(elements: LyricsAppearanceSettingsElements, opacity: number): void {
-        if (elements.highlightOpacitySlider) {
-            elements.highlightOpacitySlider.value = String(opacity);
-        }
-
-        if (elements.highlightOpacityValue) {
-            elements.highlightOpacityValue.textContent = opacity.toFixed(1);
-        }
+        if (elements.colorModeSelect) elements.colorModeSelect.value = settings.colorMode;
+        this.updateColor(elements, settings.textColor);
+        this.updateAvailability(elements, settings.colorMode);
     }
 
     updateColor(elements: LyricsAppearanceSettingsElements, color: string): void {
-        if (elements.highlightColorInput) {
-            elements.highlightColorInput.value = color;
-        }
+        if (elements.textColorInput) elements.textColorInput.value = color;
+        if (elements.textColorValue) elements.textColorValue.textContent = color;
+    }
 
-        if (elements.highlightColorValue) {
-            elements.highlightColorValue.textContent = color;
-        }
+    updateAvailability(elements: LyricsAppearanceSettingsElements, mode: 'auto' | 'custom'): void {
+        if (elements.textColorInput) elements.textColorInput.disabled = mode !== 'custom';
     }
 }
 
