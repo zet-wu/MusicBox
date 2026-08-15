@@ -80,6 +80,26 @@ describe('LyricsNormalizer', () => {
         expect(result.render.lines[0].translatedLyric).toBe('Hello');
     });
 
+    it('容纳网易 YRC 与翻译轨的真实行首偏差', () => {
+        const result = normalizer.fromYrc(
+            '[45370,2000](45370,1000,0)你(46370,1000,0)好',
+            {translation: '[00:44.660]Hello'},
+            {source}
+        );
+
+        expect(result.render.lines[0].translatedLyric).toBe('Hello');
+    });
+
+    it('不强行合并来源本身缺失或分行不同的翻译', () => {
+        const result = normalizer.fromYrc(
+            '[33290,2000](33290,2000,0)你好',
+            {translation: '[00:30.820]Hello'},
+            {source}
+        );
+
+        expect(result.render.lines[0].translatedLyric).toBe('');
+    });
+
     it('保留 QRC 逐字时间', () => {
         const result = normalizer.fromQrc(
             '[1000,2000]你(1000,500)好(1500,500)',

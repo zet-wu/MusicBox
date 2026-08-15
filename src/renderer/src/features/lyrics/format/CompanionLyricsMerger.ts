@@ -4,7 +4,8 @@ import type {LyricLine, SubLyricContent, TTMLResult} from '@applemusic-like-lyri
 export type CompanionKind = 'translation' | 'romanization';
 
 export class CompanionLyricsMerger {
-    constructor(private readonly toleranceMs = 250) {}
+    // 网易 YRC 与辅助 LRC 在真实数据中可出现约 700ms 的行首偏差。
+    constructor(private readonly toleranceMs = 750) {}
 
     mergeLrc(document: TTMLResult, lyrics: string | undefined, kind: CompanionKind): void {
         if (!lyrics?.trim()) return;

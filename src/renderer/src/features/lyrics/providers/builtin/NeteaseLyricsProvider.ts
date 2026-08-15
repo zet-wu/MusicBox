@@ -37,7 +37,9 @@ export class NeteaseLyricsProvider implements LyricsProvider {
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
         const url = new URL('https://music.163.com/api/search/get/web');
         url.search = new URLSearchParams({s: query.title, type: '1', offset: '0', total: 'true', limit: '20'}).toString();
-        const response = await fetchJson<NeteaseSearchResponse>(this.request, url.toString(), signal);
+        const response = await fetchJson<NeteaseSearchResponse>(this.request, url.toString(), signal, {
+            headers: {Accept: 'application/json', Referer: 'https://music.163.com/'}
+        });
         const songs = response.result?.songs ?? [];
 
         return rankProviderCandidates(query, songs.map(song => ({
@@ -56,7 +58,9 @@ export class NeteaseLyricsProvider implements LyricsProvider {
         const songId = (candidate.providerData as {songId?: number} | undefined)?.songId ?? candidate.candidateId;
         const url = new URL('https://music.163.com/api/song/lyric');
         url.search = new URLSearchParams({id: String(songId), lv: '-1', kv: '-1', tv: '-1', rv: '-1', yv: '-1'}).toString();
-        const result = await fetchJson<NeteaseLyricResponse>(this.request, url.toString(), signal);
+        const result = await fetchJson<NeteaseLyricResponse>(this.request, url.toString(), signal, {
+            headers: {Accept: 'application/json', Referer: 'https://music.163.com/'}
+        });
         const auxiliary = {
             translation: result.tlyric?.lyric,
             romanization: result.romalrc?.lyric
