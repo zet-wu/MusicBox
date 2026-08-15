@@ -1,32 +1,37 @@
 import {desktopLyricsService} from "@/features/desktopLyrics/service/DesktopLyricsService";
-import {lyricsContentService} from "@/features/mediaAssets/service/LyricsContentService";
-import {getLyricsTrackIdentity, type LyricsTrack, type RenderLyricLine} from "@ui/widgets/lyrics/LyricsTypes";
+import {getLyricsService} from '@/features/lyrics/service/defaultLyricsServices';
+import type {LyricsDocument} from '@/features/lyrics/domain/types';
+import type {LyricsService} from '@/features/lyrics/service/LyricsService';
+import {getLyricsTrackIdentity, type LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 
 interface LyricsLoaderControllerOptions {
-    setLyrics: (lyrics: RenderLyricLine[]) => void;
-    renderLyrics: () => void;
+    setDocument: (document: LyricsDocument) => void;
     showLoading: () => void;
     showNoLyrics: () => void;
+    service?: LyricsService;
 }
 
 class LyricsLoaderController {
-    private readonly setLyrics: (lyrics: RenderLyricLine[]) => void;
-    private readonly renderLyrics: () => void;
+    private readonly setDocument: (document: LyricsDocument) => void;
     private readonly showLoading: () => void;
     private readonly showNoLyrics: () => void;
     private loadGeneration = 0;
     private currentTrackIdentity: string | null = null;
+    private abortController: AbortController | null = null;
+    private readonly service: LyricsService;
 
     constructor(options: LyricsLoaderControllerOptions) {
-        this.setLyrics = options.setLyrics;
-        this.renderLyrics = options.renderLyrics;
+        this.setDocument = options.setDocument;
         this.showLoading = options.showLoading;
         this.showNoLyrics = options.showNoLyrics;
+        this.service = options.service ?? getLyricsService();
     }
 
     reset(): void {
         this.loadGeneration++;
         this.currentTrackIdentity = null;
+        this.abortController?.abort();
+        this.abortController = null;
     }
 
     async loadLyrics(track: LyricsTrack): Promise<void> {
@@ -42,22 +47,22 @@ class LyricsLoaderController {
 
         const generation = ++this.loadGeneration;
         this.currentTrackIdentity = trackIdentity;
+        this.abortController?.abort();
+        this.abortController = new AbortController();
 
         if (!track.lyrics) {
             this.showLoading();
         }
 
         try {
-            const result = await lyricsContentService.loadTrackLyrics(track);
+            const result = await this.service.load(track, this.abortController.signal);
             if (!this.isCurrentLoad(generation, trackIdentity)) {
                 return;
             }
 
-            if (result.success && result.lyrics.length > 0) {
-                const lyrics = result.lyrics as RenderLyricLine[];
-                this.setLyrics(lyrics);
-                this.renderLyrics();
-                await desktopLyricsService.syncLyrics(lyrics);
+            if (result.document && result.document.render.lines.length > 0) {
+                this.setDocument(result.document);
+                await desktopLyricsService.syncLyrics(toLegacyProjection(result.document));
             } else {
                 this.showNoLyrics();
                 console.log(`❌ Lyrics: ${result.error || '歌词获取失败'}`);
@@ -74,6 +79,22 @@ class LyricsLoaderController {
     private isCurrentLoad(generation: number, trackIdentity: string): boolean {
         return generation === this.loadGeneration && trackIdentity === this.currentTrackIdentity;
     }
+}
+
+function toLegacyProjection(document: LyricsDocument) {
+    return document.render.lines.map(line => ({
+        time: line.startTime / 1000,
+        endTime: line.endTime / 1000,
+        content: line.words.map(word => word.word).join(''),
+        type: line.words.length > 1 ? 'word-by-word' : 'line',
+        translation: line.translatedLyric || undefined,
+        romanization: line.romanLyric || undefined,
+        words: line.words.map(word => ({
+            text: word.word,
+            time: word.startTime / 1000,
+            endTime: word.endTime / 1000
+        }))
+    }));
 }
 
 export {LyricsLoaderController};

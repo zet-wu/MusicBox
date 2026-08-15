@@ -1,35 +1,61 @@
-import {describe, expect, it, vi} from 'vitest';
-import {LyricsRenderController} from '../ui/widgets/lyrics/LyricsRenderController';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-describe('LyricsRenderController 初始位置同步', () => {
-    it('首次同步当前歌词时允许立即滚动', () => {
-        const line = {
-            classList: {add: vi.fn(), remove: vi.fn()},
-            querySelectorAll: vi.fn(() => [])
-        } as unknown as HTMLElement;
-        const lyricsDisplay = {
-            querySelector: vi.fn(() => line)
-        } as unknown as HTMLElement;
-        const controller = new LyricsRenderController({
-            lyricsDisplay,
+function fakeElement() {
+    return {
+        hidden: false,
+        textContent: '',
+        className: '',
+        classList: {add: vi.fn(), remove: vi.fn()},
+        append: vi.fn(),
+        appendChild: vi.fn(),
+        replaceChildren: vi.fn()
+    } as unknown as HTMLElement;
+}
+
+describe('AmllLyricsView', () => {
+    beforeEach(() => {
+        vi.stubGlobal('document', {createElement: vi.fn(() => fakeElement())});
+        vi.stubGlobal('MouseEvent', class extends Event {});
+        vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+        vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('使用 AMLL Core 接收文档、毫秒进度并在销毁时释放实例', async () => {
+        const {AmllLyricsView} = await import('@/features/lyrics/ui/AmllLyricsView');
+        const player = Object.assign(new EventTarget(), {
+            getElement: vi.fn(() => fakeElement()),
+            setLyricLines: vi.fn(),
+            setCurrentTime: vi.fn(),
+            pause: vi.fn(),
+            resume: vi.fn(),
+            update: vi.fn(),
+            dispose: vi.fn()
+        });
+        const view = new AmllLyricsView({
+            container: fakeElement(),
             isVisible: () => true,
-            seek: vi.fn()
+            seek: vi.fn(),
+            createPlayer: () => player
         });
-        const internals = controller as unknown as {
-            scrollLineIntoView: (target: HTMLElement, behavior: 'instant' | 'smooth') => void;
-        };
-        internals.scrollLineIntoView = vi.fn();
-        controller.setLyrics([
-            {time: 0, content: '第一行', type: 'line'},
-            {time: 10, content: '当前行', type: 'line'}
-        ]);
+        const lyrics = [{
+            words: [{word: '当前行', startTime: 10_000, endTime: 12_000}],
+            translatedLyric: '', romanLyric: '', isBG: false, isDuet: false,
+            startTime: 10_000, endTime: 12_000
+        }];
 
-        controller.handlePlaybackPositionChanged(15, {
-            forceScroll: true,
-            behavior: 'instant'
-        });
+        view.setDocument({
+            ttmlText: '<tt/>',
+            ttml: {metadata: {}, lines: []},
+            render: {metadata: [], lines: lyrics},
+            source: {kind: 'embedded', trackId: 'track'}
+        }, 15);
+        view.handlePlaybackPositionChanged(16, true);
+        view.destroy();
 
-        expect(line.classList.add).toHaveBeenCalledWith('highlight');
-        expect(internals.scrollLineIntoView).toHaveBeenCalledWith(line, 'instant');
+        expect(player.setLyricLines).toHaveBeenCalledWith(lyrics, 15_000);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(16_000, true);
+        expect(player.dispose).toHaveBeenCalledOnce();
     });
 });

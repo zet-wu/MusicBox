@@ -785,6 +785,37 @@
   }
 }
 
+.lyrics-display.amll-lyrics-host {
+  position: relative;
+  overflow: hidden;
+
+  > .amll-lyrics-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.72);
+    text-align: center;
+
+    &[hidden] {
+      display: none;
+    }
+
+    p {
+      margin: 0.3rem 0;
+    }
+  }
+
+  > [class*="lyricPlayer"] {
+    width: 100%;
+    height: 100%;
+    font-family: inherit;
+    color: inherit;
+  }
+}
+
 
 // 脉动动画
 @keyframes pulse {

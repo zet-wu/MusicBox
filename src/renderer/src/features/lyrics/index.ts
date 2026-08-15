@@ -8,5 +8,7 @@ export * from './providers/LyricsProviderRegistry';
 export * from './providers/builtin';
 export * from './service/LyricsSearchService';
 export * from './service/LyricsService';
+export * from './service/defaultLyricsServices';
 export * from './sources/EmbeddedLyricsSource';
 export * from './sources/LocalLyricsSource';
+export * from './ui/AmllLyricsView';
