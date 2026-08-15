@@ -49,6 +49,7 @@ describe('LyricsNormalizer', () => {
         const result = normalizer.fromTtml(fixture, {source});
 
         expect(result.ttml.lines[1].words?.[0].ruby?.[0].text).toBe('さだめ');
+        expect(result.render.lines[1].words[0].ruby?.[0].word).toBe('さだめ');
         expect(result.render.lines[1].translatedLyric).toBe('命运');
         expect(result.render.lines[1].isDuet).toBe(true);
         expect(result.render.lines.some(line => line.isBG)).toBe(true);

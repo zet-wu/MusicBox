@@ -12,6 +12,16 @@ describe('LyricsDisplayProjection', () => {
         isDuet: false
     };
 
+    it('启用假名注音时将 Ruby 原样交给 AMLL', () => {
+        const projected = projectLyricsForDisplay([line], {
+            showTranslation: true,
+            showRomanization: true,
+            showRuby: true
+        });
+
+        expect(projected[0].words[0].ruby?.[0]).toMatchObject({word: 'うんめい'});
+    });
+
     it('只过滤渲染投影并保留原始 AMLL 数据', () => {
         const projected = projectLyricsForDisplay([line], {
             showTranslation: false,
