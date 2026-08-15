@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-legacy": "^8.0.1",
+    "@xmldom/xmldom": "0.9.11",
     "chokidar": "^3.6.0",
     "concurrently": "^7.6.0",
     "esbuild": "^0.28.0",
