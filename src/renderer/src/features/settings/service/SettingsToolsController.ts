@@ -25,8 +25,10 @@ export interface SettingsToolsElements {
     cacheStatsDescription: HTMLElement | null;
     testEmbeddedLyricsButton: HTMLButtonElement | null;
     lyricsColorModeSelect: HTMLSelectElement | null;
-    lyricsTextColorInput: HTMLInputElement | null;
-    lyricsTextColorValue: HTMLElement | null;
+    lyricsSungColorInput: HTMLInputElement | null;
+    lyricsSungColorValue: HTMLElement | null;
+    lyricsUnsungColorInput: HTMLInputElement | null;
+    lyricsUnsungColorValue: HTMLElement | null;
     lyricsShowTranslationToggle: HTMLInputElement | null;
     lyricsShowRomanizationToggle: HTMLInputElement | null;
     lyricsShowRubyToggle: HTMLInputElement | null;
@@ -266,22 +268,38 @@ class SettingsToolsController {
     private bindLyricsAppearanceEvents(elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks, scope: SettingsListenerScope): void {
         scope.listen(elements.lyricsColorModeSelect, 'change', () => {
             const mode = elements.lyricsColorModeSelect?.value === 'custom' ? 'custom' : 'auto';
-            const textColor = elements.lyricsTextColorInput?.value || '#335eea';
+            const sungColor = elements.lyricsSungColorInput?.value || '#335eea';
+            const unsungColor = elements.lyricsUnsungColorInput?.value || '#6b7280';
             callbacks.updateSetting('lyricsColorMode', mode);
             lyricsAppearanceSettingsRenderer.updateAvailability(this.toLyricsAppearanceElements(elements), mode);
-            lyricsAppearanceSettingsService.applyTextColor({colorMode: mode, textColor});
+            lyricsAppearanceSettingsService.applyTextColor({colorMode: mode, sungColor, unsungColor});
         });
 
-        scope.listen(elements.lyricsTextColorInput, 'input', () => {
-            const color = elements.lyricsTextColorInput?.value || '#335eea';
-            lyricsAppearanceSettingsRenderer.updateColor(this.toLyricsAppearanceElements(elements), color);
-            callbacks.updateSetting('lyricsTextColor', color);
-            lyricsAppearanceSettingsService.applyTextColor({colorMode: 'custom', textColor: color});
+        scope.listen(elements.lyricsSungColorInput, 'input', () => {
+            const color = elements.lyricsSungColorInput?.value || '#335eea';
+            lyricsAppearanceSettingsRenderer.updateSungColor(this.toLyricsAppearanceElements(elements), color);
+            callbacks.updateSetting('lyricsSungColor', color);
+            this.applyCustomLyricsColors(elements);
+        });
+
+        scope.listen(elements.lyricsUnsungColorInput, 'input', () => {
+            const color = elements.lyricsUnsungColorInput?.value || '#6b7280';
+            lyricsAppearanceSettingsRenderer.updateUnsungColor(this.toLyricsAppearanceElements(elements), color);
+            callbacks.updateSetting('lyricsUnsungColor', color);
+            this.applyCustomLyricsColors(elements);
         });
 
         this.bindLyricsDisplayToggle(elements.lyricsShowTranslationToggle, 'lyricsShowTranslation', callbacks, scope);
         this.bindLyricsDisplayToggle(elements.lyricsShowRomanizationToggle, 'lyricsShowRomanization', callbacks, scope);
         this.bindLyricsDisplayToggle(elements.lyricsShowRubyToggle, 'lyricsShowRuby', callbacks, scope);
+    }
+
+    private applyCustomLyricsColors(elements: SettingsToolsElements): void {
+        lyricsAppearanceSettingsService.applyTextColor({
+            colorMode: 'custom',
+            sungColor: elements.lyricsSungColorInput?.value || '#335eea',
+            unsungColor: elements.lyricsUnsungColorInput?.value || '#6b7280'
+        });
     }
 
     private bindLyricsDisplayToggle(
@@ -322,8 +340,10 @@ class SettingsToolsController {
     private toLyricsAppearanceElements(elements: SettingsToolsElements) {
         return {
             colorModeSelect: elements.lyricsColorModeSelect,
-            textColorInput: elements.lyricsTextColorInput,
-            textColorValue: elements.lyricsTextColorValue,
+            sungColorInput: elements.lyricsSungColorInput,
+            sungColorValue: elements.lyricsSungColorValue,
+            unsungColorInput: elements.lyricsUnsungColorInput,
+            unsungColorValue: elements.lyricsUnsungColorValue,
             showTranslationToggle: elements.lyricsShowTranslationToggle,
             showRomanizationToggle: elements.lyricsShowRomanizationToggle,
             showRubyToggle: elements.lyricsShowRubyToggle

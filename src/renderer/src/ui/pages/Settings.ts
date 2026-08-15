@@ -177,8 +177,10 @@ class Settings extends Component {
 
         // 歌词颜色设置
         this.lyricsColorMode = this.element.querySelector('#lyrics-color-mode');
-        this.lyricsTextColor = this.element.querySelector('#lyrics-text-color');
-        this.lyricsTextColorValue = this.element.querySelector('#lyrics-text-color-value');
+        this.lyricsSungColor = this.element.querySelector('#lyrics-sung-color');
+        this.lyricsSungColorValue = this.element.querySelector('#lyrics-sung-color-value');
+        this.lyricsUnsungColor = this.element.querySelector('#lyrics-unsung-color');
+        this.lyricsUnsungColorValue = this.element.querySelector('#lyrics-unsung-color-value');
         this.lyricsShowTranslation = this.element.querySelector('#lyrics-show-translation');
         this.lyricsShowRomanization = this.element.querySelector('#lyrics-show-romanization');
         this.lyricsShowRuby = this.element.querySelector('#lyrics-show-ruby');
@@ -696,8 +698,10 @@ class Settings extends Component {
             cacheStatsDescription: this.cacheStatsDescription,
             testEmbeddedLyricsButton: this.testEmbeddedLyricsBtn,
             lyricsColorModeSelect: this.lyricsColorMode,
-            lyricsTextColorInput: this.lyricsTextColor,
-            lyricsTextColorValue: this.lyricsTextColorValue,
+            lyricsSungColorInput: this.lyricsSungColor,
+            lyricsSungColorValue: this.lyricsSungColorValue,
+            lyricsUnsungColorInput: this.lyricsUnsungColor,
+            lyricsUnsungColorValue: this.lyricsUnsungColorValue,
             lyricsShowTranslationToggle: this.lyricsShowTranslation,
             lyricsShowRomanizationToggle: this.lyricsShowRomanization,
             lyricsShowRubyToggle: this.lyricsShowRuby

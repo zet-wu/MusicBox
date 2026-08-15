@@ -717,8 +717,12 @@
     height: 100%;
     font-family: inherit;
     color: inherit;
-    --amll-lp-color: var(--lyrics-text-color, var(--color-text));
+    --amll-lp-color: var(--lyrics-unsung-color, var(--color-text-secondary));
     mix-blend-mode: normal;
+
+    [class*="_lyricLine"][class*="_active"] {
+      color: var(--lyrics-sung-color, var(--color-text));
+    }
   }
 }
 
