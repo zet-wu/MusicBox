@@ -1,7 +1,7 @@
 import {decryptQrcHex} from '@applemusic-like-lyrics/lyric';
 import type {LyricsCandidate, ProviderLyricsPayload, TrackLyricsQuery} from '../../domain/types';
 import type {LyricsProvider} from '../LyricsProvider';
-import {decodeBase64Text, fetchJson, rankProviderCandidates, type LyricsFetch} from './shared';
+import {decodeBase64Text, fetchJson, providerFetch, rankProviderCandidates, type LyricsFetch} from './shared';
 
 interface QqSong {
     songmid: string;
@@ -26,7 +26,7 @@ export class QqMusicLyricsProvider implements LyricsProvider {
     readonly id = 'qqmusic';
     readonly displayName = 'QQ 音乐';
 
-    constructor(private readonly request: LyricsFetch = fetch) {}
+    constructor(private readonly request: LyricsFetch = providerFetch) {}
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
         const url = new URL('https://c.y.qq.com/soso/fcgi-bin/client_search_cp');

@@ -1,6 +1,6 @@
 import type {LyricsCandidate, ProviderLyricsPayload, TrackLyricsQuery} from '../../domain/types';
 import type {LyricsProvider} from '../LyricsProvider';
-import {fetchJson, fetchText, rankProviderCandidates, splitArtists, type LyricsFetch} from './shared';
+import {fetchJson, fetchText, providerFetch, rankProviderCandidates, splitArtists, type LyricsFetch} from './shared';
 
 interface AmllSearchItem {
     id?: string | number;
@@ -25,7 +25,7 @@ export class AmllLyricsProvider implements LyricsProvider {
     readonly displayName = 'AMLL';
 
     constructor(
-        private readonly request: LyricsFetch = fetch,
+        private readonly request: LyricsFetch = providerFetch,
         private readonly baseUrl = 'https://amlldb.bikonoo.com'
     ) {}
 

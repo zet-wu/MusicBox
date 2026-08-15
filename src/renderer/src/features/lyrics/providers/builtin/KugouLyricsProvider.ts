@@ -3,6 +3,7 @@ import type {LyricsProvider} from '../LyricsProvider';
 import {
     decodeBase64Bytes,
     fetchJson,
+    providerFetch,
     rankProviderCandidates,
     splitArtists,
     type LyricsFetch
@@ -46,7 +47,7 @@ export class KugouLyricsProvider implements LyricsProvider {
     readonly id = 'kugou';
     readonly displayName = '酷狗音乐';
 
-    constructor(private readonly request: LyricsFetch = fetch) {}
+    constructor(private readonly request: LyricsFetch = providerFetch) {}
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
         const url = new URL('https://mobilecdn.kugou.com/api/v3/search/song');

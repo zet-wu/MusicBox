@@ -1,7 +1,9 @@
 import type {LyricsCandidate, TrackLyricsQuery} from '../../domain/types';
 import {rankLyricsCandidates} from '../../domain/candidateMatching';
+import {lyricsGateway} from '@/infrastructure/electron';
 
 export type LyricsFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+export const providerFetch: LyricsFetch = (input, init) => lyricsGateway.providerRequest(input, init);
 
 export async function fetchJson<T>(
     request: LyricsFetch,

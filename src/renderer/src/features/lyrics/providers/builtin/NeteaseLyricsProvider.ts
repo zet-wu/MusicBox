@@ -1,6 +1,6 @@
 import type {LyricsCandidate, ProviderLyricsPayload, TrackLyricsQuery} from '../../domain/types';
 import type {LyricsProvider} from '../LyricsProvider';
-import {fetchJson, rankProviderCandidates, splitArtists, type LyricsFetch} from './shared';
+import {fetchJson, providerFetch, rankProviderCandidates, splitArtists, type LyricsFetch} from './shared';
 
 interface NeteaseSong {
     id: number;
@@ -32,7 +32,7 @@ export class NeteaseLyricsProvider implements LyricsProvider {
     readonly id = 'netease';
     readonly displayName = '网易云音乐';
 
-    constructor(private readonly request: LyricsFetch = fetch) {}
+    constructor(private readonly request: LyricsFetch = providerFetch) {}
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
         const url = new URL('https://music.163.com/api/search/get/web');

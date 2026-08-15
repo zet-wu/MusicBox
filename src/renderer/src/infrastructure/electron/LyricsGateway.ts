@@ -80,6 +80,39 @@ class LyricsGateway extends ElectronNamespaceAdapter<'lyrics'> {
     clearBinding(trackId: string): Promise<{success: boolean; cleared?: boolean; error?: string}> {
         return this.call('clearBinding', trackId);
     }
+
+    async providerRequest(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+        const requestId = crypto.randomUUID();
+        const signal = init.signal;
+        if (signal?.aborted) throw signal.reason ?? new DOMException('请求已取消', 'AbortError');
+        const cancel = () => void this.call('cancelProviderRequest', requestId);
+        signal?.addEventListener('abort', cancel, {once: true});
+        try {
+            const result = await this.call<{
+                status: number;
+                statusText: string;
+                body: string;
+                contentType: string;
+            }>('providerRequest', requestId, String(input), {
+                method: init.method,
+                headers: headersToRecord(init.headers),
+                body: typeof init.body === 'string' ? init.body : undefined
+            });
+            if (signal?.aborted) throw signal.reason ?? new DOMException('请求已取消', 'AbortError');
+            return new Response(result.body, {
+                status: result.status,
+                statusText: result.statusText,
+                headers: {'Content-Type': result.contentType}
+            });
+        } finally {
+            signal?.removeEventListener('abort', cancel);
+        }
+    }
 }
 
 export const lyricsGateway = new LyricsGateway();
+
+function headersToRecord(headers: HeadersInit | undefined): Record<string, string> | undefined {
+    if (!headers) return undefined;
+    return Object.fromEntries(new Headers(headers).entries());
+}

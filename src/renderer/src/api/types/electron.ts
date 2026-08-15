@@ -298,6 +298,12 @@ export interface ElectronLyricsAPI {
         source: LyricsSourceRef
     ): Promise<{success: boolean; binding?: LyricsBinding; error?: string}>;
     clearBinding(trackId: string): Promise<{success: boolean; cleared?: boolean; error?: string}>;
+    providerRequest(
+        requestId: string,
+        url: string,
+        options?: {method?: string; headers?: Record<string, string>; body?: string}
+    ): Promise<{status: number; statusText: string; body: string; contentType: string}>;
+    cancelProviderRequest(requestId: string): Promise<void>;
     getEmbedded(filePath: string): Promise<{success: boolean; lyrics?: EmbeddedLyricsData; source?: string; error?: string}>;
 }
 
