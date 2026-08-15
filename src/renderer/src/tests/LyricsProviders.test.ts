@@ -68,8 +68,8 @@ describe('bundled lyrics providers', () => {
     it('酷狗分离 metadata search 与 KRC fetch', async () => {
         const request = vi.fn(async (input: RequestInfo | URL) => {
             const url = String(input);
-            if (url.includes('/api/v3/search/song')) {
-                return jsonResponse({data: {info: [{hash: 'hash', songname: 'Song', singername: 'Artist', duration: 180}]}});
+            if (url.includes('/song_search_v2')) {
+                return jsonResponse({data: {lists: [{FileHash: 'hash', SongName: 'Song', SingerName: 'Artist', Duration: 180}]}});
             }
             if (url.includes('/search?')) return jsonResponse({candidates: [{id: 'lyric', accesskey: 'key'}]});
             return jsonResponse({fmt: 'krc', content: toBase64('krc1payload')});

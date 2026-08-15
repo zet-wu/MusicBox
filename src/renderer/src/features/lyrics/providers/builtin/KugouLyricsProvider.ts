@@ -9,17 +9,17 @@ import {
     type LyricsFetch
 } from './shared';
 
-interface KugouSong {
-    hash: string;
-    songname?: string;
-    filename?: string;
-    singername?: string;
-    album_name?: string;
-    duration?: number;
+interface KugouSearchResponse {
+    data?: {lists?: KugouWebSong[]};
 }
 
-interface KugouSearchResponse {
-    data?: {info?: KugouSong[]};
+interface KugouWebSong {
+    FileHash: string;
+    SongName?: string;
+    FileName?: string;
+    SingerName?: string;
+    AlbumName?: string;
+    Duration?: number;
 }
 
 interface KugouLyricsCandidate {
@@ -50,22 +50,28 @@ export class KugouLyricsProvider implements LyricsProvider {
     constructor(private readonly request: LyricsFetch = providerFetch) {}
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
-        const url = new URL('https://mobilecdn.kugou.com/api/v3/search/song');
-        url.search = new URLSearchParams({format: 'json', keyword: query.title, page: '1', pagesize: '20', showtype: '1'}).toString();
-        const response = await fetchJson<KugouSearchResponse>(this.request, url.toString(), signal);
+        const url = new URL('https://songsearch.kugou.com/song_search_v2');
+        url.search = new URLSearchParams({
+            keyword: [query.title, ...query.artists].join(' '),
+            page: '1',
+            pagesize: '20'
+        }).toString();
+        const response = await fetchJson<KugouSearchResponse>(this.request, url.toString(), signal, {
+            headers: {Accept: 'application/json', Referer: 'https://www.kugou.com/'}
+        });
 
-        return rankProviderCandidates(query, (response.data?.info ?? []).map(song => ({
+        return rankProviderCandidates(query, (response.data?.lists ?? []).map(song => ({
             providerId: this.id,
-            candidateId: song.hash,
-            title: song.songname ?? song.filename ?? query.title,
-            artists: splitArtists(song.singername),
-            album: song.album_name,
-            durationMs: song.duration ? normalizeDuration(song.duration) : undefined,
+            candidateId: song.FileHash,
+            title: song.SongName ?? song.FileName ?? query.title,
+            artists: splitArtists(song.SingerName),
+            album: song.AlbumName,
+            durationMs: song.Duration ? normalizeDuration(song.Duration) : undefined,
             capabilities: {lineTimed: true, wordTimed: true, translation: true, romanization: true},
             providerData: {
-                hash: song.hash,
-                keyword: song.songname ?? song.filename ?? query.title,
-                durationMs: song.duration ? normalizeDuration(song.duration) : undefined
+                hash: song.FileHash,
+                keyword: [song.SingerName, song.SongName ?? song.FileName].filter(Boolean).join(' - '),
+                durationMs: song.Duration ? normalizeDuration(song.Duration) : undefined
             } satisfies KugouProviderData
         })));
     }
@@ -79,7 +85,8 @@ export class KugouLyricsProvider implements LyricsProvider {
             ver: '1', man: 'yes', client: 'pc', keyword: data.keyword,
             duration: String(data.durationMs ?? ''), hash: data.hash
         }).toString();
-        const search = await fetchJson<KugouLyricsSearchResponse>(this.request, searchUrl.toString(), signal);
+        const headers = {Accept: 'application/json', Referer: 'https://www.kugou.com/'};
+        const search = await fetchJson<KugouLyricsSearchResponse>(this.request, searchUrl.toString(), signal, {headers});
         const lyricCandidate = search.candidates?.[0];
         if (!lyricCandidate) throw new Error('酷狗候选不包含歌词文件');
 
@@ -88,7 +95,7 @@ export class KugouLyricsProvider implements LyricsProvider {
             ver: '1', client: 'pc', id: lyricCandidate.id,
             accesskey: lyricCandidate.accesskey, fmt: 'krc', charset: 'utf8'
         }).toString();
-        const download = await fetchJson<KugouDownloadResponse>(this.request, downloadUrl.toString(), signal);
+        const download = await fetchJson<KugouDownloadResponse>(this.request, downloadUrl.toString(), signal, {headers});
         if (!download.content) throw new Error('酷狗歌词内容为空');
         if (download.fmt?.toLowerCase() === 'lrc') {
             return {kind: 'lrc', lyrics: new TextDecoder().decode(decodeBase64Bytes(download.content))};
