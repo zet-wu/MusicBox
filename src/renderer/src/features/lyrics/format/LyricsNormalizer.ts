@@ -18,6 +18,7 @@ import type {
     ProviderLyricsPayload
 } from '../domain/types';
 import {CompanionLyricsMerger} from './CompanionLyricsMerger';
+import {parseKrc} from './krc/parseKrc';
 import {TtmlDocumentService} from './TtmlDocumentService';
 
 type ParsedFormat = 'lrc' | 'yrc' | 'qrc';
@@ -28,7 +29,7 @@ export class LyricsNormalizer {
         private readonly companionMerger = new CompanionLyricsMerger()
     ) {}
 
-    fromPayload(payload: Exclude<ProviderLyricsPayload, {kind: 'krc'}>, context: NormalizeContext): LyricsDocument {
+    fromPayload(payload: ProviderLyricsPayload, context: NormalizeContext): LyricsDocument {
         switch (payload.kind) {
             case 'ttml':
                 return this.fromTtml(payload.ttml, context);
@@ -38,6 +39,8 @@ export class LyricsNormalizer {
                 return this.fromYrc(payload.lyrics, payload, context);
             case 'qrc':
                 return this.fromQrc(payload.lyrics, payload, context);
+            case 'krc':
+                return this.fromKrc(payload.bytes, context);
         }
     }
 
@@ -56,6 +59,28 @@ export class LyricsNormalizer {
 
     fromQrc(qrc: string, auxiliary: AuxiliaryLyrics, context: NormalizeContext): LyricsDocument {
         return this.fromParsedLines(parseQrc(qrc), 'qrc', auxiliary, context);
+    }
+
+    fromKrc(bytes: Uint8Array, context: NormalizeContext): LyricsDocument {
+        const parsed = parseKrc(bytes);
+        const document: TTMLResult = {
+            metadata: {
+                ...this.createStructuredMetadata(context),
+                timingMode: 'Word'
+            },
+            lines: parsed.lines.map(line => ({
+                text: line.text,
+                startTime: line.startTime,
+                endTime: line.endTime,
+                words: line.words,
+                translations: line.translation ? [{text: line.translation}] : undefined,
+                romanizations: line.romanization
+                    ? [{text: line.romanization, words: line.romanizationWords}]
+                    : undefined
+            }))
+        };
+        const ttmlText = this.ttmlService.serialize(document);
+        return this.createDocument(ttmlText, this.ttmlService.parse(ttmlText), context);
     }
 
     private fromParsedLines(

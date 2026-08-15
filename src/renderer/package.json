@@ -22,9 +22,11 @@
     "dayjs": "^1.11.7",
     "fuse.js": "^6.6.2",
     "lru-cache": "11.5.2",
-    "p-queue": "9.3.3"
+    "p-queue": "9.3.3",
+    "pako": "2.1.0"
   },
   "devDependencies": {
+    "@types/pako": "2.0.4",
     "@vitejs/plugin-legacy": "^8.0.1",
     "@xmldom/xmldom": "0.9.11",
     "chokidar": "^3.6.0",
