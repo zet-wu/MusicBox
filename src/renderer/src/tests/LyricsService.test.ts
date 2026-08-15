@@ -88,6 +88,73 @@ describe('LyricsService', () => {
         expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source);
     });
 
+    it('高匹配在线逐字歌词优先于本地逐行歌词', async () => {
+        gateway.readCanonical.mockResolvedValue({success: false});
+        const localDocument = {
+            ...document,
+            ttml: {metadata: {timingMode: 'Line'}, lines: []},
+            source: {kind: 'local', path: 'Song.lrc'}
+        };
+        const onlineDocument = {
+            ...document,
+            ttml: {metadata: {timingMode: 'Word'}, lines: []},
+            source: {kind: 'provider', providerId: 'test', candidateId: 'word', manuallySelected: false}
+        };
+        const testNormalizer = {
+            fromLrc: vi.fn(() => localDocument),
+            fromPayload: vi.fn(() => onlineDocument)
+        };
+        const provider = {
+            id: 'test', displayName: 'Test',
+            search: vi.fn().mockResolvedValue([{
+                providerId: 'test', candidateId: 'word', title: 'Song', artists: ['Artist'], matchScore: 90
+            }]),
+            fetch: vi.fn().mockResolvedValue({kind: 'yrc', lyrics: '[0,100]S(0,100) Artist'})
+        };
+        const registry = new LyricsProviderRegistry();
+        registry.register(provider);
+        const service = new LyricsService({
+            providers: registry,
+            localSource: {find: vi.fn().mockResolvedValue({kind: 'lrc', path: 'Song.lrc', content: '[00:00]Song'})} as never,
+            embeddedSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            normalizer: testNormalizer as never
+        });
+
+        const result = await service.load(track, new AbortController().signal);
+
+        expect(result.document).toBe(onlineDocument);
+        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', onlineDocument.source);
+    });
+
+    it('低匹配在线候选不会覆盖本地歌词', async () => {
+        gateway.readCanonical.mockResolvedValue({success: false});
+        const localDocument = {
+            ...document,
+            ttml: {metadata: {timingMode: 'Line'}, lines: []},
+            source: {kind: 'local', path: 'Song.lrc'}
+        };
+        const provider = {
+            id: 'test', displayName: 'Test',
+            search: vi.fn().mockResolvedValue([{
+                providerId: 'test', candidateId: 'weak', title: 'Other', artists: ['Other'], matchScore: 74
+            }]),
+            fetch: vi.fn()
+        };
+        const registry = new LyricsProviderRegistry();
+        registry.register(provider);
+        const service = new LyricsService({
+            providers: registry,
+            localSource: {find: vi.fn().mockResolvedValue({kind: 'lrc', path: 'Song.lrc', content: '[00:00]Song'})} as never,
+            embeddedSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            normalizer: {fromLrc: vi.fn(() => localDocument)} as never
+        });
+
+        const result = await service.load(track, new AbortController().signal);
+
+        expect(result.document).toBe(localDocument);
+        expect(provider.fetch).not.toHaveBeenCalled();
+    });
+
     it('provider 搜索状态彼此隔离', async () => {
         const registry = new LyricsProviderRegistry();
         registry.register({
