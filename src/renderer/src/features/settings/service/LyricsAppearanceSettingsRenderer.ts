@@ -4,6 +4,9 @@ export interface LyricsAppearanceSettingsElements {
     colorModeSelect: HTMLSelectElement | null;
     textColorInput: HTMLInputElement | null;
     textColorValue: HTMLElement | null;
+    showTranslationToggle: HTMLInputElement | null;
+    showRomanizationToggle: HTMLInputElement | null;
+    showRubyToggle: HTMLInputElement | null;
 }
 
 class LyricsAppearanceSettingsRenderer {
@@ -11,6 +14,9 @@ class LyricsAppearanceSettingsRenderer {
         if (elements.colorModeSelect) elements.colorModeSelect.value = settings.colorMode;
         this.updateColor(elements, settings.textColor);
         this.updateAvailability(elements, settings.colorMode);
+        if (elements.showTranslationToggle) elements.showTranslationToggle.checked = settings.showTranslation;
+        if (elements.showRomanizationToggle) elements.showRomanizationToggle.checked = settings.showRomanization;
+        if (elements.showRubyToggle) elements.showRubyToggle.checked = settings.showRuby;
     }
 
     updateColor(elements: LyricsAppearanceSettingsElements, color: string): void {

@@ -1,6 +1,12 @@
 import {LyricPlayer, type LyricLineMouseEvent} from '@applemusic-like-lyrics/core';
 import '@applemusic-like-lyrics/core/style.css';
 import type {LyricsDocument} from '../domain/types';
+import {settingsStore} from '@/features/settings/service/SettingsStore';
+import {
+    LYRICS_DISPLAY_SETTINGS_CHANGED_EVENT,
+    lyricsAppearanceSettingsService
+} from '@/features/settings/service/LyricsAppearanceSettingsService';
+import {projectLyricsForDisplay} from './LyricsDisplayProjection';
 
 interface AmllPlayerPort extends EventTarget {
     getElement(): HTMLElement;
@@ -27,6 +33,8 @@ export class AmllLyricsView {
     private readonly stateElement: HTMLElement;
     private animationFrame: number | null = null;
     private lastFrameTime = performance.now();
+    private currentDocument: LyricsDocument | null = null;
+    private currentTimeSeconds = 0;
 
     constructor(options: AmllLyricsViewOptions) {
         this.container = options.container;
@@ -40,27 +48,35 @@ export class AmllLyricsView {
         this.container.classList.add('amll-lyrics-host');
         this.container.append(this.player.getElement(), this.stateElement);
         this.player.addEventListener('line-click', this.handleLineClick);
+        if (typeof window !== 'undefined') {
+            window.addEventListener(LYRICS_DISPLAY_SETTINGS_CHANGED_EVENT, this.handleDisplaySettingsChanged);
+        }
         this.startAnimationLoop();
     }
 
     setDocument(document: LyricsDocument, initialTimeSeconds = 0): void {
+        this.currentDocument = document;
+        this.currentTimeSeconds = initialTimeSeconds;
         this.hideState();
-        this.player.setLyricLines(document.render.lines, initialTimeSeconds * 1000);
+        this.setProjectedLines();
         this.player.update(0);
     }
 
     showLoading(): void {
+        this.currentDocument = null;
         this.player.setLyricLines([]);
         this.showState('正在加载歌词...');
     }
 
     showNoLyrics(): void {
+        this.currentDocument = null;
         this.player.setLyricLines([]);
         this.showState('暂无歌词', '请欣赏音乐');
     }
 
     handlePlaybackPositionChanged(positionSeconds: number, isSeek = false): void {
         if (!this.isVisible()) return;
+        this.currentTimeSeconds = positionSeconds;
         this.player.setCurrentTime(positionSeconds * 1000, isSeek);
     }
 
@@ -78,6 +94,9 @@ export class AmllLyricsView {
         if (this.animationFrame !== null) cancelAnimationFrame(this.animationFrame);
         this.animationFrame = null;
         this.player.removeEventListener('line-click', this.handleLineClick);
+        if (typeof window !== 'undefined') {
+            window.removeEventListener(LYRICS_DISPLAY_SETTINGS_CHANGED_EVENT, this.handleDisplaySettingsChanged);
+        }
         this.player.dispose();
         this.container.classList.remove('amll-lyrics-host');
         this.container.textContent = '';
@@ -88,6 +107,23 @@ export class AmllLyricsView {
         const line = lineEvent.line?.getLine();
         if (line) void this.seek(line.startTime / 1000);
     };
+
+    private readonly handleDisplaySettingsChanged = (): void => {
+        if (!this.currentDocument) return;
+        this.setProjectedLines();
+        this.player.update(0);
+    };
+
+    private setProjectedLines(): void {
+        if (!this.currentDocument) return;
+        const settings = typeof localStorage === 'undefined'
+            ? {showTranslation: true, showRomanization: true, showRuby: true}
+            : lyricsAppearanceSettingsService.getSettings(settingsStore.load());
+        this.player.setLyricLines(
+            projectLyricsForDisplay(this.currentDocument.render.lines, settings),
+            this.currentTimeSeconds * 1000
+        );
+    }
 
     private startAnimationLoop(): void {
         const update = (timestamp: number): void => {

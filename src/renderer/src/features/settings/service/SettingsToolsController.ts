@@ -27,6 +27,9 @@ export interface SettingsToolsElements {
     lyricsColorModeSelect: HTMLSelectElement | null;
     lyricsTextColorInput: HTMLInputElement | null;
     lyricsTextColorValue: HTMLElement | null;
+    lyricsShowTranslationToggle: HTMLInputElement | null;
+    lyricsShowRomanizationToggle: HTMLInputElement | null;
+    lyricsShowRubyToggle: HTMLInputElement | null;
 }
 
 interface SettingsToolsCallbacks {
@@ -275,6 +278,22 @@ class SettingsToolsController {
             callbacks.updateSetting('lyricsTextColor', color);
             lyricsAppearanceSettingsService.applyTextColor({colorMode: 'custom', textColor: color});
         });
+
+        this.bindLyricsDisplayToggle(elements.lyricsShowTranslationToggle, 'lyricsShowTranslation', callbacks, scope);
+        this.bindLyricsDisplayToggle(elements.lyricsShowRomanizationToggle, 'lyricsShowRomanization', callbacks, scope);
+        this.bindLyricsDisplayToggle(elements.lyricsShowRubyToggle, 'lyricsShowRuby', callbacks, scope);
+    }
+
+    private bindLyricsDisplayToggle(
+        element: HTMLInputElement | null,
+        key: string,
+        callbacks: SettingsToolsCallbacks,
+        scope: SettingsListenerScope
+    ): void {
+        scope.listen(element, 'change', () => {
+            callbacks.updateSetting(key, Boolean(element?.checked));
+            lyricsAppearanceSettingsService.notifyDisplaySettingsChanged();
+        });
     }
 
     private toMediaDirectoryElements(elements: SettingsToolsElements) {
@@ -304,7 +323,10 @@ class SettingsToolsController {
         return {
             colorModeSelect: elements.lyricsColorModeSelect,
             textColorInput: elements.lyricsTextColorInput,
-            textColorValue: elements.lyricsTextColorValue
+            textColorValue: elements.lyricsTextColorValue,
+            showTranslationToggle: elements.lyricsShowTranslationToggle,
+            showRomanizationToggle: elements.lyricsShowRomanizationToggle,
+            showRubyToggle: elements.lyricsShowRubyToggle
         };
     }
 }

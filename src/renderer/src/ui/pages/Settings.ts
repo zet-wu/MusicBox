@@ -179,6 +179,9 @@ class Settings extends Component {
         this.lyricsColorMode = this.element.querySelector('#lyrics-color-mode');
         this.lyricsTextColor = this.element.querySelector('#lyrics-text-color');
         this.lyricsTextColorValue = this.element.querySelector('#lyrics-text-color-value');
+        this.lyricsShowTranslation = this.element.querySelector('#lyrics-show-translation');
+        this.lyricsShowRomanization = this.element.querySelector('#lyrics-show-romanization');
+        this.lyricsShowRuby = this.element.querySelector('#lyrics-show-ruby');
 
         // 桌面歌词设置元素
         this.dlDisplayModeSelect = this.element.querySelector('#dl-display-mode-select');
@@ -694,7 +697,10 @@ class Settings extends Component {
             testEmbeddedLyricsButton: this.testEmbeddedLyricsBtn,
             lyricsColorModeSelect: this.lyricsColorMode,
             lyricsTextColorInput: this.lyricsTextColor,
-            lyricsTextColorValue: this.lyricsTextColorValue
+            lyricsTextColorValue: this.lyricsTextColorValue,
+            lyricsShowTranslationToggle: this.lyricsShowTranslation,
+            lyricsShowRomanizationToggle: this.lyricsShowRomanization,
+            lyricsShowRubyToggle: this.lyricsShowRuby
         };
     }
 
