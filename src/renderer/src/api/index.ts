@@ -10,7 +10,6 @@ import {
     coverAPI,
     fileAPI,
     libraryAPI,
-    lyricsAPI,
     networkAPI,
     trayAPI,
     updateAPI,
@@ -22,7 +21,6 @@ export {
     coverAPI,
     fileAPI,
     libraryAPI,
-    lyricsAPI,
     networkAPI,
     trayAPI,
     updateAPI,
@@ -37,7 +35,6 @@ export const MusicBoxAPI = {
     window: windowAPI,
     library: libraryAPI,
     network: networkAPI,
-    lyrics: lyricsAPI,
     cover: coverAPI,
     update: updateAPI
 } as const;

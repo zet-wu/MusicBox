@@ -54,9 +54,6 @@ class SettingsToolsController {
         const lyricsDirectory = typeof settings.lyricsDirectory === 'string' ? settings.lyricsDirectory : '';
         mediaDirectorySettingsRenderer.updateDirectory(this.toMediaDirectoryElements(elements), 'lyrics', lyricsDirectory || null);
 
-        if (lyricsDirectory) {
-            mediaDirectorySettingsService.applyLyricsDirectory(lyricsDirectory);
-        }
     }
 
     async initializeCoverCacheDirectory(settings: MusicBoxSettings, elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks): Promise<void> {
@@ -100,7 +97,6 @@ class SettingsToolsController {
 
             callbacks.updateSetting('lyricsDirectory', selectedPath);
             mediaDirectorySettingsRenderer.updateDirectory(this.toMediaDirectoryElements(elements), 'lyrics', selectedPath);
-            mediaDirectorySettingsService.applyLyricsDirectory(selectedPath);
         } catch (error) {
             console.error('❌ Settings: 选择歌词目录失败:', error);
         }

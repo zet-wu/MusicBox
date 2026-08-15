@@ -1,128 +1,63 @@
-import {
-    appendLyricsWordSpans,
-    findActiveLyricIndex,
-    getLyricsWordText,
-    LyricsWordHighlightController
-} from '@/shared/lyrics';
 import type {DesktopLyricLine, DesktopLyricsElements} from './DesktopLyricsTypes';
 
 export class DesktopLyricsRenderController {
     private lyrics: DesktopLyricLine[] = [];
     private currentLyricIndex = -1;
-    private readonly wordHighlightController = new LyricsWordHighlightController();
 
     constructor(
         private readonly elements: Pick<DesktopLyricsElements, 'currentLyricEl' | 'nextLyricEl'>
-    ) {
-    }
+    ) {}
 
     showDefaultLyrics(): void {
         this.elements.currentLyricEl.textContent = '暂无歌词';
         this.elements.nextLyricEl.textContent = '';
     }
 
-    updateLyrics(lyricsData: DesktopLyricLine[] | string | unknown): void {
+    updateLyrics(lyricsData: DesktopLyricLine[] | unknown): void {
         if (!Array.isArray(lyricsData)) {
-            this.lyrics = [];
-            this.wordHighlightController.clearActiveHighlight();
-            this.showDefaultLyrics();
+            this.reset();
             return;
         }
-
-        this.lyrics = lyricsData;
+        this.lyrics = (lyricsData as DesktopLyricLine[]).filter(line => !line.isBG);
         this.currentLyricIndex = -1;
-        this.wordHighlightController.clearActiveHighlight();
         this.renderCurrentLyric();
     }
 
-    updatePosition(position: number): number | null {
-        if (typeof position !== 'number' || isNaN(position)) {
-            return null;
+    updatePosition(positionSeconds: number): number | null {
+        if (!Number.isFinite(positionSeconds)) return null;
+        const index = findLine(this.lyrics, positionSeconds * 1000);
+        if (index !== this.currentLyricIndex) {
+            this.currentLyricIndex = index;
+            this.renderCurrentLyric();
         }
-
-        const updateResult = this.wordHighlightController.updatePlaybackPosition(position);
-        if (updateResult.seeked) {
-            this.wordHighlightController.resetWordHighlightStates(
-                this.elements.currentLyricEl,
-                updateResult.position
-            );
-        }
-
-        this.updateLyricHighlight(updateResult.position);
-        return updateResult.position;
+        return positionSeconds;
     }
 
     reset(): void {
         this.lyrics = [];
         this.currentLyricIndex = -1;
-        this.wordHighlightController.reset();
         this.showDefaultLyrics();
     }
 
-    setPlaying(isPlaying: boolean): void {
-        this.wordHighlightController.setPlaying(isPlaying);
-    }
-
-    private updateLyricHighlight(currentTime: number): void {
-        if (this.lyrics.length === 0) {
-            return;
-        }
-
-        const newIndex = findActiveLyricIndex(this.lyrics, currentTime);
-        if (newIndex !== this.currentLyricIndex) {
-            this.currentLyricIndex = newIndex;
-            this.renderCurrentLyric();
-        }
-
-        if (newIndex >= 0 && this.lyrics[newIndex].type === 'word-by-word') {
-            this.updateWordHighlight(newIndex, currentTime);
-        } else {
-            this.wordHighlightController.clearActiveHighlight();
-        }
-    }
+    setPlaying(_isPlaying: boolean): void {}
 
     private renderCurrentLyric(): void {
-        if (this.currentLyricIndex < 0 || this.currentLyricIndex >= this.lyrics.length) {
-            this.showDefaultLyrics();
-            return;
-        }
-
-        const currentLyric = this.lyrics[this.currentLyricIndex];
-        const nextLyric = this.lyrics[this.currentLyricIndex + 1];
-
-        this.renderCurrentLine(currentLyric);
-        this.elements.nextLyricEl.textContent = nextLyric ? this.getLyricText(nextLyric) : '';
+        const current = this.lyrics[this.currentLyricIndex];
+        const next = this.lyrics[this.currentLyricIndex + 1];
+        this.elements.currentLyricEl.textContent = current ? getText(current) : '暂无歌词';
+        this.elements.nextLyricEl.textContent = next ? getText(next) : '';
     }
+}
 
-    private renderCurrentLine(lyric: DesktopLyricLine): void {
-        if (lyric.type !== 'word-by-word' || !lyric.words) {
-            this.wordHighlightController.clearActiveHighlight();
-            this.elements.currentLyricEl.textContent = lyric.content || '';
-            return;
-        }
-
-        appendLyricsWordSpans(this.elements.currentLyricEl, lyric.words);
+function findLine(lines: DesktopLyricLine[], currentTimeMs: number): number {
+    let active = -1;
+    for (let index = 0; index < lines.length; index += 1) {
+        if (lines[index].startTime > currentTimeMs) break;
+        active = index;
     }
+    return active;
+}
 
-    private getLyricText(lyric: DesktopLyricLine): string {
-        if (lyric.type === 'word-by-word' && lyric.words) {
-            return getLyricsWordText(lyric.words);
-        }
-
-        return lyric.content || '';
-    }
-
-    private updateWordHighlight(lineIndex: number, currentTime: number): void {
-        const lyric = this.lyrics[lineIndex];
-        if (!lyric?.words || lyric.words.length === 0) {
-            return;
-        }
-
-        this.wordHighlightController.updateWordHighlight({
-            lineElement: this.elements.currentLyricEl,
-            words: lyric.words,
-            currentTime,
-            lineEndTime: lyric.endTime
-        });
-    }
+function getText(line: DesktopLyricLine): string {
+    return line.words.map(word => word.word).join('');
 }

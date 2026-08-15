@@ -1,5 +1,5 @@
 import type {Result} from '@api/types/common';
-import type {LyricLine} from '@api/types/lyrics';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {DesktopLyricsSettings, MusicBoxSettings} from '@api/types/settings';
 import type {Track} from '@api/types/track';
 import {DesktopLyricsSync} from './DesktopLyricsSync';
@@ -59,7 +59,7 @@ export class DesktopLyricsService {
         return await this.sync.updateDesktopLyricsSettings(settings);
     }
 
-    async syncLyrics(lyrics: LyricLine[] | string): Promise<void> {
+    async syncLyrics(lyrics: AmllLyricLine[]): Promise<void> {
         await this.sync.syncToDesktopLyrics('lyrics', lyrics);
     }
 }

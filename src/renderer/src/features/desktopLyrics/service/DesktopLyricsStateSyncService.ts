@@ -1,6 +1,6 @@
 import {desktopLyricsGateway} from '@/infrastructure/electron/DesktopLyricsGateway';
-import {lyricsContentService} from '@/features/mediaAssets/service/LyricsContentService';
-import type {LyricLine} from '@api/types/lyrics';
+import {getLyricsService} from '@/features/lyrics/service/defaultLyricsServices';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {DesktopLyricsPlaybackState} from '@api/types/playback';
 import type {Track} from '@api/types/track';
 
@@ -25,7 +25,7 @@ export class DesktopLyricsStateSyncService {
 
     async syncToDesktopLyrics(
         type: DesktopLyricsSyncType,
-        data: Track | DesktopLyricsPlaybackState | number | LyricLine[] | string | null
+        data: Track | DesktopLyricsPlaybackState | number | AmllLyricLine[] | null
     ): Promise<void> {
         try {
             switch (type) {
@@ -39,7 +39,7 @@ export class DesktopLyricsStateSyncService {
                     await desktopLyricsGateway.updatePosition(data as number);
                     break;
                 case 'lyrics':
-                    await desktopLyricsGateway.updateLyrics(data as LyricLine[] | string);
+                    await desktopLyricsGateway.updateLyrics(data as AmllLyricLine[]);
                     break;
             }
         } catch (error) {
@@ -49,10 +49,10 @@ export class DesktopLyricsStateSyncService {
 
     async loadLyricsForDesktop(track: Track): Promise<void> {
         try {
-            const result = await lyricsContentService.loadTrackLyrics(track);
-            if (result.success && result.lyrics.length > 0) {
-                await this.syncToDesktopLyrics('lyrics', result.lyrics);
-                console.log(`🎵 loadLyricsForDesktop: 歌词已同步，来源=${result.source || 'unknown'}`);
+            const result = await getLyricsService().load(track, new AbortController().signal);
+            if (result.document?.render.lines.length) {
+                await this.syncToDesktopLyrics('lyrics', result.document.render.lines);
+                console.log(`🎵 loadLyricsForDesktop: canonical 歌词已同步`);
             }
         } catch (error) {
             console.error('❌ 为桌面歌词加载歌词失败:', error);
@@ -66,10 +66,7 @@ export class DesktopLyricsStateSyncService {
             if (currentTrack) {
                 await desktopLyricsGateway.updateTrack(currentTrack);
 
-                if (currentTrack.lyrics && currentTrack.lyrics.length > 0) {
-                    const updateLyricsResult = await desktopLyricsGateway.updateLyrics(currentTrack.lyrics);
-                    console.log('🔄 syncCurrentStateToDesktopLyrics: updateLyrics 结果', updateLyricsResult);
-                } else if (currentTrack.title && currentTrack.artist) {
+                if (currentTrack.title && currentTrack.artist) {
                     await this.loadLyricsForDesktop(currentTrack);
                 } else {
                     console.log('🔄 syncCurrentStateToDesktopLyrics: 无法加载歌词，缺少 title 或 artist');
@@ -89,9 +86,7 @@ export class DesktopLyricsStateSyncService {
 
     private async syncTrack(track: Track | null): Promise<void> {
         await desktopLyricsGateway.updateTrack(track);
-        if (track && track.lyrics) {
-            await desktopLyricsGateway.updateLyrics(track.lyrics);
-        } else if (track && track.title && track.artist) {
+        if (track && track.title && track.artist) {
             await this.loadLyricsForDesktop(track);
         }
     }

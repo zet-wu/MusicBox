@@ -1,18 +1,7 @@
 import type {DesktopLyricsSettings as ApiDesktopLyricsSettings} from '@api/types/settings';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 
-export interface DesktopLyricWord {
-    time: number;
-    endTime?: number;
-    text: string;
-}
-
-export interface DesktopLyricLine {
-    time: number;
-    endTime?: number;
-    content?: string;
-    type?: string;
-    words?: DesktopLyricWord[];
-}
+export type DesktopLyricLine = AmllLyricLine;
 
 export interface DesktopLyricsSettings extends ApiDesktopLyricsSettings {
     layoutMode: 'default' | 'center';

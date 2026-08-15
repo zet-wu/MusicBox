@@ -1,6 +1,6 @@
 import type {Result, Unsubscribe} from './common';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from './library';
-import type {LyricLine} from './lyrics';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {LyricsBinding, LyricsSourceRef} from '@/features/lyrics/domain/types';
 import type {DesktopLyricsPlaybackState} from './playback';
 import type {DesktopLyricsSettings, MusicBoxSettings, WasapiShareMode} from './settings';
@@ -235,7 +235,7 @@ export interface ElectronDesktopLyricsAPI {
     toggle(): Promise<{success: boolean; visible?: boolean; error?: string}>;
     isVisible(): Promise<boolean>;
     updatePlaybackState(state: DesktopLyricsPlaybackState): Promise<unknown>;
-    updateLyrics(lyricsData: LyricLine[] | string): Promise<unknown>;
+    updateLyrics(lyricsData: AmllLyricLine[]): Promise<unknown>;
     updatePosition(position: number): Promise<unknown>;
     updateTrack(trackInfo: Track | null): Promise<unknown>;
     updateSettings(settings: DesktopLyricsSettings | MusicBoxSettings): Promise<Result>;
@@ -248,7 +248,7 @@ export interface ElectronDesktopLyricsAPI {
     getSize(): Promise<[number, number]>;
     centerOnScreen(): Promise<unknown>;
     onPlaybackStateChanged(callback: (state: DesktopLyricsPlaybackState) => void): Unsubscribe;
-    onLyricsUpdated(callback: (lyricsData: LyricLine[] | string) => void): Unsubscribe;
+    onLyricsUpdated(callback: (lyricsData: AmllLyricLine[]) => void): Unsubscribe;
     onPositionChanged(callback: (position: number) => void): Unsubscribe;
     onTrackChanged(callback: (trackInfo: Track | null) => void): Unsubscribe;
     onSettingsChanged(callback: (settings: DesktopLyricsSettings) => void): Unsubscribe;

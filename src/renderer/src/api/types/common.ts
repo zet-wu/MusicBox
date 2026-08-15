@@ -64,7 +64,6 @@ export interface QueryOptions {
 /**
  * 歌词格式
  */
-export type LyricsFormat = 'lrc' | 'ttml';
 
 /**
  * 时间戳（毫秒）

@@ -1,5 +1,5 @@
 import type {Result} from '@api/types/common';
-import type {LyricLine} from '@api/types/lyrics';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {DesktopLyricsSettings, MusicBoxSettings} from '@api/types/settings';
 import {desktopLyricsService} from './service';
 import type {DesktopLyricsToggleResult} from './service';
@@ -25,7 +25,7 @@ class DesktopLyricsController {
         return await desktopLyricsService.updateSettings(settings);
     }
 
-    async syncLyrics(lyrics: LyricLine[] | string): Promise<void> {
+    async syncLyrics(lyrics: AmllLyricLine[]): Promise<void> {
         await desktopLyricsService.syncLyrics(lyrics);
     }
 }

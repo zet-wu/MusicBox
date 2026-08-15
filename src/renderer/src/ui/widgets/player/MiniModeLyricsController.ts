@@ -1,29 +1,16 @@
-import {lyricsContentService} from "@/features/mediaAssets/service/LyricsContentService";
-import {playbackUiStateService} from "@/features/playback/service/PlaybackUiStateService";
-import {appendLyricsWordSpans, findActiveLyricIndex, LyricsWordHighlightController} from "@/shared/lyrics";
-import type {Unsubscribe} from "@/features/playback/PlaybackStore";
-import type {LyricLine} from "@api/types/lyrics";
-import type {Track} from "@api/types/track";
-
-interface MiniModeLyricWord {
-    text: string;
-    time: number;
-    endTime?: number | null;
-}
-
-interface MiniModeLyricLine extends LyricLine {
-    endTime?: number | null;
-    words?: MiniModeLyricWord[];
-}
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
+import {getLyricsService} from '@/features/lyrics/service/defaultLyricsServices';
+import {playbackUiStateService} from '@/features/playback/service/PlaybackUiStateService';
+import type {Unsubscribe} from '@/features/playback/PlaybackStore';
+import type {Track} from '@api/types/track';
 
 class MiniModeLyricsController {
     private readonly rootElement: Element | null;
-    private readonly wordHighlightController = new LyricsWordHighlightController();
-
     private active = false;
     private currentLyricIndex = -1;
-    private lyrics: MiniModeLyricLine[] = [];
+    private lyrics: AmllLyricLine[] = [];
     private positionUnsubscribe: Unsubscribe | null = null;
+    private loadController: AbortController | null = null;
 
     constructor(rootElement: Element | null) {
         this.rootElement = rootElement;
@@ -31,13 +18,17 @@ class MiniModeLyricsController {
 
     start(): void {
         this.active = true;
-        this.subscribePositionChanges();
+        this.unsubscribePositionChanges();
+        this.positionUnsubscribe = playbackUiStateService.on('positionChanged', position => {
+            this.updateLyricIndex(position * 1000);
+        });
     }
 
     stop(): void {
         this.active = false;
         this.unsubscribePositionChanges();
-        this.wordHighlightController.reset();
+        this.loadController?.abort();
+        this.loadController = null;
         this.resetLyrics(false);
         this.removeElement();
     }
@@ -47,160 +38,78 @@ class MiniModeLyricsController {
     }
 
     removeElement(): void {
-        document.querySelectorAll('.mini-mode-lyrics').forEach((element) => {
-            element.remove();
-        });
+        document.querySelectorAll('.mini-mode-lyrics').forEach(element => element.remove());
     }
 
     async loadTrackLyrics(track: Track | null, currentTime: number): Promise<void> {
-        if (!track || !track.title || !track.artist) {
+        if (!track?.title || !track.artist) {
             this.resetLyrics(true);
             return;
         }
-
+        this.loadController?.abort();
+        const controller = new AbortController();
+        this.loadController = controller;
         try {
-            const parsedLyrics = await this.resolveLyrics(track);
-            if (!parsedLyrics || parsedLyrics.length === 0) {
-                this.resetLyrics(true);
-                return;
-            }
-
-            this.lyrics = parsedLyrics;
-            this.currentLyricIndex = findActiveLyricIndex(parsedLyrics, currentTime, {beforeFirst: 'first'});
-            console.log(`✅ MiniModeLyricsController: 迷你模式歌词加载成功，共${parsedLyrics.length}行，当前索引:${this.currentLyricIndex}，播放位置:${currentTime.toFixed(2)}s`);
+            const result = await getLyricsService().load(track, controller.signal);
+            if (controller.signal.aborted || !result.document?.render.lines.length) return;
+            this.lyrics = result.document.render.lines.filter(line => !line.isBG);
+            this.currentLyricIndex = findLine(this.lyrics, currentTime * 1000);
             this.updateLyrics();
         } catch (error) {
-            console.error('❌ MiniModeLyricsController: 迷你模式歌词加载失败:', error);
-            this.resetLyrics(true);
+            if (!controller.signal.aborted) {
+                console.error('❌ MiniModeLyricsController: 迷你模式歌词加载失败:', error);
+                this.resetLyrics(true);
+            }
         }
     }
 
-    private subscribePositionChanges(): void {
-        this.unsubscribePositionChanges();
-        this.positionUnsubscribe = playbackUiStateService.on('positionChanged', (position) => {
-            this.updateLyricIndex(position);
-            this.updateLyricsWordHighlight(position);
-        });
-    }
-
-    private unsubscribePositionChanges(): void {
-        if (!this.positionUnsubscribe) return;
-
-        try {
-            this.positionUnsubscribe();
-        } catch (error) {
-            console.warn('⚠️ MiniModeLyricsController: 移除播放位置监听失败:', error);
-        }
-        this.positionUnsubscribe = null;
-    }
-
-    private resetLyrics(renderEmptyState: boolean): void {
-        this.lyrics = [];
-        this.currentLyricIndex = -1;
-        this.wordHighlightController.resetPlaybackPosition();
-        if (renderEmptyState) {
-            this.showNoLyrics();
-        }
-    }
-
-    private async resolveLyrics(track: Track): Promise<MiniModeLyricLine[] | null> {
-        const result = await lyricsContentService.loadTrackLyrics(track);
-        if (!result.success || result.lyrics.length === 0) {
-            return null;
-        }
-
-        return result.lyrics as MiniModeLyricLine[];
-    }
-
-    private updateLyricIndex(currentTime: number): void {
-        if (this.lyrics.length === 0) {
-            return;
-        }
-
-        const newIndex = findActiveLyricIndex(this.lyrics, currentTime, {beforeFirst: 'first'});
-        if (newIndex !== this.currentLyricIndex) {
-            this.currentLyricIndex = newIndex;
+    private updateLyricIndex(currentTimeMs: number): void {
+        if (this.lyrics.length === 0) return;
+        const index = findLine(this.lyrics, currentTimeMs);
+        if (index !== this.currentLyricIndex) {
+            this.currentLyricIndex = index;
             this.updateLyrics();
         }
     }
 
     private updateLyrics(): void {
         if (!this.active) return;
-
-        if (this.lyrics.length === 0) {
-            this.showNoLyrics();
-            return;
-        }
-
-        if (this.currentLyricIndex < 0 || this.currentLyricIndex >= this.lyrics.length) {
-            this.showNoLyrics();
-            return;
-        }
-
-        const currentLyric = this.lyrics[this.currentLyricIndex];
-        const miniLyricsElement = this.getOrCreateLyricsElement();
-        if (!miniLyricsElement) return;
-
-        const isWordByWord = currentLyric.type === 'word-by-word' && currentLyric.words && currentLyric.words.length > 0;
-        if (isWordByWord) {
-            this.renderWordByWordLyrics(miniLyricsElement, currentLyric.words ?? []);
-            return;
-        }
-
-        miniLyricsElement.classList.remove('lyrics-word-by-word');
-        miniLyricsElement.textContent = currentLyric.content || '暂无歌词';
+        const line = this.lyrics[this.currentLyricIndex];
+        const element = this.getOrCreateLyricsElement();
+        if (!element) return;
+        element.textContent = line ? line.words.map(word => word.word).join('') : '暂无歌词';
     }
 
-    private renderWordByWordLyrics(element: HTMLElement, words: MiniModeLyricWord[]): void {
-        element.classList.add('lyrics-word-by-word');
-        appendLyricsWordSpans(element, words);
+    private resetLyrics(renderEmptyState: boolean): void {
+        this.lyrics = [];
+        this.currentLyricIndex = -1;
+        if (renderEmptyState) this.updateLyrics();
     }
 
-    private updateLyricsWordHighlight(currentTime: number): void {
-        if (!this.active) return;
-
-        const miniLyricsElement = document.querySelector<HTMLElement>('.mini-mode-lyrics');
-        if (!miniLyricsElement || !miniLyricsElement.classList.contains('lyrics-word-by-word')) {
-            return;
-        }
-
-        const currentLyric = this.lyrics[this.currentLyricIndex];
-        if (!currentLyric || !currentLyric.words || currentLyric.words.length === 0) return;
-
-        this.wordHighlightController.updateWordHighlight({
-            lineElement: miniLyricsElement,
-            words: currentLyric.words,
-            currentTime,
-            lineEndTime: currentLyric.endTime,
-            preservePlayedProgress: false
-        });
-    }
-
-    private showNoLyrics(): void {
-        const miniLyricsElement = this.getOrCreateLyricsElement();
-        if (!miniLyricsElement) return;
-
-        miniLyricsElement.classList.remove('lyrics-word-by-word');
-        miniLyricsElement.textContent = '暂无歌词';
+    private unsubscribePositionChanges(): void {
+        this.positionUnsubscribe?.();
+        this.positionUnsubscribe = null;
     }
 
     private getOrCreateLyricsElement(): HTMLElement | null {
-        let miniLyricsElement = document.querySelector<HTMLElement>('.mini-mode-lyrics');
-        if (miniLyricsElement) {
-            return miniLyricsElement;
-        }
-
-        miniLyricsElement = document.createElement('div');
-        miniLyricsElement.className = 'mini-mode-lyrics';
-        const playerControls = this.rootElement?.querySelector('.controls');
-        if (!playerControls) {
-            return null;
-        }
-
-        playerControls.appendChild(miniLyricsElement);
-        return miniLyricsElement;
+        let element = document.querySelector<HTMLElement>('.mini-mode-lyrics');
+        if (element) return element;
+        element = document.createElement('div');
+        element.className = 'mini-mode-lyrics';
+        const controls = this.rootElement?.querySelector('.controls');
+        if (!controls) return null;
+        controls.appendChild(element);
+        return element;
     }
+}
 
+function findLine(lines: AmllLyricLine[], currentTimeMs: number): number {
+    let active = 0;
+    for (let index = 0; index < lines.length; index += 1) {
+        if (lines[index].startTime > currentTimeMs) break;
+        active = index;
+    }
+    return active;
 }
 
 export {MiniModeLyricsController};

@@ -62,7 +62,7 @@ class LyricsLoaderController {
 
             if (result.document && result.document.render.lines.length > 0) {
                 this.setDocument(result.document);
-                await desktopLyricsService.syncLyrics(toLegacyProjection(result.document));
+                await desktopLyricsService.syncLyrics(result.document.render.lines);
             } else {
                 this.showNoLyrics();
                 console.log(`❌ Lyrics: ${result.error || '歌词获取失败'}`);
@@ -79,22 +79,6 @@ class LyricsLoaderController {
     private isCurrentLoad(generation: number, trackIdentity: string): boolean {
         return generation === this.loadGeneration && trackIdentity === this.currentTrackIdentity;
     }
-}
-
-function toLegacyProjection(document: LyricsDocument) {
-    return document.render.lines.map(line => ({
-        time: line.startTime / 1000,
-        endTime: line.endTime / 1000,
-        content: line.words.map(word => word.word).join(''),
-        type: line.words.length > 1 ? 'word-by-word' : 'line',
-        translation: line.translatedLyric || undefined,
-        romanization: line.romanLyric || undefined,
-        words: line.words.map(word => ({
-            text: word.word,
-            time: word.startTime / 1000,
-            endTime: word.endTime / 1000
-        }))
-    }));
 }
 
 export {LyricsLoaderController};
