@@ -6,7 +6,7 @@ describe('LyricsAppearanceSettingsService', () => {
         vi.unstubAllGlobals();
     });
 
-    it('迁移旧的单色设置并提供未唱歌词默认颜色', () => {
+    it('读取单色设置', () => {
         const settings = lyricsAppearanceSettingsService.getSettings({
             lyricsColorMode: 'custom',
             lyricsTextColor: '#123456'
@@ -14,12 +14,11 @@ describe('LyricsAppearanceSettingsService', () => {
 
         expect(settings).toMatchObject({
             colorMode: 'custom',
-            sungColor: '#123456',
-            unsungColor: '#6b7280'
+            textColor: '#123456'
         });
     });
 
-    it('仅在自定义模式写入已唱和未唱颜色变量', () => {
+    it('仅在自定义模式写入 AMLL 基础文字颜色变量', () => {
         const values = new Map<string, string>();
         vi.stubGlobal('document', {
             documentElement: {
@@ -32,20 +31,26 @@ describe('LyricsAppearanceSettingsService', () => {
         });
         lyricsAppearanceSettingsService.applyTextColor({
             colorMode: 'custom',
-            sungColor: '#112233',
-            unsungColor: '#445566'
+            textColor: '#112233'
         });
 
-        expect(document.documentElement.style.getPropertyValue('--lyrics-sung-color')).toBe('#112233');
-        expect(document.documentElement.style.getPropertyValue('--lyrics-unsung-color')).toBe('#445566');
+        expect(document.documentElement.style.getPropertyValue('--lyrics-text-color')).toBe('#112233');
 
         lyricsAppearanceSettingsService.applyTextColor({
             colorMode: 'auto',
-            sungColor: '#112233',
-            unsungColor: '#445566'
+            textColor: '#112233'
         });
 
-        expect(document.documentElement.style.getPropertyValue('--lyrics-sung-color')).toBe('');
-        expect(document.documentElement.style.getPropertyValue('--lyrics-unsung-color')).toBe('');
+        expect(document.documentElement.style.getPropertyValue('--lyrics-text-color')).toBe('');
+    });
+
+    it('将上一版已唱颜色迁移为单色设置', () => {
+        const settings = lyricsAppearanceSettingsService.getSettings({
+            lyricsColorMode: 'custom',
+            lyricsSungColor: '#abcdef',
+            lyricsUnsungColor: '#123456'
+        });
+
+        expect(settings.textColor).toBe('#abcdef');
     });
 });
