@@ -199,6 +199,11 @@
     font-size: 0.75rem;
     background: rgba(var(--color-primary-rgb), 0.12);
     border-radius: 999px;
+
+    &.error {
+      color: var(--color-text-secondary);
+      background: var(--color-primary-bg);
+    }
   }
 
   &__score {

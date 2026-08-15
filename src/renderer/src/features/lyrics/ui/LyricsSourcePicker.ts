@@ -2,7 +2,8 @@ import type {Track} from '@api/types/track';
 import {lyricsGateway} from '@/infrastructure/electron';
 import {getLyricsService, lyricsProviderRegistry, lyricsSearchService} from '../service/defaultLyricsServices';
 import {toTrackLyricsQuery} from '../service/LyricsService';
-import type {LyricsCandidate, LyricsDocument, TrackLyricsQuery} from '../domain/types';
+import type {LyricsCandidate, LyricsCandidatePreview, LyricsDocument, TrackLyricsQuery} from '../domain/types';
+import {describeLyricsCandidatePreview} from '../domain/describeLyricsCandidatePreview';
 import type {ProviderSearchResult} from '../service/LyricsSearchService';
 
 type PickerTab = 'current' | 'embedded' | 'local' | string;
@@ -22,9 +23,10 @@ export class LyricsSourcePicker {
     private query: TrackLyricsQuery | null = null;
     private activeTab: PickerTab = 'current';
     private searchController: AbortController | null = null;
-    private previewController: AbortController | null = null;
+    private inspectionController: AbortController | null = null;
     private readonly searchResults = new Map<string, ProviderSearchResult>();
-    private readonly previewCache = new Map<string, LyricsDocument>();
+    private readonly previewCache = new Map<string, LyricsCandidatePreview>();
+    private readonly previewRequests = new Map<string, Promise<LyricsCandidatePreview>>();
     private selectedCandidate: LyricsCandidate | null = null;
 
     constructor() {
@@ -72,6 +74,8 @@ export class LyricsSourcePicker {
         this.selectedCandidate = null;
         this.searchResults.clear();
         this.previewCache.clear();
+        this.previewRequests.clear();
+        this.inspectionController = new AbortController();
         this.root.hidden = false;
         this.requireElement('.lyrics-source-picker__track').textContent = `${track.title} · ${track.artist}`;
         this.renderTabs();
@@ -173,6 +177,7 @@ export class LyricsSourcePicker {
             return;
         }
         this.content.replaceChildren(...result.candidates.map(candidate => this.createCandidateRow(candidate)));
+        void this.inspectCandidates(result.providerId, result.candidates);
     }
 
     private createCandidateRow(candidate: LyricsCandidate): HTMLElement {
@@ -185,20 +190,86 @@ export class LyricsSourcePicker {
         row.querySelector('strong')!.textContent = candidate.title;
         row.querySelector('p')!.textContent = `${candidate.artists.join(' / ') || '未知艺术家'} · ${candidate.album || '未知专辑'} · ${duration}`;
         row.querySelector('.lyrics-candidate__score')!.textContent = `匹配度 ${candidate.matchScore}%`;
-        const badges = row.querySelector('.lyrics-candidate__badges')!;
-        const labels = [
-            candidate.capabilities?.wordTimed && '逐字',
-            candidate.capabilities?.translation && '翻译',
-            candidate.capabilities?.romanization && '音译',
-            candidate.capabilities?.ttml && 'TTML'
-        ].filter(Boolean) as string[];
-        labels.forEach(label => {
+        const preview = this.previewCache.get(candidateKey(candidate));
+        if (preview) this.renderCandidateBadges(row, preview);
+        return row;
+    }
+
+    private async inspectCandidates(providerId: string, candidates: LyricsCandidate[]): Promise<void> {
+        const query = this.query;
+        const controller = this.inspectionController;
+        if (!query || !controller || controller.signal.aborted) return;
+        let nextIndex = 0;
+        const worker = async () => {
+            while (nextIndex < candidates.length && !controller.signal.aborted) {
+                const candidate = candidates[nextIndex++];
+                try {
+                    const preview = await this.resolveCandidate(query, candidate, controller.signal);
+                    if (this.activeTab === providerId) this.updateCandidateBadges(candidate, preview);
+                } catch (error) {
+                    if (!controller.signal.aborted && this.activeTab === providerId) {
+                        this.updateCandidateError(candidate, error);
+                    }
+                }
+            }
+        };
+        await Promise.all(Array.from({length: Math.min(3, candidates.length)}, worker));
+    }
+
+    private resolveCandidate(
+        query: TrackLyricsQuery,
+        candidate: LyricsCandidate,
+        signal: AbortSignal
+    ): Promise<LyricsCandidatePreview> {
+        const key = candidateKey(candidate);
+        const cached = this.previewCache.get(key);
+        if (cached) return Promise.resolve(cached);
+        const pending = this.previewRequests.get(key);
+        if (pending) return pending;
+        const request = getLyricsService().previewCandidate(query, candidate, signal)
+            .then(preview => {
+                if (signal.aborted) throw signal.reason;
+                this.previewCache.set(key, preview);
+                return preview;
+            })
+            .finally(() => {
+                if (this.previewRequests.get(key) === request) this.previewRequests.delete(key);
+            });
+        this.previewRequests.set(key, request);
+        return request;
+    }
+
+    private updateCandidateBadges(candidate: LyricsCandidate, preview: LyricsCandidatePreview): void {
+        const row = this.findCandidateRow(candidate);
+        if (row) this.renderCandidateBadges(row, preview);
+    }
+
+    private renderCandidateBadges(row: HTMLElement, preview: LyricsCandidatePreview): void {
+        const labels = describeLyricsCandidatePreview(preview);
+        const badges = row.querySelector('.lyrics-candidate__badges');
+        if (!badges) return;
+        badges.replaceChildren(...labels.map(label => {
             const badge = document.createElement('span');
             badge.className = 'badge';
             badge.textContent = label;
-            badges.appendChild(badge);
-        });
-        return row;
+            return badge;
+        }));
+    }
+
+    private updateCandidateError(candidate: LyricsCandidate, error: unknown): void {
+        const row = this.findCandidateRow(candidate);
+        const badges = row?.querySelector('.lyrics-candidate__badges');
+        if (!badges) return;
+        const badge = document.createElement('span');
+        badge.className = 'badge error';
+        badge.textContent = '解析失败';
+        badge.title = error instanceof Error ? error.message : String(error);
+        badges.replaceChildren(badge);
+    }
+
+    private findCandidateRow(candidate: LyricsCandidate): HTMLElement | undefined {
+        return Array.from(this.content.querySelectorAll<HTMLElement>('[data-candidate-id]'))
+            .find(row => row.dataset.candidateId === candidate.candidateId);
     }
 
     private async selectCandidate(candidateId: string): Promise<void> {
@@ -213,22 +284,20 @@ export class LyricsSourcePicker {
         this.preview.innerHTML = '<p>正在获取预览...</p>';
 
         const cacheKey = `${candidate.providerId}:${candidate.candidateId}`;
-        let document = this.previewCache.get(cacheKey);
-        if (!document) {
-            this.previewController?.abort();
-            this.previewController = new AbortController();
+        let resolved = this.previewCache.get(cacheKey);
+        if (!resolved) {
+            const controller = this.inspectionController;
+            if (!controller) return;
             try {
-                document = await getLyricsService().previewCandidate(this.query, candidate, this.previewController.signal);
-                this.previewCache.set(cacheKey, document);
+                resolved = await this.resolveCandidate(this.query, candidate, controller.signal);
+                this.updateCandidateBadges(candidate, resolved);
             } catch (error) {
-                if (!this.previewController.signal.aborted) {
-                    this.preview.textContent = error instanceof Error ? error.message : String(error);
-                }
+                if (!controller.signal.aborted) this.preview.textContent = error instanceof Error ? error.message : String(error);
                 return;
             }
         }
         if (this.selectedCandidate !== candidate) return;
-        this.preview.replaceChildren(...document.render.lines.slice(0, 6).map(line => {
+        this.preview.replaceChildren(...resolved.document.render.lines.slice(0, 6).map(line => {
             const block = documentNode('div', line.words.map(word => word.word).join(''));
             if (line.translatedLyric) block.appendChild(documentNode('small', line.translatedLyric));
             if (line.romanLyric) block.appendChild(documentNode('small', line.romanLyric));
@@ -284,6 +353,7 @@ export class LyricsSourcePicker {
         if (!this.query || ['current', 'local', 'embedded'].includes(this.activeTab)) return;
         const provider = lyricsProviderRegistry.get(this.activeTab);
         if (!provider) return;
+        this.resetCandidateInspections();
         const controller = this.searchController ?? new AbortController();
         this.searchController = controller;
         this.searchResults.set(provider.id, {providerId: provider.id, displayName: provider.displayName, state: 'loading', candidates: []});
@@ -343,9 +413,17 @@ export class LyricsSourcePicker {
 
     private closeRequests(): void {
         this.searchController?.abort();
-        this.previewController?.abort();
+        this.inspectionController?.abort();
         this.searchController = null;
-        this.previewController = null;
+        this.inspectionController = null;
+        this.previewRequests.clear();
+    }
+
+    private resetCandidateInspections(): void {
+        this.inspectionController?.abort();
+        this.inspectionController = new AbortController();
+        this.previewCache.clear();
+        this.previewRequests.clear();
     }
 
     private requireElement(selector: string): HTMLElement {
@@ -371,4 +449,8 @@ function documentNode(tagName: string, text: string): HTMLElement {
     const element = document.createElement(tagName);
     element.textContent = text;
     return element;
+}
+
+function candidateKey(candidate: LyricsCandidate): string {
+    return `${candidate.providerId}:${candidate.candidateId}`;
 }

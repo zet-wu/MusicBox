@@ -54,6 +54,11 @@ export interface LyricsDocument {
     source: LyricsSourceRef;
 }
 
+export interface LyricsCandidatePreview {
+    document: LyricsDocument;
+    format: ProviderLyricsPayload['kind'];
+}
+
 export interface NormalizeContext {
     source: LyricsSourceRef;
     durationMs?: number;

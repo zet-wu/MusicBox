@@ -82,6 +82,7 @@ describe('bundled lyrics providers', () => {
             lyrics: '[0,100]S(0,100)',
             romanizationQrc: '[0,100]Song(0,100)'
         });
+        expect(request).toHaveBeenCalledTimes(2);
     });
 
     it('QQ 在 musicu 无结果时回退网页 LRC 接口', async () => {

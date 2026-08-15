@@ -3,6 +3,7 @@ import {lyricsGateway} from '@/infrastructure/electron';
 import type {
     LyricsBinding,
     LyricsCandidate,
+    LyricsCandidatePreview,
     LyricsDocument,
     LyricsSourceRef,
     TrackLyricsQuery
@@ -119,7 +120,7 @@ export class LyricsService {
         query: TrackLyricsQuery,
         candidate: LyricsCandidate,
         signal: AbortSignal
-    ): Promise<LyricsDocument> {
+    ): Promise<LyricsCandidatePreview> {
         const provider = this.providers.get(candidate.providerId);
         if (!provider) throw new Error('未知歌词来源');
         const payload = await provider.fetch(candidate, signal);
@@ -129,7 +130,10 @@ export class LyricsService {
             candidateId: candidate.candidateId,
             manuallySelected: true
         };
-        return this.normalizer.fromPayload(payload, this.createContext(query, source));
+        return {
+            document: this.normalizer.fromPayload(payload, this.createContext(query, source)),
+            format: payload.kind
+        };
     }
 
     async clearBinding(track: Track): Promise<void> {

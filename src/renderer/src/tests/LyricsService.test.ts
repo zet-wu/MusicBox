@@ -88,6 +88,30 @@ describe('LyricsService', () => {
         expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source);
     });
 
+    it('预览候选时返回实际获取的原始格式', async () => {
+        const provider = {
+            id: 'test',
+            displayName: 'Test',
+            search: vi.fn(),
+            fetch: vi.fn().mockResolvedValue({kind: 'qrc', lyrics: '[0,100]S(0,100)'})
+        };
+        const registry = new LyricsProviderRegistry();
+        registry.register(provider);
+        const service = new LyricsService({
+            providers: registry,
+            localSource: {find: vi.fn()} as never,
+            normalizer: normalizer as never
+        });
+
+        const result = await service.previewCandidate(
+            {trackId: 'track-1', title: 'Song', artists: ['Artist']},
+            {providerId: 'test', candidateId: 'candidate', title: 'Song', artists: ['Artist'], matchScore: 100},
+            new AbortController().signal
+        );
+
+        expect(result).toEqual({document, format: 'qrc'});
+    });
+
     it('高匹配在线逐字歌词优先于本地逐行歌词', async () => {
         gateway.readCanonical.mockResolvedValue({success: false});
         const localDocument = {
@@ -124,6 +148,45 @@ describe('LyricsService', () => {
 
         expect(result.document).toBe(onlineDocument);
         expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', onlineDocument.source);
+    });
+
+    it('高分在线逐行候选不会抢在较低分的逐字候选前应用', async () => {
+        gateway.readCanonical.mockResolvedValue({success: false});
+        const lineDocument = {
+            ...document,
+            ttml: {metadata: {timingMode: 'Line'}, lines: []},
+            source: {kind: 'provider', providerId: 'test', candidateId: 'line', manuallySelected: false}
+        };
+        const wordDocument = {
+            ...document,
+            ttml: {metadata: {timingMode: 'Word'}, lines: []},
+            source: {kind: 'provider', providerId: 'test', candidateId: 'word', manuallySelected: false}
+        };
+        const provider = {
+            id: 'test', displayName: 'Test',
+            search: vi.fn().mockResolvedValue([
+                {providerId: 'test', candidateId: 'line', title: 'Song', artists: ['Artist'], matchScore: 95},
+                {providerId: 'test', candidateId: 'word', title: 'Song', artists: ['Artist'], matchScore: 90}
+            ]),
+            fetch: vi.fn((candidate: {candidateId: string}) => Promise.resolve(candidate.candidateId === 'line'
+                ? {kind: 'lrc', lyrics: '[00:00]Song'}
+                : {kind: 'qrc', lyrics: '[0,100]S(0,100)'}))
+        };
+        const registry = new LyricsProviderRegistry();
+        registry.register(provider);
+        const service = new LyricsService({
+            providers: registry,
+            localSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            embeddedSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            normalizer: {
+                fromPayload: vi.fn((payload: {kind: string}) => payload.kind === 'lrc' ? lineDocument : wordDocument)
+            } as never
+        });
+
+        const result = await service.load(track, new AbortController().signal);
+
+        expect(result.document).toBe(wordDocument);
+        expect(provider.fetch).toHaveBeenCalledTimes(2);
     });
 
     it('低匹配在线候选不会覆盖本地歌词', async () => {
