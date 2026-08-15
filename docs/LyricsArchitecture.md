@@ -40,9 +40,13 @@ Renderer 不直接访问文件系统。canonical 文件和绑定通过 preload �
 
 ## 来源优先级与手动绑定
 
-自动加载顺序为：已绑定 canonical、本地同名歌词、音频内嵌歌词、内置在线 provider。四个 provider 统一实现 `search` 与 `fetch`，并接受 `AbortSignal`；切歌或关闭选择器时会取消旧请求，单个 provider 失败不会中断播放或其他来源。
+手动绑定始终优先。自动匹配按质量选择：本地、内嵌或缓存中的逐字歌词可以直接使用；本地或内嵌只有逐行歌词时，匹配分数达到阈值的在线逐字歌词优先。在线候选不合格或只能提供逐行歌词时，继续保留本地/内嵌结果。四个 provider 统一实现 `search` 与 `fetch`，并接受 `AbortSignal`；切歌或关闭选择器时会取消旧请求，单个 provider 失败不会中断播放或其他来源。
+
+在线 provider 不在 renderer 中直接跨域请求。请求通过 preload 进入主进程的歌词专用域名白名单通道，仅允许已登记来源、GET/POST 和有限请求头，同时保留请求取消。酷狗使用有效证书的 `songsearch.kugou.com` 搜索接口；QQ 优先使用 `musicu` 获取逐字或加密歌词，并以网页歌词接口回退。
 
 手动选择候选会保存 `manuallySelected` binding，并立即刷新当前歌词。该绑定优先于自动匹配，只有用户执行“清除绑定”或“重新自动匹配”后才退出。统一来源选择器可从单曲右键菜单和播放详情歌词区域右键菜单进入，并按当前、本地、内嵌及四个 provider 分栏显示独立加载与错误状态。
+
+AMLL 文字颜色默认使用主题的 `--color-text`，随浅色/深色模式切换；设置页可以切换为自定义颜色。翻译、行/逐字罗马字和 TTML Ruby/假名均可独立关闭。这些设置只改变 AMLL render projection，不会删除或改写 canonical TTML 中的内容。
 
 ## 后续编辑能力
 
@@ -63,4 +67,3 @@ Renderer 不直接访问文件系统。canonical 文件和绑定通过 preload �
 - seek、暂停/恢复、切歌、重复行、长歌词、窗口缩放和歌词不可用状态。
 - 两个右键入口、各来源独立 loading/error、预览、应用、当前绑定标记、清除绑定和即时刷新。
 - Windows 桌面歌词与迷你模式；macOS/Linux Web Audio 回退路径不依赖 WASAPI 或 `NativeAudio.node`。
-
