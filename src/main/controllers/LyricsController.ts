@@ -237,6 +237,7 @@ const PROVIDER_HOSTS = new Set([
     'c.y.qq.com',
     'i.y.qq.com',
     'u.y.qq.com',
+    'mobiles.kugou.com',
     'songsearch.kugou.com',
     'lyrics.kugou.com'
 ]);

@@ -13,6 +13,19 @@ interface KugouSearchResponse {
     data?: {lists?: KugouWebSong[]};
 }
 
+interface KugouMobileSearchResponse {
+    data?: {info?: KugouMobileSong[]};
+}
+
+interface KugouMobileSong {
+    hash: string;
+    songname?: string;
+    singername?: string;
+    album_name?: string;
+    duration?: number;
+    album_audio_id?: number;
+}
+
 interface KugouWebSong {
     FileHash: string;
     SongName?: string;
@@ -50,6 +63,43 @@ export class KugouLyricsProvider implements LyricsProvider {
     constructor(private readonly request: LyricsFetch = providerFetch) {}
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
+        try {
+            return await this.searchMobile(query, signal);
+        } catch (error) {
+            if (signal.aborted) throw error;
+            console.warn('⚠️ Lyrics: 酷狗移动搜索失败，尝试网页接口', error);
+            return this.searchWeb(query, signal);
+        }
+    }
+
+    private async searchMobile(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
+        const url = new URL('https://mobiles.kugou.com/api/v3/search/song');
+        url.search = new URLSearchParams({
+            format: 'json',
+            keyword: [query.title, ...query.artists].join(' '),
+            page: '1',
+            pagesize: '30',
+            showtype: '14',
+            plat: '0',
+            sver: '5',
+            correct: '1',
+            api_ver: '1',
+            version: '9108'
+        }).toString();
+        const response = await fetchJson<KugouMobileSearchResponse>(this.request, url.toString(), signal, {
+            headers: {Accept: 'application/json', Referer: 'https://www.kugou.com/'}
+        });
+        return rankProviderCandidates(query, (response.data?.info ?? []).map(song => this.toCandidate(query, {
+            hash: song.hash,
+            title: song.songname,
+            artist: song.singername,
+            album: song.album_name,
+            duration: song.duration,
+            candidateId: song.album_audio_id ? String(song.album_audio_id) : song.hash
+        })));
+    }
+
+    private async searchWeb(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
         const url = new URL('https://songsearch.kugou.com/song_search_v2');
         url.search = new URLSearchParams({
             keyword: [query.title, ...query.artists].join(' '),
@@ -60,20 +110,38 @@ export class KugouLyricsProvider implements LyricsProvider {
             headers: {Accept: 'application/json', Referer: 'https://www.kugou.com/'}
         });
 
-        return rankProviderCandidates(query, (response.data?.lists ?? []).map(song => ({
-            providerId: this.id,
-            candidateId: song.FileHash,
-            title: song.SongName ?? song.FileName ?? query.title,
-            artists: splitArtists(song.SingerName),
+        return rankProviderCandidates(query, (response.data?.lists ?? []).map(song => this.toCandidate(query, {
+            hash: song.FileHash,
+            title: song.SongName ?? song.FileName,
+            artist: song.SingerName,
             album: song.AlbumName,
-            durationMs: song.Duration ? normalizeDuration(song.Duration) : undefined,
+            duration: song.Duration
+        })));
+    }
+
+    private toCandidate(query: TrackLyricsQuery, song: {
+        hash: string;
+        title?: string;
+        artist?: string;
+        album?: string;
+        duration?: number;
+        candidateId?: string;
+    }): Omit<LyricsCandidate, 'matchScore'> {
+        const durationMs = song.duration ? normalizeDuration(song.duration) : undefined;
+        return {
+            providerId: this.id,
+            candidateId: song.candidateId ?? song.hash,
+            title: song.title ?? query.title,
+            artists: splitArtists(song.artist),
+            album: song.album,
+            durationMs,
             capabilities: {lineTimed: true, wordTimed: true, translation: true, romanization: true},
             providerData: {
-                hash: song.FileHash,
-                keyword: [song.SingerName, song.SongName ?? song.FileName].filter(Boolean).join(' - '),
-                durationMs: song.Duration ? normalizeDuration(song.Duration) : undefined
+                hash: song.hash,
+                keyword: [song.artist, song.title].filter(Boolean).join(' - '),
+                durationMs
             } satisfies KugouProviderData
-        })));
+        };
     }
 
     async fetch(candidate: LyricsCandidate, signal: AbortSignal): Promise<ProviderLyricsPayload> {
@@ -87,7 +155,7 @@ export class KugouLyricsProvider implements LyricsProvider {
         }).toString();
         const headers = {Accept: 'application/json', Referer: 'https://www.kugou.com/'};
         const search = await fetchJson<KugouLyricsSearchResponse>(this.request, searchUrl.toString(), signal, {headers});
-        const lyricCandidate = search.candidates?.[0];
+        const lyricCandidate = selectClosestLyric(search.candidates ?? [], data.durationMs);
         if (!lyricCandidate) throw new Error('酷狗候选不包含歌词文件');
 
         const downloadUrl = new URL('https://lyrics.kugou.com/download');
@@ -106,4 +174,17 @@ export class KugouLyricsProvider implements LyricsProvider {
 
 function normalizeDuration(value: number): number {
     return value < 10_000 ? value * 1000 : value;
+}
+
+function selectClosestLyric(
+    candidates: KugouLyricsCandidate[],
+    durationMs: number | undefined
+): KugouLyricsCandidate | undefined {
+    if (!durationMs) return candidates[0];
+    return candidates.reduce<KugouLyricsCandidate | undefined>((best, candidate) => {
+        if (!best) return candidate;
+        const candidateDifference = Math.abs(normalizeDuration(candidate.duration ?? durationMs) - durationMs);
+        const bestDifference = Math.abs(normalizeDuration(best.duration ?? durationMs) - durationMs);
+        return candidateDifference < bestDifference ? candidate : best;
+    }, undefined);
 }

@@ -102,10 +102,15 @@ describe('bundled lyrics providers', () => {
     it('酷狗分离 metadata search 与 KRC fetch', async () => {
         const request = vi.fn(async (input: RequestInfo | URL) => {
             const url = String(input);
-            if (url.includes('/song_search_v2')) {
-                return jsonResponse({data: {lists: [{FileHash: 'hash', SongName: 'Song', SingerName: 'Artist', Duration: 180}]}});
+            if (url.includes('/api/v3/search/song')) {
+                return jsonResponse({data: {info: [{
+                    hash: 'hash', songname: 'Song', singername: 'Artist', duration: 180, album_audio_id: 123
+                }]}});
             }
-            if (url.includes('/search?')) return jsonResponse({candidates: [{id: 'lyric', accesskey: 'key'}]});
+            if (url.includes('/search?')) return jsonResponse({candidates: [
+                {id: 'wrong-duration', accesskey: 'wrong', duration: 200000},
+                {id: 'lyric', accesskey: 'key', duration: 180000}
+            ]});
             return jsonResponse({fmt: 'krc', content: toBase64('krc1payload')});
         });
         const provider = new KugouLyricsProvider(request);
@@ -114,6 +119,23 @@ describe('bundled lyrics providers', () => {
 
         const payload = await provider.fetch(candidates[0], signal);
         expect(payload.kind).toBe('krc');
+        expect(String(request.mock.calls[2][0])).toContain('id=lyric');
         expect(request).toHaveBeenCalledTimes(3);
+    });
+
+    it('酷狗移动搜索失败时回退网页接口', async () => {
+        const request = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes('mobiles.kugou.com')) return new Response('', {status: 503});
+            return jsonResponse({data: {lists: [{
+                FileHash: 'fallback', SongName: 'Song', SingerName: 'Artist', Duration: 180
+            }]}});
+        });
+        const provider = new KugouLyricsProvider(request);
+
+        const candidates = await provider.search(query, new AbortController().signal);
+
+        expect(candidates[0].providerData).toMatchObject({hash: 'fallback'});
+        expect(request).toHaveBeenCalledTimes(2);
     });
 });
