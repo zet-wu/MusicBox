@@ -46,12 +46,22 @@ describe('bundled lyrics providers', () => {
     it('网易优先返回 YRC 并携带翻译和音译', async () => {
         const request = vi.fn(async (input: RequestInfo | URL) => String(input).includes('/search/')
             ? jsonResponse({result: {songs: [{id: 1, name: 'Song', ar: [{name: 'Artist'}], al: {name: 'Album'}, dt: 180000}]}})
-            : jsonResponse({yrc: {lyric: '[0,100](0,100,0)Song'}, tlyric: {lyric: '[00:00.000]歌'}, romalrc: {lyric: '[00:00.000]song'}}));
+            : jsonResponse({
+                yrc: {lyric: '[0,100](0,100,0)Song'},
+                tlyric: {lyric: '[00:00.000]旧翻译'},
+                romalrc: {lyric: '[00:00.000]old'},
+                ytlrc: {lyric: '[00:00.010]歌'},
+                yromalrc: {lyric: '[00:00.010]song'}
+            }));
         const provider = new NeteaseLyricsProvider(request);
         const signal = new AbortController().signal;
         const candidates = await provider.search(query, signal);
 
-        await expect(provider.fetch(candidates[0], signal)).resolves.toMatchObject({kind: 'yrc', translation: '[00:00.000]歌'});
+        await expect(provider.fetch(candidates[0], signal)).resolves.toMatchObject({
+            kind: 'yrc',
+            translation: '[00:00.010]歌',
+            romanization: '[00:00.010]song'
+        });
     });
 
     it('QQ 返回 QRC 及 companion tracks', async () => {

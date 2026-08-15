@@ -26,6 +26,8 @@ interface NeteaseLyricResponse {
     lrc?: LyricTrack;
     tlyric?: LyricTrack;
     romalrc?: LyricTrack;
+    ytlrc?: LyricTrack;
+    yromalrc?: LyricTrack;
 }
 
 export class NeteaseLyricsProvider implements LyricsProvider {
@@ -61,12 +63,26 @@ export class NeteaseLyricsProvider implements LyricsProvider {
         const result = await fetchJson<NeteaseLyricResponse>(this.request, url.toString(), signal, {
             headers: {Accept: 'application/json', Referer: 'https://music.163.com/'}
         });
-        const auxiliary = {
-            translation: result.tlyric?.lyric,
-            romanization: result.romalrc?.lyric
-        };
-        if (result.yrc?.lyric?.trim()) return {kind: 'yrc', lyrics: result.yrc.lyric, ...auxiliary};
-        if (result.lrc?.lyric?.trim()) return {kind: 'lrc', lyrics: result.lrc.lyric, ...auxiliary};
+        if (result.yrc?.lyric?.trim()) {
+            return {
+                kind: 'yrc',
+                lyrics: result.yrc.lyric,
+                translation: preferTrack(result.ytlrc, result.tlyric),
+                romanization: preferTrack(result.yromalrc, result.romalrc)
+            };
+        }
+        if (result.lrc?.lyric?.trim()) {
+            return {
+                kind: 'lrc',
+                lyrics: result.lrc.lyric,
+                translation: result.tlyric?.lyric,
+                romanization: result.romalrc?.lyric
+            };
+        }
         throw new Error('网易云音乐候选不包含可用歌词');
     }
+}
+
+function preferTrack(primary: LyricTrack | undefined, fallback: LyricTrack | undefined): string | undefined {
+    return primary?.lyric?.trim() ? primary.lyric : fallback?.lyric;
 }
