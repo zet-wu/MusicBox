@@ -99,6 +99,7 @@ export class LyricsNormalizer {
 
         this.companionMerger.mergeLrc(document, auxiliary.translation, 'translation');
         this.companionMerger.mergeLrc(document, auxiliary.romanization, 'romanization');
+        this.companionMerger.mergeQrc(document, auxiliary.romanizationQrc, 'romanization');
 
         const ttmlText = this.ttmlService.serialize(document);
         const validatedDocument = this.ttmlService.parse(ttmlText);

@@ -110,4 +110,19 @@ describe('LyricsNormalizer', () => {
 
         expect(result.ttml.lines[0].words?.map(word => word.text)).toEqual(['你', '好']);
     });
+
+    it('保留 QQ 罗马字 QRC 的逐字时间', () => {
+        const result = normalizer.fromQrc(
+            '[1000,2000]鳥(1000,500)の(1500,500)詩(2000,1000)',
+            {romanizationQrc: '[1000,2000]to(1000,500)ri (1500,500)no uta(2000,1000)'},
+            {source}
+        );
+
+        expect(result.ttml.lines[0].romanizations?.[0].words).toHaveLength(3);
+        expect(result.ttml.lines[0].romanizations?.[0].words?.[2]).toMatchObject({
+            text: 'no uta',
+            startTime: 2000,
+            endTime: 3000
+        });
+    });
 });

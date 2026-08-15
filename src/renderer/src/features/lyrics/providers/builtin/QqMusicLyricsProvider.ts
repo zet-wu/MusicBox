@@ -17,10 +17,14 @@ interface QqSearchResponse {
 }
 
 interface QqLyricResponse {
-    qrc?: string;
+    qrc?: number;
+    crypt?: number;
     lyric?: string;
     trans?: string;
     roma?: string;
+    lyric_t?: number;
+    trans_t?: number;
+    roma_t?: number;
 }
 
 interface QqMusicuResponse {
@@ -111,12 +115,15 @@ export class QqMusicLyricsProvider implements LyricsProvider {
                 param: {
                     songMID: songmid,
                     songID: songid ?? 0,
-                    trans_t: 1,
-                    roma_t: 1,
-                    qrc_t: 1,
                     crypt: 1,
-                    lrc_t: 1,
-                    interval: 0
+                    type: 1,
+                    lrc_t: 0,
+                    qrc: 1,
+                    qrc_t: 0,
+                    trans: 1,
+                    trans_t: 0,
+                    roma: 1,
+                    roma_t: 0
                 }
             },
             loginUin: '0',
@@ -145,12 +152,19 @@ function decodeQqText(value: string | undefined): string | undefined {
 
 function toQqPayload(result: QqLyricResponse): ProviderLyricsPayload {
     const translation = decodeQqText(result.trans);
-    const romanization = decodeQqText(result.roma);
-    const decoded = decodeQqText(result.qrc) ?? decodeQqText(result.lyric);
+    const decodedRomanization = decodeQqText(result.roma);
+    const decoded = decodeQqText(result.lyric);
     if (!decoded?.trim()) throw new Error('QQ 音乐候选不包含可用歌词');
     const lyrics = normalizeQrc(decoded);
-    return looksLikeQrc(lyrics)
-        ? {kind: 'qrc', lyrics, translation, romanization}
+    const romanization = decodedRomanization ? normalizeQrc(decodedRomanization) : undefined;
+    return looksLikeQrc(lyrics) || result.qrc === 1
+        ? {
+            kind: 'qrc',
+            lyrics,
+            translation,
+            romanization: romanization && !looksLikeQrc(romanization) ? romanization : undefined,
+            romanizationQrc: romanization && looksLikeQrc(romanization) ? romanization : undefined
+        }
         : {kind: 'lrc', lyrics, translation, romanization};
 }
 
@@ -165,7 +179,7 @@ function qqHeaders(referer: string): Record<string, string> {
 function normalizeQrc(value: string): string {
     const trimmed = value.trim();
     const decrypted = /^[0-9a-f]+$/i.test(trimmed) ? decryptQrcHex(trimmed) : trimmed;
-    const attribute = decrypted.match(/LyricContent="([\s\S]*?)"\s*\/>/i)?.[1];
+    const attribute = decrypted.match(/LyricContent="([\s\S]*?)"(?:\s|\/?>)/i)?.[1];
     return (attribute ?? decrypted)
         .replace(/&#39;/g, "'")
         .replace(/&quot;/g, '"')

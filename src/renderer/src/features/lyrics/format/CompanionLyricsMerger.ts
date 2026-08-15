@@ -1,4 +1,4 @@
-import {parseLrc, type LyricLine as ParsedLyricLine} from '@applemusic-like-lyrics/lyric';
+import {parseLrc, parseQrc, type LyricLine as ParsedLyricLine} from '@applemusic-like-lyrics/lyric';
 import type {LyricLine, SubLyricContent, TTMLResult} from '@applemusic-like-lyrics/ttml';
 
 export type CompanionKind = 'translation' | 'romanization';
@@ -10,13 +10,27 @@ export class CompanionLyricsMerger {
     mergeLrc(document: TTMLResult, lyrics: string | undefined, kind: CompanionKind): void {
         if (!lyrics?.trim()) return;
 
-        const companions = parseLrc(lyrics);
+        this.mergeParsedLines(document, parseLrc(lyrics), kind, false);
+    }
+
+    mergeQrc(document: TTMLResult, lyrics: string | undefined, kind: CompanionKind): void {
+        if (!lyrics?.trim()) return;
+
+        this.mergeParsedLines(document, parseQrc(lyrics), kind, true);
+    }
+
+    private mergeParsedLines(
+        document: TTMLResult,
+        companions: ParsedLyricLine[],
+        kind: CompanionKind,
+        preserveWordTiming: boolean
+    ): void {
         let searchFrom = 0;
         for (const companion of companions) {
             const matchIndex = this.findMonotonicMatch(document.lines, companion, searchFrom);
             if (matchIndex < 0) continue;
 
-            const content = this.toSubLyric(companion);
+            const content = this.toSubLyric(companion, preserveWordTiming);
             if (kind === 'translation') {
                 document.lines[matchIndex].translations = [content];
             } else {
@@ -35,7 +49,16 @@ export class CompanionLyricsMerger {
         return -1;
     }
 
-    private toSubLyric(line: ParsedLyricLine): SubLyricContent {
-        return {text: line.words.map(word => word.word).join('')};
+    private toSubLyric(line: ParsedLyricLine, preserveWordTiming: boolean): SubLyricContent {
+        return {
+            text: line.words.map(word => word.word).join(''),
+            words: preserveWordTiming
+                ? line.words.map(word => ({
+                    text: word.word,
+                    startTime: word.startTime,
+                    endTime: word.endTime
+                }))
+                : undefined
+        };
     }
 }

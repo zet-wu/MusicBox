@@ -34,7 +34,7 @@ export type ProviderLyricsPayload =
     | {kind: 'ttml'; ttml: string}
     | {kind: 'lrc'; lyrics: string; translation?: string; romanization?: string}
     | {kind: 'yrc'; lyrics: string; translation?: string; romanization?: string}
-    | {kind: 'qrc'; lyrics: string; translation?: string; romanization?: string}
+    | {kind: 'qrc'; lyrics: string; translation?: string; romanization?: string; romanizationQrc?: string}
     | {kind: 'krc'; bytes: Uint8Array};
 
 export type LyricsSourceRef =
@@ -67,6 +67,7 @@ export interface NormalizeContext {
 export interface AuxiliaryLyrics {
     translation?: string;
     romanization?: string;
+    romanizationQrc?: string;
 }
 
 export interface LyricsBinding {
