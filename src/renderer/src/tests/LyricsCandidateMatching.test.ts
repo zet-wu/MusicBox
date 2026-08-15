@@ -70,4 +70,54 @@ describe('lyrics candidate matching', () => {
 
         expect(candidates[0].candidateId).toBe('ttml');
     });
+
+    it('统一中文简繁、日文新旧字体和汉字迭代符后评分', () => {
+        const score = scoreLyricsCandidate({
+            trackId: 'shinai',
+            title: '深愛',
+            artists: ['水樹奈々'],
+            album: 'THE MUSEUM II',
+            durationMs: 296_277
+        }, {
+            providerId: 'qqmusic',
+            candidateId: 'shinai-qq',
+            title: '深爱',
+            artists: ['水树奈奈'],
+            album: 'THE MUSEUM II',
+            durationMs: 296_000,
+            capabilities: {wordTimed: true}
+        });
+
+        expect(score).toBeGreaterThanOrEqual(98);
+    });
+
+    it('将日文新字体、旧字体与对应简体映射到共同候选形式', () => {
+        const japanese = scoreLyricsCandidate({
+            trackId: 'sawada',
+            title: '時の過ぎゆくままに',
+            artists: ['沢田研二'],
+            durationMs: 202_000
+        }, {
+            providerId: 'test',
+            candidateId: 'traditional',
+            title: '時の過ぎゆくままに',
+            artists: ['澤田研二'],
+            durationMs: 202_000
+        });
+        const simplified = scoreLyricsCandidate({
+            trackId: 'sawada',
+            title: '時の過ぎゆくままに',
+            artists: ['沢田研二'],
+            durationMs: 202_000
+        }, {
+            providerId: 'test',
+            candidateId: 'simplified',
+            title: '时の过ぎゆくままに',
+            artists: ['泽田研二'],
+            durationMs: 202_000
+        });
+
+        expect(japanese).toBeGreaterThanOrEqual(90);
+        expect(simplified).toBeGreaterThanOrEqual(90);
+    });
 });
