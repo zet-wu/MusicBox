@@ -122,7 +122,7 @@ src/renderer/src/
   infrastructure/electron/ Electron API gateway
   api/                     MusicBoxAPI、播放运行时 API 和类型
   extensions/              插件 host、API、内置插件、示例和文档
-  shared/                  跨功能共享的缓存、歌词、网络、类型
+  shared/                  跨功能共享的缓存、网络、类型
   styles/                  SCSS 分层样式
   assets/                  图标和图片
   core/                    deprecated 兼容转发层
@@ -143,7 +143,8 @@ src/renderer/src/
 
 - `playback`：播放状态、队列、播放历史、播放服务、Web Audio / WASAPI engine adapter。
 - `library`：音乐库数据、扫描入口、元数据编辑、UI 绑定。
-- `mediaAssets`：歌词、封面、本地/内嵌/在线资源解析。
+- `lyrics`：canonical TTML、格式归一化、内置 provider、来源编排和 AMLL Core 渲染，详见 [歌词系统架构](LyricsArchitecture.md)。
+- `mediaAssets`：封面和其他媒体资源解析。
 - `equalizer`：图形均衡器、参量均衡器、预设文件。
 - `desktopLyrics`：桌面歌词窗口同步和渲染控制。
 - `settings`：设置页面 controller、renderer、service。
