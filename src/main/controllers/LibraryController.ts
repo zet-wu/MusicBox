@@ -126,6 +126,7 @@ export class LibraryController extends BaseController {
             if (hasInvalid) {
                 this.libraryCacheManager.removeInvalidTracks(result.invalid);
                 await this.libraryCacheManager.saveCache();
+                this.emitPlaylistsUpdated();
             }
 
             console.log(`✅ 缓存验证完成 - 有效: ${result.valid.length}, 无效: ${result.invalid.length}, 已修改: ${result.modified.length}`);
@@ -147,6 +148,7 @@ export class LibraryController extends BaseController {
         try {
             const track = this.libraryCacheManager.removeTrack(trackFileId);
             await this.libraryCacheManager.saveCache();
+            this.emitPlaylistsUpdated();
             console.log(`🗑️ 从音乐库删除: ${track.title}`);
             return {success: true};
         } catch (error: any) {
@@ -159,6 +161,7 @@ export class LibraryController extends BaseController {
         try {
             const removedCount = this.libraryCacheManager.removeTracksByDrive(driveId);
             await this.libraryCacheManager.saveCache();
+            if (removedCount > 0) this.emitPlaylistsUpdated();
             return {success: true, removedCount};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -204,6 +207,7 @@ export class LibraryController extends BaseController {
         try {
             const playlist = this.libraryCacheManager.createPlaylist(name, description);
             await this.libraryCacheManager.saveCache();
+            this.emitPlaylistsUpdated();
             return {success: true, playlist};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -255,6 +259,8 @@ export class LibraryController extends BaseController {
             await this.playlistCoverStorage.remove(coverFileName).catch(error => {
                 console.warn('⚠️ 删除歌单封面快照失败:', error);
             });
+            this.emitPlaylistsUpdated();
+            this.emitSourcesUpdated();
             return {success: true};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -270,6 +276,8 @@ export class LibraryController extends BaseController {
         try {
             const playlist = this.libraryCacheManager.renamePlaylist(playlistId, newName, description);
             await this.libraryCacheManager.saveCache();
+            this.emitPlaylistsUpdated();
+            this.emitSourcesUpdated();
             return {success: true, playlist};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -337,6 +345,7 @@ export class LibraryController extends BaseController {
                     false
                 );
             }
+            this.emitPlaylistsUpdated();
             return {success: true, results};
         } catch (error: any) {
             return {success: false, error: error.message};
@@ -347,7 +356,10 @@ export class LibraryController extends BaseController {
     async cleanupPlaylists(): Promise<{ success: boolean; cleanedCount?: number; error?: string }> {
         try {
             const cleanedCount = this.libraryCacheManager.cleanupPlaylistReferences();
-            if (cleanedCount > 0) await this.libraryCacheManager.saveCache();
+            if (cleanedCount > 0) {
+                await this.libraryCacheManager.saveCache();
+                this.emitPlaylistsUpdated();
+            }
             return {success: true, cleanedCount};
         } catch (error: any) {
             return {success: false, error: error.message};
