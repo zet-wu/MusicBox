@@ -13,8 +13,7 @@ export interface DesktopLyricsSettings extends ApiDesktopLyricsSettings {
 
 export interface DesktopLyricsElements {
     container: HTMLElement;
-    currentLyricEl: HTMLElement;
-    nextLyricEl: HTMLElement;
+    lyricsMount: HTMLElement;
     controlsBar: HTMLElement;
     lockBtn: HTMLElement;
     lockIcon: HTMLElement;

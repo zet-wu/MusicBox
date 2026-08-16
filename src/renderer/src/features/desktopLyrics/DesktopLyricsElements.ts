@@ -14,8 +14,7 @@ export function resolveDesktopLyricsElements(): DesktopLyricsElements {
 
     return {
         container,
-        currentLyricEl: requireElement<HTMLElement>('.current-lyric .lyric-text'),
-        nextLyricEl: requireElement<HTMLElement>('.next-lyric .lyric-text'),
+        lyricsMount: requireElement<HTMLElement>('#desktop-lyrics-amll'),
         controlsBar: requireElement<HTMLElement>('.controls-bar'),
         lockBtn,
         lockIcon: requireElement<HTMLElement>('.lock-icon', lockBtn),

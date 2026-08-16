@@ -52,10 +52,10 @@ export class DesktopLyricsSettingsController {
         document.documentElement.style.setProperty('--theme-color', themeColor);
 
         if (fontColor) {
-            document.documentElement.style.setProperty('--dl-font-color', fontColor);
+            document.documentElement.style.setProperty('--amll-lp-color', fontColor);
         }
 
-        document.documentElement.style.setProperty('--lyric-font-size', `${fontSize}px`);
+        document.documentElement.style.setProperty('--amll-lp-font-size', `${fontSize}px`);
 
         await this.applyWindowOperation(
             () => this.windowService.setOpacity(opacity),
