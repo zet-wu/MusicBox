@@ -13,6 +13,7 @@ import type {LyricsElements} from "@ui/widgets/lyrics/LyricsElementRegistry";
 import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 import type {LyricsDocument} from '@/features/lyrics/domain/types';
 import {getLyricsSourcePicker} from '@/features/lyrics/ui/LyricsSourcePicker';
+import {LyricsTimelineAdjustController} from './LyricsTimelineAdjustController';
 
 interface LyricsWidgetCompositionOptions {
     root: Element | null;
@@ -32,6 +33,7 @@ class LyricsWidgetComposition {
     private readonly playbackStateController: LyricsPlaybackStateController;
     private readonly lyricsView: AmllLyricsView;
     private readonly trackInfoController: LyricsTrackInfoController;
+    private readonly timelineAdjustController: LyricsTimelineAdjustController;
     private readonly addDomListener: AddLyricsDomListener;
     private readonly isVisible: () => boolean;
     private readonly getCurrentTrack: () => LyricsTrack | null;
@@ -66,15 +68,24 @@ class LyricsWidgetComposition {
             }
         });
 
+        this.timelineAdjustController = new LyricsTimelineAdjustController({
+            elements: this.elements.timelineAdjust,
+            addDomListener: this.addDomListener,
+            getCurrentTrack: this.getCurrentTrack
+        });
+
         this.lyricsLoader = new LyricsLoaderController({
             setDocument: (document) => {
                 this.lyricsView.setDocument(document, playbackUiStateService.getState().position);
+                this.timelineAdjustController.setEditableDocument(document);
             },
             showLoading: () => {
                 this.lyricsView.showLoading();
+                this.timelineAdjustController.setEditableDocument(null);
             },
             showNoLyrics: () => {
                 this.lyricsView.showNoLyrics();
+                this.timelineAdjustController.setEditableDocument(null);
             }
         });
 
@@ -141,6 +152,7 @@ class LyricsWidgetComposition {
         });
 
         this.layoutController.bind();
+        this.timelineAdjustController.bind();
         this.playbackControls.bind();
         this.playbackStateController.bind();
         this.bound = true;
@@ -219,6 +231,7 @@ class LyricsWidgetComposition {
 
     applyDocument(document: LyricsDocument): void {
         this.lyricsView.setDocument(document, playbackUiStateService.getState().position);
+        this.timelineAdjustController.setEditableDocument(document);
         this.syncCurrentPlaybackState(true);
     }
 

@@ -689,6 +689,40 @@
 
 }
 
+.lyrics-timeline-adjust {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  opacity: 1;
+  transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  &[hidden] {
+    display: none;
+  }
+
+  button {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--color-text-primary);
+    background: var(--color-hover);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), background-color 0.2s ease;
+
+    &:hover {
+      background: var(--color-active);
+      transform: scale(1.08);
+    }
+
+    &:active {
+      transform: scale(0.94);
+    }
+  }
+}
+
 .lyrics-display.amll-lyrics-host {
   position: relative;
   overflow: hidden;
@@ -908,6 +942,11 @@
 
 // 居中模式状态类
 .lyrics-page.center-mode {
+  .lyrics-timeline-adjust {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   .lyrics-left-side {
     // 默认的CSS居中方案（备用）
     justify-content: center;
