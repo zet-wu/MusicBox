@@ -265,7 +265,7 @@ export class WindowManager {
 
         const defaultConfig: WindowConfig = {
             width: 1000,
-            height: 150,
+            height: 220,
             x: lyricsX,
             y: lyricsY,
             frame: false,
@@ -299,7 +299,6 @@ export class WindowManager {
 
         // 页面加载完成后显示
         this.desktopLyricsWindow.once('ready-to-show', () => {
-            this.desktopLyricsWindow?.webContents.openDevTools({mode: 'detach'});
             this.desktopLyricsWindow?.show();
         });
 
