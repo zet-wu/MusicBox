@@ -95,6 +95,43 @@ describe('LyricsService', () => {
         expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source, 'manual');
     });
 
+    it('本地歌词存在时只使用 find 返回项生成预览并手动应用', async () => {
+        const localDocument = {...document, source: {kind: 'local', path: 'Song.lrc'} as const};
+        const localSource = {
+            find: vi.fn().mockResolvedValue({kind: 'lrc', path: 'Song.lrc', content: '[00:00]Song'})
+        };
+        const localNormalizer = {fromLrc: vi.fn(() => localDocument)};
+        const registry = new LyricsProviderRegistry();
+        const service = new LyricsService({
+            providers: registry,
+            localSource: localSource as never,
+            normalizer: localNormalizer as never
+        });
+
+        const preview = await service.previewLocal({trackId: 'track-1', title: 'Song', artists: ['Artist']});
+        expect(preview).toEqual({document: localDocument, format: 'lrc'});
+        expect(localSource.find).toHaveBeenCalledTimes(1);
+        expect(localNormalizer.fromLrc).toHaveBeenCalledWith(
+            '[00:00]Song',
+            expect.objectContaining({source: {kind: 'local', path: 'Song.lrc'}})
+        );
+
+        await service.applyPreview({trackId: 'track-1', title: 'Song', artists: ['Artist']}, preview!);
+        expect(gateway.saveCanonical).toHaveBeenCalledWith(
+            'track-1', '<tt/>', {kind: 'local', path: 'Song.lrc'}, 'manual'
+        );
+    });
+
+    it('本地歌词不存在时返回空预览', async () => {
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            normalizer: normalizer as never
+        });
+
+        await expect(service.previewLocal({trackId: 'track-1', title: 'Song', artists: []})).resolves.toBeNull();
+    });
+
     it('预览候选时返回实际获取的原始格式', async () => {
         const provider = {
             id: 'test',

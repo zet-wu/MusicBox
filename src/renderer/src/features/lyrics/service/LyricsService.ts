@@ -120,6 +120,18 @@ export class LyricsService {
         return this.persist(query.trackId, preview.document, 'manual');
     }
 
+    async previewLocal(query: TrackLyricsQuery): Promise<LyricsCandidatePreview | null> {
+        const local = await this.localSource.find(query);
+        if (!local) return null;
+        const source: LyricsSourceRef = {kind: 'local', path: local.path};
+        return {
+            document: local.kind === 'ttml'
+                ? this.normalizer.fromTtml(local.content, this.createContext(query, source))
+                : this.normalizer.fromLrc(local.content, this.createContext(query, source)),
+            format: local.kind
+        };
+    }
+
     async previewCandidate(
         query: TrackLyricsQuery,
         candidate: LyricsCandidate,
