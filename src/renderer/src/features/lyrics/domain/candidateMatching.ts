@@ -10,6 +10,7 @@ const ALBUM_FULL_MATCH_WEIGHT = 0.3;
 const ARTIST_FULL_MATCH_WEIGHT = 0.2;
 const DURATION_REJECT_THRESHOLD_MS = 15_000;
 const FUZZ_OPTIONS = {full_process: false} as const;
+export const AUTO_MATCH_IDENTITY_THRESHOLD = 55;
 const cjkConverters = [
     OpenCC.Converter({from: 't', to: 'cn'}),
     OpenCC.Converter({from: 'tw', to: 'cn'}),
@@ -76,11 +77,21 @@ export function rankLyricsCandidates(
             identityScore: scoreLyricsCandidateIdentity(query, candidate),
             qualityScore: scoreLyricsCandidateQuality(candidate)
         }))
-        .sort((left, right) => {
-            const scoreDifference = right.identityScore - left.identityScore;
-            if (scoreDifference !== 0) return scoreDifference;
-            return right.qualityScore - left.qualityScore;
-        });
+        .sort(compareLyricsCandidates);
+}
+
+export function identityBucket(score: number): number {
+    return Math.min(4, Math.floor(score / 20));
+}
+
+export function compareLyricsCandidates(left: LyricsCandidate, right: LyricsCandidate): number {
+    const bucketDifference = identityBucket(right.identityScore) - identityBucket(left.identityScore);
+    if (bucketDifference !== 0) return bucketDifference;
+
+    const qualityDifference = right.qualityScore - left.qualityScore;
+    if (qualityDifference !== 0) return qualityDifference;
+
+    return right.identityScore - left.identityScore;
 }
 
 function normalizeBase(value: string): string {

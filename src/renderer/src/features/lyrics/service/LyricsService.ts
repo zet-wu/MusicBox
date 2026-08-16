@@ -13,6 +13,7 @@ import type {LyricsProviderRegistry} from '../providers/LyricsProviderRegistry';
 import {LyricsSearchService} from './LyricsSearchService';
 import {EmbeddedLyricsSource} from '../sources/EmbeddedLyricsSource';
 import {LocalLyricsSource} from '../sources/LocalLyricsSource';
+import {AUTO_MATCH_IDENTITY_THRESHOLD, compareLyricsCandidates} from '../domain/candidateMatching';
 
 export interface LyricsLoadResult {
     document: LyricsDocument | null;
@@ -28,7 +29,6 @@ export interface LyricsServiceOptions {
 }
 
 export class LyricsService {
-    private static readonly AUTO_MATCH_THRESHOLD = 75;
     private readonly providers: LyricsProviderRegistry;
     private readonly localSource: LocalLyricsSource;
     private readonly embeddedSource: EmbeddedLyricsSource;
@@ -81,8 +81,8 @@ export class LyricsService {
         const searchResults = await new LyricsSearchService(this.providers).searchAll(query, signal);
         const candidates = searchResults
             .flatMap(result => result.candidates.slice(0, 2))
-            .filter(candidate => candidate.identityScore >= LyricsService.AUTO_MATCH_THRESHOLD)
-            .sort((left, right) => right.identityScore - left.identityScore);
+            .filter(candidate => candidate.identityScore >= AUTO_MATCH_IDENTITY_THRESHOLD)
+            .sort(compareLyricsCandidates);
         let onlineLineTimed: LyricsDocument | null = null;
 
         for (const candidate of candidates) {

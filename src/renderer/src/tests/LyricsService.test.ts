@@ -170,7 +170,7 @@ describe('LyricsService', () => {
         expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', onlineDocument.source);
     });
 
-    it('高分在线逐行候选不会抢在较低分的逐字候选前应用', async () => {
+    it('同一 identity 分箱内优先尝试高质量逐字候选', async () => {
         gateway.readCanonical.mockResolvedValue({success: false});
         const lineDocument = {
             ...document,
@@ -206,7 +206,7 @@ describe('LyricsService', () => {
         const result = await service.load(track, new AbortController().signal);
 
         expect(result.document).toBe(wordDocument);
-        expect(provider.fetch).toHaveBeenCalledTimes(2);
+        expect(provider.fetch).toHaveBeenCalledTimes(1);
     });
 
     it('低匹配在线候选不会覆盖本地歌词', async () => {
@@ -219,7 +219,7 @@ describe('LyricsService', () => {
         const provider = {
             id: 'test', displayName: 'Test',
             search: vi.fn().mockResolvedValue([{
-                providerId: 'test', candidateId: 'weak', title: 'Other', artists: ['Other'], identityScore: 74, qualityScore: 100
+                providerId: 'test', candidateId: 'weak', title: 'Other', artists: ['Other'], identityScore: 54, qualityScore: 100
             }]),
             fetch: vi.fn()
         };

@@ -1,6 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import {
     combinedFuzzyScore,
+    compareLyricsCandidates,
+    AUTO_MATCH_IDENTITY_THRESHOLD,
     rankLyricsCandidates,
     scoreLyricsCandidateIdentity,
     scoreLyricsCandidateQuality
@@ -103,6 +105,26 @@ describe('lyrics candidate matching', () => {
             {providerId: 'test', candidateId: 'live', title: 'Song (Live)', artists: []}
         );
         expect(score).toBe(100);
+    });
+
+    it('同一 identity 分箱优先质量，跨分箱优先 identity', () => {
+        const candidate = (identityScore: number, qualityScore: number) => ({
+            providerId: 'test', candidateId: `${identityScore}/${qualityScore}`, title: 'Song', artists: [],
+            identityScore, qualityScore
+        });
+
+        expect([candidate(79, 20), candidate(61, 90)].sort(compareLyricsCandidates)[0].candidateId).toBe('61/90');
+        expect([candidate(80, 1), candidate(79, 100)].sort(compareLyricsCandidates)[0].candidateId).toBe('80/1');
+        expect([candidate(62, 80), candidate(78, 80)].sort(compareLyricsCandidates)[0].candidateId).toBe('78/80');
+    });
+
+    it('自动候选门槛只检查 identityScore 55 分', () => {
+        const eligible = [
+            {identityScore: 54, qualityScore: 100},
+            {identityScore: 55, qualityScore: 0}
+        ].filter(candidate => candidate.identityScore >= AUTO_MATCH_IDENTITY_THRESHOLD);
+
+        expect(eligible).toEqual([{identityScore: 55, qualityScore: 0}]);
     });
 
     it('统一中文简繁、日文新旧字体和汉字迭代符后评分', () => {
