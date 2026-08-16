@@ -8,7 +8,6 @@ export interface DesktopLyricsSettings extends ApiDesktopLyricsSettings {
     themeColor: string;
     fontColor: string;
     opacity: number;
-    fontSize: number;
 }
 
 export interface DesktopLyricsElements {

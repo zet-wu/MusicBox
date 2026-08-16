@@ -75,7 +75,8 @@ export class MusicBoxAPI extends EventEmitter {
                 currentTrack: this.playbackRuntimeState.currentTrack,
                 isPlaying: this.playbackRuntimeState.isPlaying,
                 position: this.playbackRuntimeState.position
-            })
+            }),
+            getCurrentSettings: () => cacheManager.getLocalCache<MusicBoxSettings>('musicbox-settings') || {}
         });
         this.audioEngineAdapter = new AudioEngineAdapter({
             getNextTrackIndex: () => this.getNextTrackIndex(),

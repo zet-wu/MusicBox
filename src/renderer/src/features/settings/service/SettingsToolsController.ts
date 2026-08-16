@@ -12,6 +12,8 @@ import {mediaDirectorySettingsService} from "./MediaDirectorySettingsService";
 import {appConfirmationService} from "@/features/appShell/service";
 import type {SettingValue} from "./SettingsStore";
 import type {SettingsListenerScope} from "./SettingsListenerScope";
+import {desktopLyricsService} from '@/features/desktopLyrics/service/DesktopLyricsService';
+import {settingsStore} from './SettingsStore';
 
 export interface SettingsToolsElements {
     selectLyricsFolderButton: HTMLElement | null;
@@ -332,6 +334,7 @@ class SettingsToolsController {
         });
         lyricsAppearanceSettingsService.applyTypography(settings);
         lyricsAppearanceSettingsService.notifyDisplaySettingsChanged();
+        void desktopLyricsService.updateSettings(settingsStore.load());
     }
 
     private bindLyricsDisplayToggle(

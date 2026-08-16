@@ -3,6 +3,7 @@ import {getLyricsService} from '@/features/lyrics/service/defaultLyricsServices'
 import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {DesktopLyricsPlaybackState} from '@api/types/playback';
 import type {Track} from '@api/types/track';
+import type {MusicBoxSettings} from '@api/types/settings';
 
 export type DesktopLyricsSyncType = 'track' | 'playbackState' | 'position' | 'lyrics';
 
@@ -14,13 +15,16 @@ export interface CurrentDesktopLyricsState {
 
 export interface DesktopLyricsStateSyncOptions {
     getCurrentState: () => CurrentDesktopLyricsState;
+    getCurrentSettings: () => MusicBoxSettings;
 }
 
 export class DesktopLyricsStateSyncService {
     private readonly getCurrentState: () => CurrentDesktopLyricsState;
+    private readonly getCurrentSettings: () => MusicBoxSettings;
 
-    constructor({getCurrentState}: DesktopLyricsStateSyncOptions) {
+    constructor({getCurrentState, getCurrentSettings}: DesktopLyricsStateSyncOptions) {
         this.getCurrentState = getCurrentState;
+        this.getCurrentSettings = getCurrentSettings;
     }
 
     async syncToDesktopLyrics(
@@ -62,6 +66,7 @@ export class DesktopLyricsStateSyncService {
     async syncCurrentStateToDesktopLyrics(): Promise<void> {
         try {
             const {currentTrack, isPlaying, position} = this.getCurrentState();
+            await desktopLyricsGateway.updateSettings(this.getCurrentSettings());
 
             if (currentTrack) {
                 await desktopLyricsGateway.updateTrack(currentTrack);

@@ -13,6 +13,7 @@ export type DesktopLyricsPlaybackSnapshot = {
 
 interface DesktopLyricsServiceDependencies {
     getPlaybackSnapshot(): DesktopLyricsPlaybackSnapshot;
+    getSettings(): MusicBoxSettings;
 }
 
 export class DesktopLyricsService {
@@ -25,7 +26,8 @@ export class DesktopLyricsService {
                 currentTrack: null,
                 isPlaying: false,
                 position: 0
-            })
+            }),
+            getSettings: () => ({})
         };
         this.sync = new DesktopLyricsSync({
             getCurrentState: () => {
@@ -35,7 +37,8 @@ export class DesktopLyricsService {
                     isPlaying: snapshot.isPlaying,
                     position: snapshot.position
                 };
-            }
+            },
+            getCurrentSettings: () => this.dependencies.getSettings()
         });
     }
 

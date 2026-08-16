@@ -1,6 +1,8 @@
 import {desktopLyricsWindowService} from './service';
 import type {DesktopLyricsLockController} from './DesktopLyricsLockController';
 import type {DesktopLyricsElements, DesktopLyricsSettings} from './DesktopLyricsTypes';
+import type {MusicBoxSettings} from '@api/types/settings';
+import {lyricsAppearanceSettingsService} from '@/features/settings/service/LyricsAppearanceSettingsService';
 
 type DesktopLyricsWindowService = typeof desktopLyricsWindowService;
 
@@ -11,7 +13,6 @@ const DEFAULT_DESKTOP_LYRICS_SETTINGS: DesktopLyricsSettings = {
     themeColor: '#64b5f6',
     fontColor: '#000',
     opacity: 0.9,
-    fontSize: 48
 };
 
 export class DesktopLyricsSettingsController {
@@ -38,24 +39,30 @@ export class DesktopLyricsSettingsController {
         }
     }
 
-    async updateSettings(newSettings?: Partial<DesktopLyricsSettings>): Promise<void> {
+    async updateSettings(newSettings?: Partial<DesktopLyricsSettings> | MusicBoxSettings): Promise<void> {
         if (!newSettings) return;
 
-        this.settings = {...this.settings, ...newSettings};
+        const desktopSettings: Partial<DesktopLyricsSettings> = 'desktopLyricsSettings' in newSettings
+            ? newSettings.desktopLyricsSettings ?? {}
+            : newSettings;
+        this.settings = {...this.settings, ...desktopSettings};
         this.saveSettings();
+        if (isMusicBoxSettings(newSettings)) {
+            lyricsAppearanceSettingsService.applyTypography(
+                lyricsAppearanceSettingsService.getSettings(newSettings)
+            );
+        }
         await this.applySettings();
     }
 
     async applySettings(): Promise<void> {
-        const {layoutMode, themeColor, fontColor, opacity, fontSize} = this.settings;
+        const {layoutMode, themeColor, fontColor, opacity} = this.settings;
 
         document.documentElement.style.setProperty('--theme-color', themeColor);
 
         if (fontColor) {
             document.documentElement.style.setProperty('--amll-lp-color', fontColor);
         }
-
-        document.documentElement.style.setProperty('--amll-lp-font-size', `${fontSize}px`);
 
         await this.applyWindowOperation(
             () => this.windowService.setOpacity(opacity),
@@ -118,4 +125,12 @@ export class DesktopLyricsSettingsController {
             console.error(`❌ 桌面歌词: ${errorMessage}`, error);
         }
     }
+}
+
+function isMusicBoxSettings(settings: Partial<DesktopLyricsSettings> | MusicBoxSettings): settings is MusicBoxSettings {
+    return 'desktopLyricsSettings' in settings
+        || 'lyricsFontFamily' in settings
+        || 'lyricsFontSize' in settings
+        || 'lyricsCustomLatinFont' in settings
+        || 'lyricsCustomCjkFont' in settings;
 }

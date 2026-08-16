@@ -52,6 +52,8 @@ body {
     color: var(--amll-lp-color, #fff);
     mix-blend-mode: normal;
     pointer-events: none;
+    font-family: var(--lyrics-font-family, inherit);
+    font-size: var(--amll-lp-font-size, 48px);
     --amll-lp-line-width-aspect: 1;
     --amll-lp-line-padding-x: 0;
   }
