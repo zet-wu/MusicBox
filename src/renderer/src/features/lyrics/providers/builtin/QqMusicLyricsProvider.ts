@@ -130,7 +130,7 @@ export class QqMusicLyricsProvider implements LyricsProvider {
         for (let attempt = 0; attempt < 3; attempt++) {
             const response = await fetchJson<QqMusicuResponse>(this.request, 'https://u.y.qq.com/cgi-bin/musicu.fcg', signal, {
                 method: 'POST',
-                headers: {...qqHeaders('https://y.qq.com/portal/player.html'), 'Content-Type': 'application/json'},
+                headers: {...qqHeaders('https://y.qq.com/'), 'Content-Type': 'application/json'},
                 body: JSON.stringify(body)
             });
             if (response.code === 0 && response.req_0?.code === 0) return response.req_0.data ?? null;

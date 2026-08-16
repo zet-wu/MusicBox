@@ -65,7 +65,7 @@ describe('bundled lyrics providers', () => {
     });
 
     it('QQ 返回 QRC 及 companion tracks', async () => {
-        const request = vi.fn(async (input: RequestInfo | URL) => String(input).includes('client_search')
+        const request = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => String(input).includes('client_search')
             ? jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}], interval: 180}]}}})
             : jsonResponse({code: 0, req_0: {code: 0, data: {
                 qrc: 1,
@@ -83,6 +83,7 @@ describe('bundled lyrics providers', () => {
             romanizationQrc: '[0,100]Song(0,100)'
         });
         expect(request).toHaveBeenCalledTimes(2);
+        expect(new Headers(request.mock.calls[1][1]?.headers).get('referer')).toBe('https://y.qq.com/');
     });
 
     it('QQ 仅在 musicu 成功响应无歌词时回退网页 LRC 接口', async () => {
