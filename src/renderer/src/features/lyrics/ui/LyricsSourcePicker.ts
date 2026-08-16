@@ -414,7 +414,7 @@ export class LyricsSourcePicker {
                 ?? (this.selectedCandidate ? this.previewCache.get(candidateKey(this.selectedCandidate)) : undefined);
             if (!preview) throw new Error('候选预览已失效，请重新选择');
             const result = await getLyricsService().applyPreview(this.query, preview);
-            if (!result.document) throw new Error(result.error ?? '应用歌词失败');
+            if (!result.document || !result.binding) throw new Error(result.error ?? '应用歌词失败');
             window.dispatchEvent(new CustomEvent<LyricsDocumentAppliedDetail>('lyrics:document-applied', {
                 detail: {trackId: this.query.trackId, document: result.document}
             }));
@@ -432,7 +432,7 @@ export class LyricsSourcePicker {
         await getLyricsService().clearBinding(this.track);
         const controller = new AbortController();
         const result = await getLyricsService().load(this.track, controller.signal);
-        if (result.document) {
+        if (result.document && result.binding) {
             window.dispatchEvent(new CustomEvent<LyricsDocumentAppliedDetail>('lyrics:document-applied', {
                 detail: {trackId: this.query.trackId, document: result.document}
             }));
@@ -493,7 +493,7 @@ export class LyricsSourcePicker {
         this.setStatus('正在刷新当前来源...');
         const controller = new AbortController();
         const refreshed = await getLyricsService().refreshBinding(this.query, result.binding, controller.signal);
-        if (!refreshed.document) throw new Error(refreshed.error ?? '刷新当前来源失败');
+        if (!refreshed.document || !refreshed.binding) throw new Error(refreshed.error ?? '刷新当前来源失败');
         window.dispatchEvent(new CustomEvent<LyricsDocumentAppliedDetail>('lyrics:document-applied', {
             detail: {trackId: this.query.trackId, document: refreshed.document}
         }));

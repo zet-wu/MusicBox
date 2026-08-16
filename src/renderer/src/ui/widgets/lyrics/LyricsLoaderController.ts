@@ -5,14 +5,14 @@ import type {LyricsService} from '@/features/lyrics/service/LyricsService';
 import {getLyricsTrackIdentity, type LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 
 interface LyricsLoaderControllerOptions {
-    setDocument: (document: LyricsDocument) => void;
+    setDocument: (document: LyricsDocument, editableCanonical: boolean) => void;
     showLoading: () => void;
     showNoLyrics: () => void;
     service?: LyricsService;
 }
 
 class LyricsLoaderController {
-    private readonly setDocument: (document: LyricsDocument) => void;
+    private readonly setDocument: (document: LyricsDocument, editableCanonical: boolean) => void;
     private readonly showLoading: () => void;
     private readonly showNoLyrics: () => void;
     private loadGeneration = 0;
@@ -61,7 +61,7 @@ class LyricsLoaderController {
             }
 
             if (result.document && result.document.render.lines.length > 0) {
-                this.setDocument(result.document);
+                this.setDocument(result.document, Boolean(result.binding));
                 await desktopLyricsService.syncLyrics(result.document.render.lines);
             } else {
                 this.showNoLyrics();

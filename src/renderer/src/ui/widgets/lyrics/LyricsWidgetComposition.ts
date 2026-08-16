@@ -75,9 +75,9 @@ class LyricsWidgetComposition {
         });
 
         this.lyricsLoader = new LyricsLoaderController({
-            setDocument: (document) => {
+            setDocument: (document, editableCanonical) => {
                 this.lyricsView.setDocument(document, playbackUiStateService.getState().position);
-                this.timelineAdjustController.setEditableDocument(document);
+                this.timelineAdjustController.setEditableDocument(editableCanonical ? document : null);
             },
             showLoading: () => {
                 this.lyricsView.showLoading();
