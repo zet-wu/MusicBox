@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {LyricsTimelineAdjustController} from '@/ui/widgets/lyrics/LyricsTimelineAdjustController';
+import type {LyricsDocument} from '@/features/lyrics/domain/types';
 
 class FakeElement extends EventTarget {
     hidden = false;
@@ -9,15 +10,19 @@ const track = {
     fileId: 'track-1',
     title: 'Song',
     artist: 'Artist',
-    album: 'Album'
+    album: 'Album',
+    filePath: 'Song.flac'
 };
 const source = {kind: 'provider', providerId: 'test', candidateId: '1'} as const;
 
-function lyricDocument(startTime: number) {
+function lyricDocument(startTime: number): LyricsDocument {
     return {
         ttmlText: '<tt/>',
         ttml: {metadata: {}, lines: []},
-        render: {metadata: [], lines: [{words: [], startTime, endTime: startTime + 1000}]},
+        render: {metadata: [], lines: [{
+            words: [], translatedLyric: '', romanLyric: '', isBG: false, isDuet: false,
+            startTime, endTime: startTime + 1000
+        }]},
         source
     };
 }

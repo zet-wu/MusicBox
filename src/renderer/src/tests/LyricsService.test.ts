@@ -2,6 +2,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {LyricsProviderRegistry} from '@/features/lyrics/providers/LyricsProviderRegistry';
 import {LyricsSearchService} from '@/features/lyrics/service/LyricsSearchService';
 import {LyricsService} from '@/features/lyrics/service/LyricsService';
+import type {AmllLyricResult, TTMLResult} from '@applemusic-like-lyrics/ttml';
 
 const gateway = vi.hoisted(() => ({
     readCanonical: vi.fn(),
@@ -29,11 +30,17 @@ const normalizer = {
     fromPayload: vi.fn(() => document),
     fromLrc: vi.fn(() => document)
 };
-const parsedTtml = {
+const parsedTtml: TTMLResult = {
     metadata: {timingMode: 'Word' as const},
     lines: [{text: 'Song', startTime: 100, endTime: 1000}]
 };
-const shiftedRender = {metadata: [], lines: [{words: [], startTime: 200, endTime: 1100}]};
+const shiftedRender: AmllLyricResult = {
+    metadata: [],
+    lines: [{
+        words: [], translatedLyric: '', romanLyric: '', isBG: false, isDuet: false,
+        startTime: 200, endTime: 1100
+    }]
+};
 const ttmlService = {
     parse: vi.fn(() => parsedTtml),
     serialize: vi.fn(() => '<tt>shifted</tt>'),

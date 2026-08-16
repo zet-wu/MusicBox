@@ -36,7 +36,7 @@ describe('projectLyricsForDesktop', () => {
             ruby: [{word: 'さだめ', startTime: 1100, endTime: 1900}]
         });
         expect(input[0].isDuet).toBe(true);
-        expect(input[0].words[0].romanWord).toBe('sadame');
+        expect('romanWord' in input[0].words[0] ? input[0].words[0].romanWord : undefined).toBe('sadame');
         expect(projected[0].words[0]).not.toBe(input[0].words[0]);
     });
 });
