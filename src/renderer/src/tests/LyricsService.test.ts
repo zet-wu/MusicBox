@@ -29,6 +29,16 @@ const normalizer = {
     fromPayload: vi.fn(() => document),
     fromLrc: vi.fn(() => document)
 };
+const parsedTtml = {
+    metadata: {timingMode: 'Word' as const},
+    lines: [{text: 'Song', startTime: 100, endTime: 1000}]
+};
+const shiftedRender = {metadata: [], lines: [{words: [], startTime: 200, endTime: 1100}]};
+const ttmlService = {
+    parse: vi.fn(() => parsedTtml),
+    serialize: vi.fn(() => '<tt>shifted</tt>'),
+    project: vi.fn(() => shiftedRender)
+};
 const manualSources = [
     source,
     {kind: 'local', path: 'Song.lrc'},
@@ -40,6 +50,111 @@ describe('LyricsService', () => {
         vi.clearAllMocks();
         gateway.saveCanonical.mockResolvedValue({success: true, binding: {trackId: 'track-1', source, selectionMode: 'manual'}});
         gateway.clearBinding.mockResolvedValue({success: true, cleared: true});
+        ttmlService.parse.mockReturnValue(parsedTtml);
+        ttmlService.serialize.mockReturnValue('<tt>shifted</tt>');
+        ttmlService.project.mockReturnValue(shiftedRender);
+    });
+
+    it('读取 canonical 歌词并以 manual binding 保存调整后的时间轴', async () => {
+        const binding = {
+            trackId: 'track-1', canonicalTtmlPath: 'canonical.ttml', source,
+            selectionMode: 'auto' as const, updatedAt: 1
+        };
+        gateway.readCanonical.mockResolvedValue({success: true, ttml: '<tt/>', binding});
+        gateway.saveCanonical.mockResolvedValue({success: true, binding: {...binding, selectionMode: 'manual'}});
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn()} as never,
+            normalizer: normalizer as never,
+            ttmlService: ttmlService as never
+        });
+
+        const result = await service.shiftCanonicalTimeline(
+            {trackId: 'track-1', title: 'Song', artists: ['Artist']},
+            100
+        );
+
+        expect(ttmlService.parse).toHaveBeenCalledWith('<tt/>');
+        expect(ttmlService.serialize).toHaveBeenCalledWith(expect.objectContaining({
+            lines: [expect.objectContaining({startTime: 200, endTime: 1100})]
+        }));
+        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt>shifted</tt>', source, 'manual');
+        expect(result).toMatchObject({
+            appliedDeltaMs: 100,
+            document: {ttmlText: '<tt>shifted</tt>', source, render: shiftedRender}
+        });
+    });
+
+    it('没有 canonical 歌词时返回明确失败且不写入', async () => {
+        gateway.readCanonical.mockResolvedValue({success: false, error: '不存在'});
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn()} as never,
+            normalizer: normalizer as never,
+            ttmlService: ttmlService as never
+        });
+
+        const result = await service.shiftCanonicalTimeline(
+            {trackId: 'track-1', title: 'Song', artists: []},
+            -100
+        );
+
+        expect(result).toEqual({document: null, appliedDeltaMs: 0, error: '不存在'});
+        expect(gateway.saveCanonical).not.toHaveBeenCalled();
+    });
+
+    it('零实际偏移仍保存有效文档且不改变来源', async () => {
+        const zeroTtml = {
+            metadata: {timingMode: 'Line' as const},
+            lines: [{text: 'Song', startTime: 0, endTime: 1000}]
+        };
+        const binding = {
+            trackId: 'track-1', canonicalTtmlPath: 'canonical.ttml', source,
+            selectionMode: 'auto' as const, updatedAt: 1
+        };
+        gateway.readCanonical.mockResolvedValue({success: true, ttml: '<tt/>', binding});
+        gateway.saveCanonical.mockResolvedValue({success: true, binding: {...binding, selectionMode: 'manual'}});
+        ttmlService.parse.mockReturnValue(zeroTtml);
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn()} as never,
+            normalizer: normalizer as never,
+            ttmlService: ttmlService as never
+        });
+
+        const result = await service.shiftCanonicalTimeline(
+            {trackId: 'track-1', title: 'Song', artists: []},
+            -100
+        );
+
+        expect(result.appliedDeltaMs).toBe(0);
+        expect(result.document?.source).toEqual(source);
+        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt>shifted</tt>', source, 'manual');
+    });
+
+    it('canonical 保存失败时不返回可应用的新文档', async () => {
+        gateway.readCanonical.mockResolvedValue({
+            success: true,
+            ttml: '<tt/>',
+            binding: {
+                trackId: 'track-1', canonicalTtmlPath: 'canonical.ttml', source,
+                selectionMode: 'manual', updatedAt: 1
+            }
+        });
+        gateway.saveCanonical.mockResolvedValue({success: false, error: '磁盘写入失败'});
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn()} as never,
+            normalizer: normalizer as never,
+            ttmlService: ttmlService as never
+        });
+
+        const result = await service.shiftCanonicalTimeline(
+            {trackId: 'track-1', title: 'Song', artists: []},
+            100
+        );
+
+        expect(result).toEqual({document: null, appliedDeltaMs: 0, error: '磁盘写入失败'});
     });
 
     it.each(manualSources)('优先读取持久化 manual $kind binding，不被自动搜索覆盖', async manualSource => {

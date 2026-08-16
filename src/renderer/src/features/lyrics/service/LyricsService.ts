@@ -15,6 +15,8 @@ import {LyricsSearchService} from './LyricsSearchService';
 import {EmbeddedLyricsSource} from '../sources/EmbeddedLyricsSource';
 import {LocalLyricsSource} from '../sources/LocalLyricsSource';
 import {AUTO_MATCH_IDENTITY_THRESHOLD, compareLyricsCandidates} from '../domain/candidateMatching';
+import {TtmlDocumentService} from '../format/TtmlDocumentService';
+import {shiftTimeline} from '../format/TtmlTimelineEditor';
 
 export interface LyricsLoadResult {
     document: LyricsDocument | null;
@@ -22,11 +24,16 @@ export interface LyricsLoadResult {
     error?: string;
 }
 
+export interface LyricsTimelineShiftResult extends LyricsLoadResult {
+    appliedDeltaMs: number;
+}
+
 export interface LyricsServiceOptions {
     providers: LyricsProviderRegistry;
     localSource: LocalLyricsSource;
     embeddedSource?: EmbeddedLyricsSource;
     normalizer?: LyricsNormalizer;
+    ttmlService?: TtmlDocumentService;
 }
 
 export class LyricsService {
@@ -34,12 +41,14 @@ export class LyricsService {
     private readonly localSource: LocalLyricsSource;
     private readonly embeddedSource: EmbeddedLyricsSource;
     private readonly normalizer: LyricsNormalizer;
+    private readonly ttmlService?: TtmlDocumentService;
 
     constructor(options: LyricsServiceOptions) {
         this.providers = options.providers;
         this.localSource = options.localSource;
         this.embeddedSource = options.embeddedSource ?? new EmbeddedLyricsSource();
         this.normalizer = options.normalizer ?? new LyricsNormalizer();
+        this.ttmlService = options.ttmlService;
     }
 
     async load(track: Track, signal: AbortSignal): Promise<LyricsLoadResult> {
@@ -194,6 +203,53 @@ export class LyricsService {
     async clearBinding(track: Track): Promise<void> {
         const result = await lyricsGateway.clearBinding(toTrackLyricsQuery(track).trackId);
         if (!result.success) throw new Error(result.error ?? '清除歌词绑定失败');
+    }
+
+    async shiftCanonicalTimeline(
+        query: TrackLyricsQuery,
+        requestedDeltaMs: number
+    ): Promise<LyricsTimelineShiftResult> {
+        const persisted = await lyricsGateway.readCanonical(query.trackId);
+        if (!persisted.success || !persisted.ttml || !persisted.binding) {
+            return {
+                document: null,
+                appliedDeltaMs: 0,
+                error: persisted.error ?? '当前歌曲没有可编辑的 canonical 歌词'
+            };
+        }
+
+        try {
+            const ttmlService = this.ttmlService ?? new TtmlDocumentService();
+            const current = ttmlService.parse(persisted.ttml);
+            const shifted = shiftTimeline(current, requestedDeltaMs);
+            const ttmlText = ttmlService.serialize(shifted.document);
+            const document: LyricsDocument = {
+                ttmlText,
+                ttml: shifted.document,
+                render: ttmlService.project(shifted.document),
+                source: persisted.binding.source
+            };
+            const saved = await lyricsGateway.saveCanonical(
+                query.trackId,
+                ttmlText,
+                persisted.binding.source,
+                'manual'
+            );
+            if (!saved.success) {
+                return {
+                    document: null,
+                    appliedDeltaMs: 0,
+                    error: saved.error ?? 'canonical TTML 保存失败'
+                };
+            }
+            return {document, binding: saved.binding, appliedDeltaMs: shifted.appliedDeltaMs};
+        } catch (error) {
+            return {
+                document: null,
+                appliedDeltaMs: 0,
+                error: error instanceof Error ? error.message : '歌词时间轴调整失败'
+            };
+        }
     }
 
     private async persist(
