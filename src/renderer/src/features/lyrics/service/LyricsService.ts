@@ -81,8 +81,8 @@ export class LyricsService {
         const searchResults = await new LyricsSearchService(this.providers).searchAll(query, signal);
         const candidates = searchResults
             .flatMap(result => result.candidates.slice(0, 2))
-            .filter(candidate => candidate.matchScore >= LyricsService.AUTO_MATCH_THRESHOLD)
-            .sort((left, right) => right.matchScore - left.matchScore);
+            .filter(candidate => candidate.identityScore >= LyricsService.AUTO_MATCH_THRESHOLD)
+            .sort((left, right) => right.identityScore - left.identityScore);
         let onlineLineTimed: LyricsDocument | null = null;
 
         for (const candidate of candidates) {

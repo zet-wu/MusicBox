@@ -76,7 +76,7 @@ describe('LyricsService', () => {
 
         await service.applyCandidate(
             {trackId: 'track-1', title: 'Song', artists: ['Artist']},
-            {providerId: 'test', candidateId: 'candidate', title: 'Song', artists: ['Artist'], matchScore: 100},
+            {providerId: 'test', candidateId: 'candidate', title: 'Song', artists: ['Artist'], identityScore: 100, qualityScore: 0},
             true,
             new AbortController().signal
         );
@@ -105,7 +105,7 @@ describe('LyricsService', () => {
 
         const result = await service.previewCandidate(
             {trackId: 'track-1', title: 'Song', artists: ['Artist']},
-            {providerId: 'test', candidateId: 'candidate', title: 'Song', artists: ['Artist'], matchScore: 100},
+            {providerId: 'test', candidateId: 'candidate', title: 'Song', artists: ['Artist'], identityScore: 100, qualityScore: 0},
             new AbortController().signal
         );
 
@@ -151,7 +151,7 @@ describe('LyricsService', () => {
         const provider = {
             id: 'test', displayName: 'Test',
             search: vi.fn().mockResolvedValue([{
-                providerId: 'test', candidateId: 'word', title: 'Song', artists: ['Artist'], matchScore: 90
+                providerId: 'test', candidateId: 'word', title: 'Song', artists: ['Artist'], identityScore: 90, qualityScore: 40
             }]),
             fetch: vi.fn().mockResolvedValue({kind: 'yrc', lyrics: '[0,100]S(0,100) Artist'})
         };
@@ -185,8 +185,8 @@ describe('LyricsService', () => {
         const provider = {
             id: 'test', displayName: 'Test',
             search: vi.fn().mockResolvedValue([
-                {providerId: 'test', candidateId: 'line', title: 'Song', artists: ['Artist'], matchScore: 95},
-                {providerId: 'test', candidateId: 'word', title: 'Song', artists: ['Artist'], matchScore: 90}
+                {providerId: 'test', candidateId: 'line', title: 'Song', artists: ['Artist'], identityScore: 95, qualityScore: 0},
+                {providerId: 'test', candidateId: 'word', title: 'Song', artists: ['Artist'], identityScore: 90, qualityScore: 40}
             ]),
             fetch: vi.fn((candidate: {candidateId: string}) => Promise.resolve(candidate.candidateId === 'line'
                 ? {kind: 'lrc', lyrics: '[00:00]Song'}
@@ -219,7 +219,7 @@ describe('LyricsService', () => {
         const provider = {
             id: 'test', displayName: 'Test',
             search: vi.fn().mockResolvedValue([{
-                providerId: 'test', candidateId: 'weak', title: 'Other', artists: ['Other'], matchScore: 74
+                providerId: 'test', candidateId: 'weak', title: 'Other', artists: ['Other'], identityScore: 74, qualityScore: 100
             }]),
             fetch: vi.fn()
         };

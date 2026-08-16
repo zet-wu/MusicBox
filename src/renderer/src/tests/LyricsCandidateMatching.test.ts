@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {rankLyricsCandidates, scoreLyricsCandidate} from '@/features/lyrics/domain/candidateMatching';
+import {rankLyricsCandidates, scoreLyricsCandidateIdentity} from '@/features/lyrics/domain/candidateMatching';
 
 const query = {
     trackId: 'track-1',
@@ -27,17 +27,17 @@ describe('lyrics candidate matching', () => {
         }]);
 
         expect(candidates[0].candidateId).toBe('exact');
-        expect(candidates[0].matchScore).toBeGreaterThan(90);
+        expect(candidates[0].identityScore).toBeGreaterThan(90);
     });
 
     it('允许缺少专辑或时长，但对明显时长错误降权', () => {
-        const missing = scoreLyricsCandidate(query, {
+        const missing = scoreLyricsCandidateIdentity(query, {
             providerId: 'test',
             candidateId: 'missing',
             title: 'Some Song',
             artists: ['Artist']
         });
-        const mismatch = scoreLyricsCandidate(query, {
+        const mismatch = scoreLyricsCandidateIdentity(query, {
             providerId: 'test',
             candidateId: 'mismatch',
             title: 'Some Song',
@@ -72,7 +72,7 @@ describe('lyrics candidate matching', () => {
     });
 
     it('统一中文简繁、日文新旧字体和汉字迭代符后评分', () => {
-        const score = scoreLyricsCandidate({
+        const score = scoreLyricsCandidateIdentity({
             trackId: 'shinai',
             title: '深愛',
             artists: ['水樹奈々'],
@@ -92,7 +92,7 @@ describe('lyrics candidate matching', () => {
     });
 
     it('将日文新字体、旧字体与对应简体映射到共同候选形式', () => {
-        const japanese = scoreLyricsCandidate({
+        const japanese = scoreLyricsCandidateIdentity({
             trackId: 'sawada',
             title: '時の過ぎゆくままに',
             artists: ['沢田研二'],
@@ -104,7 +104,7 @@ describe('lyrics candidate matching', () => {
             artists: ['澤田研二'],
             durationMs: 202_000
         });
-        const simplified = scoreLyricsCandidate({
+        const simplified = scoreLyricsCandidateIdentity({
             trackId: 'sawada',
             title: '時の過ぎゆくままに',
             artists: ['沢田研二'],

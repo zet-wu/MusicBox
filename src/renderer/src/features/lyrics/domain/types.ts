@@ -25,7 +25,8 @@ export interface LyricsCandidate {
     artists: string[];
     album?: string;
     durationMs?: number;
-    matchScore: number;
+    identityScore: number;
+    qualityScore: number;
     capabilities?: LyricsCapabilities;
     providerData?: unknown;
 }

@@ -210,7 +210,7 @@ export class LyricsSourcePicker {
         row.innerHTML = `<strong></strong><p></p><div class="lyrics-candidate__badges"></div><span class="lyrics-candidate__score"></span>`;
         row.querySelector('strong')!.textContent = candidate.title;
         row.querySelector('p')!.textContent = `${candidate.artists.join(' / ') || '未知艺术家'} · ${candidate.album || '未知专辑'} · ${duration}`;
-        row.querySelector('.lyrics-candidate__score')!.textContent = `匹配度 ${candidate.matchScore}%`;
+        row.querySelector('.lyrics-candidate__score')!.textContent = `匹配度 ${candidate.identityScore}%`;
         const preview = this.previewCache.get(candidateKey(candidate));
         if (preview) this.renderCandidateBadges(row, preview);
         return row;

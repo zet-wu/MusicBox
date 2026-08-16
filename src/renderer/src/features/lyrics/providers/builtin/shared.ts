@@ -211,7 +211,7 @@ function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void
 
 export function rankProviderCandidates(
     query: TrackLyricsQuery,
-    candidates: Array<Omit<LyricsCandidate, 'matchScore'>>
+    candidates: Array<Omit<LyricsCandidate, 'identityScore' | 'qualityScore'>>
 ): LyricsCandidate[] {
     return rankLyricsCandidates(query, candidates);
 }

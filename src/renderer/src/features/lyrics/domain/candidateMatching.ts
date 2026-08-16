@@ -12,35 +12,45 @@ const cjkConverters = [
     OpenCC.Converter({from: 'jp', to: 'cn'})
 ];
 
-export function scoreLyricsCandidate(
+export function scoreLyricsCandidateIdentity(
     query: TrackLyricsQuery,
-    candidate: Omit<LyricsCandidate, 'matchScore'>
+    candidate: Omit<LyricsCandidate, 'identityScore' | 'qualityScore'>
 ): number {
     const title = similarity(query.title, candidate.title);
     const artist = bestListSimilarity(query.artists, candidate.artists);
     const album = query.album && candidate.album ? similarity(query.album, candidate.album) : 0.5;
     const duration = durationSimilarity(query.durationMs, candidate.durationMs);
-    const qualityBonus = getQualityBonus(candidate);
-
     return clampScore(Math.round(100 * (
         title * TITLE_WEIGHT
         + artist * ARTIST_WEIGHT
         + album * ALBUM_WEIGHT
         + duration * DURATION_WEIGHT
-        + qualityBonus
     )));
+}
+
+export function scoreLyricsCandidateQuality(
+    candidate: Omit<LyricsCandidate, 'identityScore' | 'qualityScore'>
+): number {
+    const capabilities = candidate.capabilities;
+    if (capabilities?.ttml) return 25;
+    if (capabilities?.wordTimed) return 40;
+    return 0;
 }
 
 export function rankLyricsCandidates(
     query: TrackLyricsQuery,
-    candidates: Array<Omit<LyricsCandidate, 'matchScore'>>
+    candidates: Array<Omit<LyricsCandidate, 'identityScore' | 'qualityScore'>>
 ): LyricsCandidate[] {
     return candidates
-        .map(candidate => ({...candidate, matchScore: scoreLyricsCandidate(query, candidate)}))
+        .map(candidate => ({
+            ...candidate,
+            identityScore: scoreLyricsCandidateIdentity(query, candidate),
+            qualityScore: scoreLyricsCandidateQuality(candidate)
+        }))
         .sort((left, right) => {
-            const scoreDifference = right.matchScore - left.matchScore;
+            const scoreDifference = right.identityScore - left.identityScore;
             if (scoreDifference !== 0) return scoreDifference;
-            return getQualityBonus(right) - getQualityBonus(left);
+            return right.qualityScore - left.qualityScore;
         });
 }
 
@@ -105,13 +115,6 @@ function durationSimilarity(left?: number, right?: number): number {
     if (difference <= 2_000) return 1;
     if (difference <= 5_000) return 0.75;
     if (difference <= 10_000) return 0.35;
-    return 0;
-}
-
-function getQualityBonus(candidate: Omit<LyricsCandidate, 'matchScore'>): number {
-    const capabilities = candidate.capabilities;
-    if (capabilities?.ttml) return 0.05;
-    if (capabilities?.wordTimed) return 0.03;
     return 0;
 }
 

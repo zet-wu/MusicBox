@@ -126,7 +126,7 @@ export class KugouLyricsProvider implements LyricsProvider {
         album?: string;
         duration?: number;
         candidateId?: string;
-    }): Omit<LyricsCandidate, 'matchScore'> {
+    }): Omit<LyricsCandidate, 'identityScore' | 'qualityScore'> {
         const durationMs = song.duration ? normalizeDuration(song.duration) : undefined;
         return {
             providerId: this.id,
