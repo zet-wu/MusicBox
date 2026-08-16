@@ -5,8 +5,8 @@ export type DesktopLyricLine = AmllLyricLine;
 
 export interface DesktopLyricsSettings extends ApiDesktopLyricsSettings {
     layoutMode: 'default' | 'center';
-    themeColor: string;
-    fontColor: string;
+    color: string;
+    fontSize: number;
     opacity: number;
 }
 

@@ -7,11 +7,11 @@ export type PlaylistViewMode = 'grid' | 'list';
 export type FolderSourceViewMode = 'grid' | 'list';
 
 export interface DesktopLyricsSettings {
+    color?: string;
     fontSize?: number;
     opacity?: number;
     alwaysOnTop?: boolean;
     clickThrough?: boolean;
-    theme?: string;
     [key: string]: unknown;
 }
 

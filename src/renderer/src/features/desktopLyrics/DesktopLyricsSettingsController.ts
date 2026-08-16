@@ -10,8 +10,8 @@ const DESKTOP_LYRICS_SETTINGS_KEY = 'desktop-lyrics-settings';
 
 const DEFAULT_DESKTOP_LYRICS_SETTINGS: DesktopLyricsSettings = {
     layoutMode: 'default',
-    themeColor: '#64b5f6',
-    fontColor: '#000',
+    color: '#ffffff',
+    fontSize: 48,
     opacity: 0.9,
 };
 
@@ -48,21 +48,17 @@ export class DesktopLyricsSettingsController {
         this.settings = {...this.settings, ...desktopSettings};
         this.saveSettings();
         if (isMusicBoxSettings(newSettings)) {
-            lyricsAppearanceSettingsService.applyTypography(
-                lyricsAppearanceSettingsService.getSettings(newSettings)
-            );
+            const typography = lyricsAppearanceSettingsService.getSettings(newSettings);
+            lyricsAppearanceSettingsService.applyTypography({...typography, fontSize: null});
         }
         await this.applySettings();
     }
 
     async applySettings(): Promise<void> {
-        const {layoutMode, themeColor, fontColor, opacity} = this.settings;
+        const {layoutMode, color, fontSize, opacity} = this.settings;
 
-        document.documentElement.style.setProperty('--theme-color', themeColor);
-
-        if (fontColor) {
-            document.documentElement.style.setProperty('--amll-lp-color', fontColor);
-        }
+        document.documentElement.style.setProperty('--amll-lp-color', color);
+        document.documentElement.style.setProperty('--amll-lp-font-size', `${fontSize}px`);
 
         await this.applyWindowOperation(
             () => this.windowService.setOpacity(opacity),

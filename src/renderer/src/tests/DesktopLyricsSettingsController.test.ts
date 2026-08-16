@@ -23,7 +23,7 @@ describe('DesktopLyricsSettingsController', () => {
         vi.clearAllMocks();
     });
 
-    it('复用播放详情页的字体族与字号设置', async () => {
+    it('复用播放详情页字体族并独立应用桌面歌词颜色与字号', async () => {
         const controller = new DesktopLyricsSettingsController(
             {container: {classList: {add: vi.fn(), remove: vi.fn()}} as never},
             {applyMousePassthrough: vi.fn(), forceUnlocked: vi.fn()} as never,
@@ -38,13 +38,18 @@ describe('DesktopLyricsSettingsController', () => {
         await controller.updateSettings({
             desktopLyrics: true,
             lyricsFontFamily: 'serif',
-            lyricsFontSize: 40
+            lyricsFontSize: 64,
+            desktopLyricsSettings: {
+                color: '#abcdef',
+                fontSize: 36
+            }
         });
 
         expect(setProperty).toHaveBeenCalledWith(
             '--lyrics-font-family',
             '"Noto Serif CJK SC", "Songti SC", SimSun, serif'
         );
-        expect(setProperty).toHaveBeenCalledWith('--amll-lp-font-size', '40px');
+        expect(setProperty).toHaveBeenCalledWith('--amll-lp-color', '#abcdef');
+        expect(setProperty).toHaveBeenLastCalledWith('--amll-lp-font-size', '36px');
     });
 });

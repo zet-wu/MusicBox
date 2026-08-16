@@ -7,14 +7,12 @@ import type {
 export interface DesktopLyricsSettingsElements {
     displayModeSelect: HTMLSelectElement | null;
     layoutModeSelect: HTMLSelectElement | null;
-    themeColorInput: HTMLInputElement | null;
-    themeColorValue: HTMLElement | null;
+    colorInput: HTMLInputElement | null;
+    colorValue: HTMLElement | null;
     opacitySlider: HTMLInputElement | null;
     opacityValue: HTMLElement | null;
     fontSizeSlider: HTMLInputElement | null;
     fontSizeValue: HTMLElement | null;
-    fontColorInput: HTMLInputElement | null;
-    fontColorValue: HTMLElement | null;
 }
 
 export interface MiniModeSettingsElements {
@@ -30,17 +28,16 @@ class DisplayModeSettingsRenderer {
     initializeDesktopLyricsSettings(elements: DesktopLyricsSettingsElements, settings: DesktopLyricsDisplaySettings): void {
         this.setSelectValue(elements.displayModeSelect, settings.displayMode);
         this.setSelectValue(elements.layoutModeSelect, settings.layoutMode);
-        this.updateDesktopLyricsValue(elements, 'themeColor', settings.themeColor);
+        this.updateDesktopLyricsValue(elements, 'color', settings.color);
         this.updateDesktopLyricsValue(elements, 'opacity', settings.opacity);
         this.updateDesktopLyricsValue(elements, 'fontSize', settings.fontSize);
-        this.updateDesktopLyricsValue(elements, 'fontColor', settings.fontColor);
     }
 
     updateDesktopLyricsValue(elements: DesktopLyricsSettingsElements, key: string, value: DisplaySettingValue): void {
         switch (key) {
-            case 'themeColor':
-                this.setInputValue(elements.themeColorInput, String(value));
-                this.setText(elements.themeColorValue, String(value));
+            case 'color':
+                this.setInputValue(elements.colorInput, String(value));
+                this.setText(elements.colorValue, String(value));
                 break;
             case 'opacity':
                 this.setInputValue(elements.opacitySlider, String(value));
@@ -49,10 +46,6 @@ class DisplayModeSettingsRenderer {
             case 'fontSize':
                 this.setInputValue(elements.fontSizeSlider, String(value));
                 this.setText(elements.fontSizeValue, `${value}px`);
-                break;
-            case 'fontColor':
-                this.setInputValue(elements.fontColorInput, String(value));
-                this.setText(elements.fontColorValue, String(value));
                 break;
         }
     }

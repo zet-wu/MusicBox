@@ -191,10 +191,8 @@ class Settings extends Component {
         // 桌面歌词设置元素
         this.dlDisplayModeSelect = this.element.querySelector('#dl-display-mode-select');
         this.dlLayoutModeSelect = this.element.querySelector('#dl-layout-mode-select');
-        this.dlThemeColor = this.element.querySelector('#dl-theme-color');
-        this.dlThemeColorValue = this.element.querySelector('#dl-theme-color-value');
-        this.dlFontColor = this.element.querySelector('#dl-font-color');
-        this.dlFontColorValue = this.element.querySelector('#dl-font-color-value');
+        this.dlColor = this.element.querySelector('#dl-color');
+        this.dlColorValue = this.element.querySelector('#dl-color-value');
         this.dlOpacitySlider = this.element.querySelector('#dl-opacity-slider');
         this.dlOpacityValue = this.element.querySelector('#dl-opacity-value');
         this.dlFontSizeSlider = this.element.querySelector('#dl-font-size-slider');
@@ -308,19 +306,11 @@ class Settings extends Component {
             });
         }
 
-        if (this.dlThemeColor) {
-            this.addEventListenerManaged(this.dlThemeColor, 'input', (e: Event) => {
+        if (this.dlColor) {
+            this.addEventListenerManaged(this.dlColor, 'input', (e: Event) => {
                 const color = getInputTarget(e).value;
-                displayModeSettingsRenderer.updateDesktopLyricsValue(this.getDesktopLyricsElements(), 'themeColor', color);
-                this.updateDesktopLyricsSetting('themeColor', color);
-            });
-        }
-
-        if (this.dlFontColor) {
-            this.addEventListenerManaged(this.dlFontColor, 'input', (e: Event) => {
-                const color = getInputTarget(e).value;
-                displayModeSettingsRenderer.updateDesktopLyricsValue(this.getDesktopLyricsElements(), 'fontColor', color);
-                this.updateDesktopLyricsSetting('fontColor', color);
+                displayModeSettingsRenderer.updateDesktopLyricsValue(this.getDesktopLyricsElements(), 'color', color);
+                this.updateDesktopLyricsSetting('color', color);
             });
         }
 
@@ -630,14 +620,12 @@ class Settings extends Component {
         return {
             displayModeSelect: this.dlDisplayModeSelect,
             layoutModeSelect: this.dlLayoutModeSelect,
-            themeColorInput: this.dlThemeColor,
-            themeColorValue: this.dlThemeColorValue,
+            colorInput: this.dlColor,
+            colorValue: this.dlColorValue,
             opacitySlider: this.dlOpacitySlider,
             opacityValue: this.dlOpacityValue,
             fontSizeSlider: this.dlFontSizeSlider,
-            fontSizeValue: this.dlFontSizeValue,
-            fontColorInput: this.dlFontColor,
-            fontColorValue: this.dlFontColorValue
+            fontSizeValue: this.dlFontSizeValue
         };
     }
 
