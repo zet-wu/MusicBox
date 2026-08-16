@@ -701,16 +701,38 @@
   }
 
   button {
+    position: relative;
     width: 30px;
     height: 30px;
+    padding: 0;
     border: 0;
     border-radius: 8px;
     color: var(--color-text-primary);
     background: var(--color-hover);
-    font-size: 20px;
-    line-height: 1;
     cursor: pointer;
     transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), background-color 0.2s ease;
+
+    &::before,
+    &::after {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 12px;
+      height: 2.5px;
+      border-radius: 999px;
+      background: currentColor;
+      content: '';
+      transform: translate(-50%, -50%);
+    }
+
+    &::after {
+      display: none;
+      transform: translate(-50%, -50%) rotate(90deg);
+    }
+
+    &#lyrics-timeline-later::after {
+      display: block;
+    }
 
     &:hover {
       background: var(--color-active);
