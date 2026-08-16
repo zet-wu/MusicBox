@@ -1,5 +1,8 @@
 import {describe, expect, it} from 'vitest';
-import {describeLyricsCandidatePreview} from '@/features/lyrics/domain/describeLyricsCandidatePreview';
+import {
+    describeLyricsCandidatePreview,
+    describeLyricsDocument
+} from '@/features/lyrics/domain/describeLyricsCandidatePreview';
 import type {LyricsCandidatePreview} from '@/features/lyrics/domain/types';
 
 function preview(words: number, format: LyricsCandidatePreview['format']): LyricsCandidatePreview {
@@ -42,5 +45,18 @@ describe('describeLyricsCandidatePreview', () => {
         result.fallbackReason = 'source-unavailable';
 
         expect(describeLyricsCandidatePreview(result)).toEqual(['LRC', '逐行', '来源无 QRC']);
+    });
+
+    it('根据已绑定文档展示逐字和辅助歌词徽章', () => {
+        const result = preview(2, 'qrc');
+        result.document.render.lines[0].translatedLyric = '翻译';
+        result.document.render.lines[0].romanLyric = 'romanization';
+        result.document.render.lines[0].words[0].ruby = [{
+            word: 'かな',
+            startTime: 0,
+            endTime: 100
+        }];
+
+        expect(describeLyricsDocument(result.document)).toEqual(['逐字', '翻译', '音译', '假名']);
     });
 });

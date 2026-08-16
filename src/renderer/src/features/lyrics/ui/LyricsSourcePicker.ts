@@ -3,8 +3,9 @@ import {lyricsGateway} from '@/infrastructure/electron';
 import {getLyricsService, lyricsProviderRegistry, lyricsSearchService} from '../service/defaultLyricsServices';
 import {toTrackLyricsQuery} from '../service/LyricsService';
 import type {LyricsCandidate, LyricsCandidatePreview, LyricsDocument, TrackLyricsQuery} from '../domain/types';
-import {describeLyricsCandidatePreview} from '../domain/describeLyricsCandidatePreview';
+import {describeLyricsCandidatePreview, describeLyricsDocument} from '../domain/describeLyricsCandidatePreview';
 import type {ProviderSearchResult} from '../service/LyricsSearchService';
+import {TtmlDocumentService} from '../format/TtmlDocumentService';
 
 type PickerTab = 'current' | 'embedded' | 'local' | string;
 
@@ -19,6 +20,7 @@ export class LyricsSourcePicker {
     private readonly content: HTMLElement;
     private readonly preview: HTMLElement;
     private readonly status: HTMLElement;
+    private readonly ttmlService = new TtmlDocumentService();
     private track: Track | null = null;
     private query: TrackLyricsQuery | null = null;
     private activeTab: PickerTab = 'current';
@@ -132,9 +134,13 @@ export class LyricsSourcePicker {
     }
 
     private async renderCurrent(): Promise<void> {
-        if (!this.query) return;
+        const query = this.query;
+        if (!query) return;
+        this.activeTab = 'current';
+        this.renderTabs();
         this.content.innerHTML = '<div class="lyrics-source-picker__loading">正在读取当前绑定...</div>';
-        const result = await lyricsGateway.getBinding(this.query.trackId);
+        const result = await lyricsGateway.readCanonical(query.trackId);
+        if (this.query !== query || this.activeTab !== 'current') return;
         if (!result.success || !result.binding) {
             this.content.innerHTML = '<div class="lyrics-source-picker__empty">当前没有歌词绑定</div>';
             return;
@@ -143,9 +149,24 @@ export class LyricsSourcePicker {
         const description = source.kind === 'provider'
             ? `${source.providerId} · ${source.manuallySelected ? '手动选择' : '自动匹配'}`
             : source.kind === 'local' ? `本地 · ${source.path}` : '音频内嵌';
-        this.content.innerHTML = `<article class="lyrics-candidate current"><strong>当前使用</strong><p></p><span class="badge">已绑定</span></article>`;
+        this.content.innerHTML = `<article class="lyrics-candidate current"><strong>当前使用</strong><p></p><div class="lyrics-candidate__badges"></div></article>`;
         const paragraph = this.content.querySelector('p');
         if (paragraph) paragraph.textContent = description;
+        const labels = ['已绑定'];
+        if (result.ttml) {
+            try {
+                const ttml = this.ttmlService.parse(result.ttml);
+                labels.push('TTML', ...describeLyricsDocument({
+                    ttmlText: result.ttml,
+                    ttml,
+                    render: this.ttmlService.project(ttml),
+                    source
+                }));
+            } catch (error) {
+                console.warn('⚠️ Lyrics: 当前绑定 TTML 徽章解析失败', error);
+            }
+        }
+        this.renderBadgeLabels(this.content.querySelector('article')!, labels);
     }
 
     private renderActiveTab(): void {
@@ -245,7 +266,10 @@ export class LyricsSourcePicker {
     }
 
     private renderCandidateBadges(row: HTMLElement, preview: LyricsCandidatePreview): void {
-        const labels = describeLyricsCandidatePreview(preview);
+        this.renderBadgeLabels(row, describeLyricsCandidatePreview(preview));
+    }
+
+    private renderBadgeLabels(row: HTMLElement, labels: string[]): void {
         const badges = row.querySelector('.lyrics-candidate__badges');
         if (!badges) return;
         badges.replaceChildren(...labels.map(label => {
