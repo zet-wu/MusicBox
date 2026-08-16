@@ -23,9 +23,11 @@ describe('DesktopAmllLyricsView', () => {
     it('将投影歌词、播放位置与播放状态交给 AMLL', async () => {
         const {DesktopAmllLyricsView} = await import('@/features/desktopLyrics/DesktopAmllLyricsView');
         const groupElement = fakeElement();
+        const playerElement = fakeElement();
+        const container = fakeElement();
         const player = {
             currentLyricGroups: [{element: groupElement, isActive: true}],
-            getElement: vi.fn(() => fakeElement()),
+            getElement: vi.fn(() => playerElement),
             setLyricLines: vi.fn(),
             setCurrentTime: vi.fn(),
             pause: vi.fn(),
@@ -37,9 +39,10 @@ describe('DesktopAmllLyricsView', () => {
             setAlignPosition: vi.fn()
         };
         const view = new DesktopAmllLyricsView({
-            container: fakeElement(),
+            container,
             createPlayer: () => player
         });
+        const stateElement = vi.mocked(container.replaceChildren).mock.calls[0][1] as HTMLElement;
         const lines = [{
             words: [{word: '歌词', startTime: 1000, endTime: 2000, romanWord: 'geci'}],
             translatedLyric: 'lyrics', romanLyric: 'geci', isBG: false, isDuet: true,
@@ -55,6 +58,8 @@ describe('DesktopAmllLyricsView', () => {
             translatedLyric: '', romanLyric: '', isDuet: false,
             words: [{word: '歌词', startTime: 1000, endTime: 2000}]
         })], 0);
+        expect(stateElement.hidden).toBe(true);
+        expect(playerElement.hidden).toBe(false);
         expect(player.setCurrentTime).toHaveBeenCalledWith(1500);
         expect(player.resume).toHaveBeenCalledOnce();
         expect(player.pause).toHaveBeenCalledTimes(2);

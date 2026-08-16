@@ -82,6 +82,10 @@ body {
   color: var(--amll-lp-color, #fff);
   font-size: calc(var(--amll-lp-font-size, 48px) * 0.62);
   opacity: 0.5;
+
+  &[hidden] {
+    display: none;
+  }
 }
 
 .controls-bar {
@@ -95,7 +99,7 @@ body {
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
-  opacity: 0;
+  opacity: 0.8;
   transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-app-region: no-drag;
 }
