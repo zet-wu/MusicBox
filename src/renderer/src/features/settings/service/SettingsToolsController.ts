@@ -27,6 +27,11 @@ export interface SettingsToolsElements {
     lyricsColorModeSelect: HTMLSelectElement | null;
     lyricsColorInput: HTMLInputElement | null;
     lyricsColorValue: HTMLElement | null;
+    lyricsFontFamilySelect: HTMLSelectElement | null;
+    lyricsCustomFontContainer: HTMLElement | null;
+    lyricsCustomLatinFontInput: HTMLInputElement | null;
+    lyricsCustomCjkFontInput: HTMLInputElement | null;
+    lyricsFontSizeSelect: HTMLSelectElement | null;
     lyricsShowTranslationToggle: HTMLInputElement | null;
     lyricsShowRomanizationToggle: HTMLInputElement | null;
     lyricsShowRubyToggle: HTMLInputElement | null;
@@ -49,6 +54,7 @@ class SettingsToolsController {
         const lyricsAppearanceSettings = lyricsAppearanceSettingsService.getSettings(settings);
         lyricsAppearanceSettingsRenderer.initialize(this.toLyricsAppearanceElements(elements), lyricsAppearanceSettings);
         lyricsAppearanceSettingsService.applyTextColor(lyricsAppearanceSettings);
+        lyricsAppearanceSettingsService.applyTypography(lyricsAppearanceSettings);
     }
 
     initializeLyricsDirectory(settings: MusicBoxSettings, elements: SettingsToolsElements): void {
@@ -279,6 +285,31 @@ class SettingsToolsController {
             this.applyCustomLyricsColor(elements);
         });
 
+        scope.listen(elements.lyricsFontFamilySelect, 'change', () => {
+            callbacks.updateSetting('lyricsFontFamily', elements.lyricsFontFamilySelect?.value || 'inherit');
+            lyricsAppearanceSettingsRenderer.updateFontAvailability(
+                this.toLyricsAppearanceElements(elements),
+                elements.lyricsFontFamilySelect?.value || 'inherit'
+            );
+            this.applyLyricsTypography(elements);
+        });
+
+        scope.listen(elements.lyricsCustomLatinFontInput, 'input', () => {
+            callbacks.updateSetting('lyricsCustomLatinFont', elements.lyricsCustomLatinFontInput?.value.trim() || '');
+            this.applyLyricsTypography(elements);
+        });
+
+        scope.listen(elements.lyricsCustomCjkFontInput, 'input', () => {
+            callbacks.updateSetting('lyricsCustomCjkFont', elements.lyricsCustomCjkFontInput?.value.trim() || '');
+            this.applyLyricsTypography(elements);
+        });
+
+        scope.listen(elements.lyricsFontSizeSelect, 'change', () => {
+            const value = elements.lyricsFontSizeSelect?.value ?? 'auto';
+            callbacks.updateSetting('lyricsFontSize', value === 'auto' ? null : Number(value));
+            this.applyLyricsTypography(elements);
+        });
+
         this.bindLyricsDisplayToggle(elements.lyricsShowTranslationToggle, 'lyricsShowTranslation', callbacks, scope);
         this.bindLyricsDisplayToggle(elements.lyricsShowRomanizationToggle, 'lyricsShowRomanization', callbacks, scope);
         this.bindLyricsDisplayToggle(elements.lyricsShowRubyToggle, 'lyricsShowRuby', callbacks, scope);
@@ -289,6 +320,18 @@ class SettingsToolsController {
             colorMode: 'custom',
             textColor: elements.lyricsColorInput?.value || '#335eea'
         });
+    }
+
+    private applyLyricsTypography(elements: SettingsToolsElements): void {
+        const value = elements.lyricsFontSizeSelect?.value ?? 'auto';
+        const settings = lyricsAppearanceSettingsService.getSettings({
+            lyricsFontFamily: elements.lyricsFontFamilySelect?.value || 'inherit',
+            lyricsCustomLatinFont: elements.lyricsCustomLatinFontInput?.value || '',
+            lyricsCustomCjkFont: elements.lyricsCustomCjkFontInput?.value || '',
+            lyricsFontSize: value === 'auto' ? null : Number(value)
+        });
+        lyricsAppearanceSettingsService.applyTypography(settings);
+        lyricsAppearanceSettingsService.notifyDisplaySettingsChanged();
     }
 
     private bindLyricsDisplayToggle(
@@ -331,6 +374,11 @@ class SettingsToolsController {
             colorModeSelect: elements.lyricsColorModeSelect,
             textColorInput: elements.lyricsColorInput,
             textColorValue: elements.lyricsColorValue,
+            fontFamilySelect: elements.lyricsFontFamilySelect,
+            customFontContainer: elements.lyricsCustomFontContainer,
+            customLatinFontInput: elements.lyricsCustomLatinFontInput,
+            customCjkFontInput: elements.lyricsCustomCjkFontInput,
+            fontSizeSelect: elements.lyricsFontSizeSelect,
             showTranslationToggle: elements.lyricsShowTranslationToggle,
             showRomanizationToggle: elements.lyricsShowRomanizationToggle,
             showRubyToggle: elements.lyricsShowRubyToggle

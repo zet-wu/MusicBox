@@ -786,6 +786,68 @@
 
                         <div class="settings-item">
                             <div class="item-info">
+                                <label class="item-label">歌词字体</label>
+                                <p class="item-description">设置应用内 AMLL 歌词使用的字体族</p>
+                            </div>
+                            <div class="item-control">
+                                <select class="settings-select" id="lyrics-font-family">
+                                    <option value="inherit">跟随应用</option>
+                                    <option value="system">系统无衬线</option>
+                                    <option value="cjk-sans">中日韩无衬线</option>
+                                    <option value="serif">衬线字体</option>
+                                    <option value="monospace">等宽字体</option>
+                                    <option value="custom">自定义字体</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="lyrics-custom-font-container" hidden>
+                            <div class="settings-item">
+                                <div class="item-info">
+                                    <label class="item-label" for="lyrics-custom-latin-font">拉丁字体</label>
+                                    <p class="item-description">用于拉丁字母、数字和半角标点；留空时跟随 CJK 字体</p>
+                                </div>
+                                <div class="item-control">
+                                    <input type="text" class="settings-text-input" id="lyrics-custom-latin-font"
+                                           placeholder="例如：Inter" maxlength="100">
+                                </div>
+                            </div>
+
+                            <div class="settings-item">
+                                <div class="item-info">
+                                    <label class="item-label" for="lyrics-custom-cjk-font">CJK 字体</label>
+                                    <p class="item-description">用于中日韩字符和全角标点；留空时跟随拉丁字体</p>
+                                </div>
+                                <div class="item-control">
+                                    <input type="text" class="settings-text-input" id="lyrics-custom-cjk-font"
+                                           placeholder="例如：霞鹜文楷" maxlength="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="item-info">
+                                <label class="item-label">歌词字号</label>
+                                <p class="item-description">使用 AMLL 自适应字号，或选择固定大小</p>
+                            </div>
+                            <div class="item-control">
+                                <select class="settings-select" id="lyrics-font-size">
+                                    <option value="auto">自适应（默认）</option>
+                                    <option value="20">20px</option>
+                                    <option value="24">24px</option>
+                                    <option value="28">28px</option>
+                                    <option value="32">32px</option>
+                                    <option value="36">36px</option>
+                                    <option value="40">40px</option>
+                                    <option value="48">48px</option>
+                                    <option value="56">56px</option>
+                                    <option value="64">64px</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="item-info">
                                 <label class="item-label">显示翻译</label>
                                 <p class="item-description">显示来源或 TTML 明确提供的行级翻译</p>
                             </div>

@@ -15,6 +15,7 @@ interface AmllPlayerPort extends EventTarget {
     pause(): void;
     resume(): void;
     update(delta?: number): void;
+    onResize?(): void;
     dispose(): void;
 }
 
@@ -110,6 +111,7 @@ export class AmllLyricsView {
 
     private readonly handleDisplaySettingsChanged = (): void => {
         if (!this.currentDocument) return;
+        this.player.onResize?.();
         this.setProjectedLines();
         this.player.update(0);
     };

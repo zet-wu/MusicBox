@@ -179,6 +179,11 @@ class Settings extends Component {
         this.lyricsColorMode = this.element.querySelector('#lyrics-color-mode');
         this.lyricsColor = this.element.querySelector('#lyrics-color');
         this.lyricsColorValue = this.element.querySelector('#lyrics-color-value');
+        this.lyricsFontFamily = this.element.querySelector('#lyrics-font-family');
+        this.lyricsCustomFontContainer = this.element.querySelector('#lyrics-custom-font-container');
+        this.lyricsCustomLatinFont = this.element.querySelector('#lyrics-custom-latin-font');
+        this.lyricsCustomCjkFont = this.element.querySelector('#lyrics-custom-cjk-font');
+        this.lyricsFontSize = this.element.querySelector('#lyrics-font-size');
         this.lyricsShowTranslation = this.element.querySelector('#lyrics-show-translation');
         this.lyricsShowRomanization = this.element.querySelector('#lyrics-show-romanization');
         this.lyricsShowRuby = this.element.querySelector('#lyrics-show-ruby');
@@ -698,6 +703,11 @@ class Settings extends Component {
             lyricsColorModeSelect: this.lyricsColorMode,
             lyricsColorInput: this.lyricsColor,
             lyricsColorValue: this.lyricsColorValue,
+            lyricsFontFamilySelect: this.lyricsFontFamily,
+            lyricsCustomFontContainer: this.lyricsCustomFontContainer,
+            lyricsCustomLatinFontInput: this.lyricsCustomLatinFont,
+            lyricsCustomCjkFontInput: this.lyricsCustomCjkFont,
+            lyricsFontSizeSelect: this.lyricsFontSize,
             lyricsShowTranslationToggle: this.lyricsShowTranslation,
             lyricsShowRomanizationToggle: this.lyricsShowRomanization,
             lyricsShowRubyToggle: this.lyricsShowRuby

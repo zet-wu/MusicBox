@@ -715,7 +715,7 @@
   > .amll-lyric-player {
     width: 100%;
     height: 100%;
-    font-family: inherit;
+    font-family: var(--lyrics-font-family, inherit);
     color: inherit;
     --amll-lp-color: var(--lyrics-text-color, var(--color-text));
     mix-blend-mode: normal;

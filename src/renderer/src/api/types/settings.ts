@@ -35,6 +35,10 @@ export interface MusicBoxSettings {
     gaplessPlayback?: boolean;
     playlistDoubleClickMode?: PlaylistDoubleClickMode;
     playlistInfoAlignment?: PlaylistInfoAlignment;
+    lyricsFontFamily?: string;
+    lyricsCustomLatinFont?: string;
+    lyricsCustomCjkFont?: string;
+    lyricsFontSize?: number | null;
     exclusiveMode?: boolean;
     wasapiShareMode?: WasapiShareMode;
     [key: string]: unknown;
