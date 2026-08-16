@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {fetchJson, LyricsHttpError, providerRequestPolicy} from '@/features/lyrics/providers/builtin/shared';
+import {fetchJson, providerRequestPolicy} from '@/features/lyrics/providers/builtin/shared';
 
 describe('lyrics provider transport', () => {
     it('对可重试 HTTP 错误做有界重试', async () => {
@@ -21,7 +21,7 @@ describe('lyrics provider transport', () => {
         const request = vi.fn().mockResolvedValue(new Response('', {status: 404}));
 
         await expect(fetchJson(request, 'https://example.test/lyrics', new AbortController().signal))
-            .rejects.toEqual(expect.objectContaining<LyricsHttpError>({status: 404, retryable: false}));
+            .rejects.toMatchObject({status: 404, retryable: false});
         expect(request).toHaveBeenCalledTimes(1);
     });
 

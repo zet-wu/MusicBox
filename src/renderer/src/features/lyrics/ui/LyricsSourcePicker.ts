@@ -489,14 +489,16 @@ export class LyricsSourcePicker {
             return;
         }
         const result = await lyricsGateway.getBinding(this.query.trackId);
-        const source = result.binding?.source;
-        if (source?.kind === 'provider') {
-            this.activeTab = source.providerId;
-            this.renderActiveTab();
-            this.retryActiveProvider();
-            return;
-        }
-        await this.rerunAutomaticMatch();
+        if (!result.success || !result.binding) throw new Error(result.error ?? '当前没有歌词绑定');
+        this.setStatus('正在刷新当前来源...');
+        const controller = new AbortController();
+        const refreshed = await getLyricsService().refreshBinding(this.query, result.binding, controller.signal);
+        if (!refreshed.document) throw new Error(refreshed.error ?? '刷新当前来源失败');
+        window.dispatchEvent(new CustomEvent<LyricsDocumentAppliedDetail>('lyrics:document-applied', {
+            detail: {trackId: this.query.trackId, document: refreshed.document}
+        }));
+        this.setStatus('当前来源已刷新');
+        await this.renderCurrent();
     }
 
     private async handleClick(event: Event): Promise<void> {

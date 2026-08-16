@@ -168,6 +168,31 @@ describe('LyricsService', () => {
         await expect(service.previewEmbedded({trackId: 'track-1', title: 'Song', artists: []})).resolves.toBeNull();
     });
 
+    it('刷新 manual 本地来源时读取绑定路径并保留 selectionMode', async () => {
+        const localDocument = {...document, source: {kind: 'local', path: 'Selected.lrc'} as const};
+        gateway.readLocalFile.mockResolvedValue({success: true, content: '[00:00]Selected'});
+        const localNormalizer = {fromLrc: vi.fn(() => localDocument)};
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn()} as never,
+            normalizer: localNormalizer as never
+        });
+
+        await service.refreshBinding(
+            {trackId: 'track-1', title: 'Song', artists: []},
+            {
+                trackId: 'track-1', canonicalTtmlPath: 'canonical.ttml',
+                source: {kind: 'local', path: 'Selected.lrc'}, selectionMode: 'manual', updatedAt: 1
+            },
+            new AbortController().signal
+        );
+
+        expect(gateway.readLocalFile).toHaveBeenCalledWith('Selected.lrc');
+        expect(gateway.saveCanonical).toHaveBeenCalledWith(
+            'track-1', '<tt/>', {kind: 'local', path: 'Selected.lrc'}, 'manual'
+        );
+    });
+
     it('预览候选时返回实际获取的原始格式', async () => {
         const provider = {
             id: 'test',
@@ -269,8 +294,8 @@ describe('LyricsService', () => {
                 {providerId: 'test', candidateId: 'word', title: 'Song', artists: ['Artist'], identityScore: 90, qualityScore: 40}
             ]),
             fetch: vi.fn((candidate: {candidateId: string}) => Promise.resolve(candidate.candidateId === 'line'
-                ? {kind: 'lrc', lyrics: '[00:00]Song'}
-                : {kind: 'qrc', lyrics: '[0,100]S(0,100)'}))
+                ? {kind: 'lrc' as const, lyrics: '[00:00]Song'}
+                : {kind: 'qrc' as const, lyrics: '[0,100]S(0,100)'}))
         };
         const registry = new LyricsProviderRegistry();
         registry.register(provider);

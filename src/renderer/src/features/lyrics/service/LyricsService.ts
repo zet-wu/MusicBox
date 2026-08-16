@@ -142,6 +142,34 @@ export class LyricsService {
         };
     }
 
+    async refreshBinding(
+        query: TrackLyricsQuery,
+        binding: LyricsBinding,
+        signal: AbortSignal
+    ): Promise<LyricsLoadResult> {
+        const source = binding.source;
+        let document: LyricsDocument;
+        if (source.kind === 'local') {
+            const result = await lyricsGateway.readLocalFile(source.path);
+            if (!result.success || !result.content?.trim()) throw new Error(result.error ?? '本地歌词不可用');
+            document = source.path.toLocaleLowerCase().endsWith('.ttml')
+                ? this.normalizer.fromTtml(result.content, this.createContext(query, source))
+                : this.normalizer.fromLrc(result.content, this.createContext(query, source));
+        } else if (source.kind === 'embedded') {
+            const payload = await this.embeddedSource.find(query);
+            if (!payload) throw new Error('音频内嵌歌词不可用');
+            document = this.normalizer.fromPayload(payload, this.createContext(query, source));
+        } else {
+            const provider = this.providers.get(source.providerId);
+            if (!provider) throw new Error('未知歌词来源');
+            const candidate = (await provider.search(query, signal))
+                .find(item => item.candidateId === source.candidateId);
+            if (!candidate) throw new Error('当前歌词候选已不可用');
+            document = await this.fetchCandidate(query, candidate, signal);
+        }
+        return this.persist(query.trackId, document, binding.selectionMode);
+    }
+
     async previewCandidate(
         query: TrackLyricsQuery,
         candidate: LyricsCandidate,
