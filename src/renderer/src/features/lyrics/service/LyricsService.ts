@@ -132,6 +132,16 @@ export class LyricsService {
         };
     }
 
+    async previewEmbedded(query: TrackLyricsQuery): Promise<LyricsCandidatePreview | null> {
+        const payload = await this.embeddedSource.find(query);
+        if (!payload) return null;
+        const source: LyricsSourceRef = {kind: 'embedded', trackId: query.trackId};
+        return {
+            document: this.normalizer.fromPayload(payload, this.createContext(query, source)),
+            format: payload.kind
+        };
+    }
+
     async previewCandidate(
         query: TrackLyricsQuery,
         candidate: LyricsCandidate,

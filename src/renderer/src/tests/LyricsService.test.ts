@@ -132,6 +132,42 @@ describe('LyricsService', () => {
         await expect(service.previewLocal({trackId: 'track-1', title: 'Song', artists: []})).resolves.toBeNull();
     });
 
+    it('内嵌歌词存在时生成预览并以 manual binding 应用', async () => {
+        const embeddedDocument = {...document, source: {kind: 'embedded', trackId: 'track-1'} as const};
+        const embeddedSource = {find: vi.fn().mockResolvedValue({kind: 'lrc', lyrics: '[00:00]Song'})};
+        const embeddedNormalizer = {fromPayload: vi.fn(() => embeddedDocument)};
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn()} as never,
+            embeddedSource: embeddedSource as never,
+            normalizer: embeddedNormalizer as never
+        });
+
+        const preview = await service.previewEmbedded({trackId: 'track-1', title: 'Song', artists: []});
+        expect(preview).toEqual({document: embeddedDocument, format: 'lrc'});
+        expect(embeddedSource.find).toHaveBeenCalledTimes(1);
+        expect(embeddedNormalizer.fromPayload).toHaveBeenCalledWith(
+            {kind: 'lrc', lyrics: '[00:00]Song'},
+            expect.objectContaining({source: {kind: 'embedded', trackId: 'track-1'}})
+        );
+
+        await service.applyPreview({trackId: 'track-1', title: 'Song', artists: []}, preview!);
+        expect(gateway.saveCanonical).toHaveBeenCalledWith(
+            'track-1', '<tt/>', {kind: 'embedded', trackId: 'track-1'}, 'manual'
+        );
+    });
+
+    it('内嵌歌词不存在时返回空预览', async () => {
+        const service = new LyricsService({
+            providers: new LyricsProviderRegistry(),
+            localSource: {find: vi.fn()} as never,
+            embeddedSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            normalizer: normalizer as never
+        });
+
+        await expect(service.previewEmbedded({trackId: 'track-1', title: 'Song', artists: []})).resolves.toBeNull();
+    });
+
     it('预览候选时返回实际获取的原始格式', async () => {
         const provider = {
             id: 'test',

@@ -32,6 +32,7 @@ export class LyricsSourcePicker {
     private selectedCandidate: LyricsCandidate | null = null;
     private selectedPreview: LyricsCandidatePreview | null = null;
     private localPreview: LyricsCandidatePreview | null | undefined;
+    private embeddedPreview: LyricsCandidatePreview | null | undefined;
 
     constructor() {
         this.root = document.createElement('div');
@@ -78,6 +79,7 @@ export class LyricsSourcePicker {
         this.selectedCandidate = null;
         this.selectedPreview = null;
         this.localPreview = undefined;
+        this.embeddedPreview = undefined;
         this.searchResults.clear();
         this.previewCache.clear();
         this.previewRequests.clear();
@@ -185,7 +187,7 @@ export class LyricsSourcePicker {
             return;
         }
         if (this.activeTab === 'embedded') {
-            this.content.innerHTML = '<div class="lyrics-source-picker__empty">音频内嵌歌词会在“重新自动匹配”时参与匹配。</div>';
+            void this.renderEmbedded();
             return;
         }
 
@@ -240,6 +242,24 @@ export class LyricsSourcePicker {
         if (source.kind !== 'local') return;
         const row = this.createSourceRow('local', source.path.split(/[\\/]/).pop() || source.path, source.path);
         this.renderCandidateBadges(row, this.localPreview);
+        this.content.replaceChildren(row);
+    }
+
+    private async renderEmbedded(): Promise<void> {
+        const query = this.query;
+        if (!query) return;
+        if (this.embeddedPreview === undefined) {
+            this.content.innerHTML = '<div class="lyrics-source-picker__loading">正在读取内嵌歌词...</div>';
+            this.embeddedPreview = await getLyricsService().previewEmbedded(query);
+        }
+        if (this.query !== query || this.activeTab !== 'embedded') return;
+        if (!this.embeddedPreview) {
+            this.content.innerHTML = '<div class="lyrics-source-picker__empty">当前音频没有可用的内嵌歌词</div>';
+            return;
+        }
+
+        const row = this.createSourceRow('embedded', '音频内嵌歌词', this.query.filePath || this.query.title);
+        this.renderCandidateBadges(row, this.embeddedPreview);
         this.content.replaceChildren(row);
     }
 
@@ -365,7 +385,7 @@ export class LyricsSourcePicker {
     }
 
     private selectSourcePreview(kind: 'local' | 'embedded'): void {
-        const preview = kind === 'local' ? this.localPreview : null;
+        const preview = kind === 'local' ? this.localPreview : this.embeddedPreview;
         if (!preview) return;
         this.selectedCandidate = null;
         this.selectedPreview = preview;
@@ -455,6 +475,13 @@ export class LyricsSourcePicker {
             this.selectedPreview = null;
             this.getActionButton('apply').disabled = true;
             await this.renderLocal();
+            return;
+        }
+        if (this.activeTab === 'embedded') {
+            this.embeddedPreview = undefined;
+            this.selectedPreview = null;
+            this.getActionButton('apply').disabled = true;
+            await this.renderEmbedded();
             return;
         }
         if (this.activeTab !== 'current') {
