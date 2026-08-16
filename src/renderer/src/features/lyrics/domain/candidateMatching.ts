@@ -1,10 +1,15 @@
 import type {LyricsCandidate, TrackLyricsQuery} from './types';
 import OpenCC from 'opencc-js/t2cn';
+import {partial_ratio, ratio} from 'fuzzball';
 
-const TITLE_WEIGHT = 0.45;
-const ARTIST_WEIGHT = 0.30;
-const ALBUM_WEIGHT = 0.10;
-const DURATION_WEIGHT = 0.15;
+const TITLE_WEIGHT = 0.7;
+const ALBUM_WEIGHT = 0.2;
+const ARTIST_WEIGHT = 0.1;
+const TITLE_FULL_MATCH_WEIGHT = 0.4;
+const ALBUM_FULL_MATCH_WEIGHT = 0.3;
+const ARTIST_FULL_MATCH_WEIGHT = 0.2;
+const DURATION_REJECT_THRESHOLD_MS = 15_000;
+const FUZZ_OPTIONS = {full_process: false} as const;
 const cjkConverters = [
     OpenCC.Converter({from: 't', to: 'cn'}),
     OpenCC.Converter({from: 'tw', to: 'cn'}),
@@ -16,25 +21,49 @@ export function scoreLyricsCandidateIdentity(
     query: TrackLyricsQuery,
     candidate: Omit<LyricsCandidate, 'identityScore' | 'qualityScore'>
 ): number {
-    const title = similarity(query.title, candidate.title);
-    const artist = bestListSimilarity(query.artists, candidate.artists);
-    const album = query.album && candidate.album ? similarity(query.album, candidate.album) : 0.5;
-    const duration = durationSimilarity(query.durationMs, candidate.durationMs);
-    return clampScore(Math.round(100 * (
-        title * TITLE_WEIGHT
-        + artist * ARTIST_WEIGHT
-        + album * ALBUM_WEIGHT
-        + duration * DURATION_WEIGHT
-    )));
+    if (
+        query.durationMs !== undefined
+        && candidate.durationMs !== undefined
+        && Math.abs(query.durationMs - candidate.durationMs) > DURATION_REJECT_THRESHOLD_MS
+    ) {
+        return 0;
+    }
+
+    const fields = [
+        {score: similarity(query.title, candidate.title, TITLE_FULL_MATCH_WEIGHT), weight: TITLE_WEIGHT},
+        {
+            score: query.album && candidate.album
+                ? similarity(query.album, candidate.album, ALBUM_FULL_MATCH_WEIGHT)
+                : 0,
+            weight: query.album ? ALBUM_WEIGHT : 0
+        },
+        {
+            score: bestListSimilarity(query.artists, candidate.artists, ARTIST_FULL_MATCH_WEIGHT),
+            weight: query.artists.length > 0 ? ARTIST_WEIGHT : 0
+        }
+    ];
+    const activeWeight = fields.reduce((sum, field) => sum + field.weight, 0);
+    if (activeWeight === 0) return 0;
+    return clampScore(Math.round(fields.reduce((sum, field) => sum + field.score * field.weight, 0) / activeWeight));
 }
 
 export function scoreLyricsCandidateQuality(
     candidate: Omit<LyricsCandidate, 'identityScore' | 'qualityScore'>
 ): number {
     const capabilities = candidate.capabilities;
-    if (capabilities?.ttml) return 25;
-    if (capabilities?.wordTimed) return 40;
-    return 0;
+    return clampScore(
+        (capabilities?.ttml ? 25 : 0)
+        + (capabilities?.wordTimed ? 40 : 0)
+        + (capabilities?.translation ? 15 : 0)
+        + (capabilities?.romanization ? 10 : 0)
+        + (capabilities?.ruby ? 10 : 0)
+    );
+}
+
+export function combinedFuzzyScore(left: string, right: string, fullMatchWeight: number): number {
+    const partial = partial_ratio(left, right, FUZZ_OPTIONS);
+    const full = ratio(left, right, FUZZ_OPTIONS);
+    return partial * (1 - fullMatchWeight) + full * fullMatchWeight;
 }
 
 export function rankLyricsCandidates(
@@ -58,20 +87,22 @@ function normalizeBase(value: string): string {
     return value
         .normalize('NFKC')
         .toLocaleLowerCase()
-        .replace(/[\s_'"“”‘’·・.()[\]{}（）【】]/g, '')
         .replace(/(?:feat\.?|ft\.?).*$/i, '')
+        .replace(/[\s_'"“”‘’·・.()[\]{}（）【】]/g, '')
         .trim();
 }
 
 function normalizeVariants(value: string): string[] {
-    const base = normalizeBase(value);
+    const raw = value.normalize('NFKC').toLocaleLowerCase().trim();
+    const withoutBracketSuffix = raw.replace(/\s*[([（【].*[)\]）】]\s*$/, '').trim();
+    const base = normalizeBase(raw);
+    const strippedBase = normalizeBase(withoutBracketSuffix);
     if (!base) return [];
 
     const expanded = expandHanIterationMarks(base);
-    const variants = new Set([base, expanded]);
+    const variants = new Set([raw, withoutBracketSuffix, base, strippedBase, expanded]);
     for (const converter of cjkConverters) {
-        variants.add(converter(base));
-        variants.add(converter(expanded));
+        for (const variant of [...variants]) variants.add(converter(variant));
     }
     return [...variants].filter(Boolean);
 }
@@ -85,37 +116,20 @@ function expandHanIterationMarks(value: string): string {
     }).join('');
 }
 
-function similarity(left: string, right: string): number {
+function similarity(left: string, right: string, fullMatchWeight: number): number {
     const leftVariants = normalizeVariants(left);
     const rightVariants = normalizeVariants(right);
     if (leftVariants.length === 0 || rightVariants.length === 0) return 0;
     return Math.max(...leftVariants.flatMap(normalizedLeft => rightVariants.map(normalizedRight => (
-        normalizedSimilarity(normalizedLeft, normalizedRight)
+        combinedFuzzyScore(normalizedLeft, normalizedRight, fullMatchWeight)
     ))));
 }
 
-function normalizedSimilarity(normalizedLeft: string, normalizedRight: string): number {
-    if (normalizedLeft === normalizedRight) return 1;
-    if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) return 0.8;
-
-    const leftChars = new Set(normalizedLeft);
-    const rightChars = new Set(normalizedRight);
-    const intersection = [...leftChars].filter(character => rightChars.has(character)).length;
-    return (2 * intersection) / (leftChars.size + rightChars.size);
-}
-
-function bestListSimilarity(left: string[], right: string[]): number {
-    if (left.length === 0 || right.length === 0) return 0.5;
-    return Math.max(...left.flatMap(leftItem => right.map(rightItem => similarity(leftItem, rightItem))));
-}
-
-function durationSimilarity(left?: number, right?: number): number {
-    if (!left || !right) return 0.5;
-    const difference = Math.abs(left - right);
-    if (difference <= 2_000) return 1;
-    if (difference <= 5_000) return 0.75;
-    if (difference <= 10_000) return 0.35;
-    return 0;
+function bestListSimilarity(left: string[], right: string[], fullMatchWeight: number): number {
+    if (left.length === 0 || right.length === 0) return 0;
+    return Math.max(...left.flatMap(leftItem => right.map(rightItem => (
+        similarity(leftItem, rightItem, fullMatchWeight)
+    ))));
 }
 
 function clampScore(score: number): number {

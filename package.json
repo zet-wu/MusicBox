@@ -47,7 +47,6 @@
     "adm-zip": "^0.5.17",
     "chardet": "^2.1.1",
     "electron-icon-builder": "^2.0.1",
-    "fuse.js": "^6.6.2",
     "iconv-lite": "^0.7.2",
     "music-metadata": "11.12.3",
     "node-id3": "^0.2.9",
