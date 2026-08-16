@@ -9,6 +9,7 @@ import {generateLyricsSearchPatterns, findBestLyricsMatch} from '../utils/FileSe
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
 import {
     LyricsPersistenceService,
+    type PersistedLyricsSelectionMode,
     type PersistedLyricsSource
 } from '../services/lyrics/LyricsPersistenceService';
 
@@ -51,9 +52,14 @@ export class LyricsController extends BaseController {
     }
 
     @IpcHandle('lyrics:saveCanonical')
-    async saveCanonical(trackId: string, ttml: string, source: PersistedLyricsSource) {
+    async saveCanonical(
+        trackId: string,
+        ttml: string,
+        source: PersistedLyricsSource,
+        selectionMode: PersistedLyricsSelectionMode
+    ) {
         try {
-            const binding = await this.lyricsPersistence.save(trackId, ttml, source);
+            const binding = await this.lyricsPersistence.save(trackId, ttml, source, selectionMode);
             return {success: true, binding};
         } catch (error: any) {
             return {success: false, error: error.message};

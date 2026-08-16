@@ -10,18 +10,20 @@ export type PersistedLyricsSource =
         kind: 'provider';
         providerId: string;
         candidateId: string;
-        manuallySelected: boolean;
     };
+
+export type PersistedLyricsSelectionMode = 'auto' | 'manual';
 
 export interface PersistedLyricsBinding {
     trackId: string;
     canonicalTtmlPath: string;
     source: PersistedLyricsSource;
+    selectionMode: PersistedLyricsSelectionMode;
     updatedAt: number;
 }
 
 interface BindingFile {
-    version: 1;
+    version: 2;
     bindings: Record<string, PersistedLyricsBinding>;
 }
 
@@ -54,7 +56,12 @@ export class LyricsPersistenceService {
         return (await this.readBindingFile()).bindings[trackId] ?? null;
     }
 
-    async save(trackId: string, ttml: string, source: PersistedLyricsSource): Promise<PersistedLyricsBinding> {
+    async save(
+        trackId: string,
+        ttml: string,
+        source: PersistedLyricsSource,
+        selectionMode: PersistedLyricsSelectionMode
+    ): Promise<PersistedLyricsBinding> {
         if (!trackId.trim()) throw new Error('trackId 不能为空');
         if (!ttml.trim()) throw new Error('TTML 内容不能为空');
 
@@ -68,6 +75,7 @@ export class LyricsPersistenceService {
                 trackId,
                 canonicalTtmlPath,
                 source,
+                selectionMode,
                 updatedAt: Date.now()
             };
             store.bindings[trackId] = binding;
@@ -95,12 +103,16 @@ export class LyricsPersistenceService {
         try {
             const raw = await fs.promises.readFile(this.bindingsPath, 'utf8');
             const parsed = JSON.parse(raw) as Partial<BindingFile>;
+            const bindings = parsed.bindings && typeof parsed.bindings === 'object' ? parsed.bindings : {};
             return {
-                version: 1,
-                bindings: parsed.bindings && typeof parsed.bindings === 'object' ? parsed.bindings : {}
+                version: 2,
+                bindings: Object.fromEntries(Object.entries(bindings).map(([trackId, binding]) => [
+                    trackId,
+                    {...binding, selectionMode: binding.selectionMode ?? 'auto'}
+                ]))
             };
         } catch (error: any) {
-            if (error?.code === 'ENOENT') return {version: 1, bindings: {}};
+            if (error?.code === 'ENOENT') return {version: 2, bindings: {}};
             throw error;
         }
     }

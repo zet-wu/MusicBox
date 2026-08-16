@@ -1,7 +1,7 @@
 import type {Result, Unsubscribe} from './common';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from './library';
 import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
-import type {LyricsBinding, LyricsSourceRef} from '@/features/lyrics/domain/types';
+import type {LyricsBinding, LyricsSelectionMode, LyricsSourceRef} from '@/features/lyrics/domain/types';
 import type {DesktopLyricsPlaybackState} from './playback';
 import type {DesktopLyricsSettings, MusicBoxSettings, WasapiShareMode} from './settings';
 import type {CacheValidationResult, ScanProgress} from './events';
@@ -295,7 +295,8 @@ export interface ElectronLyricsAPI {
     saveCanonical(
         trackId: string,
         ttml: string,
-        source: LyricsSourceRef
+        source: LyricsSourceRef,
+        selectionMode: LyricsSelectionMode
     ): Promise<{success: boolean; binding?: LyricsBinding; error?: string}>;
     clearBinding(trackId: string): Promise<{success: boolean; cleared?: boolean; error?: string}>;
     providerRequest(

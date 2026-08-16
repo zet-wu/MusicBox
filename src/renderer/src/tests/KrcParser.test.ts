@@ -40,7 +40,7 @@ const ttmlService = new TtmlDocumentService({
     serializer: new XMLSerializer()
 });
 const normalizer = new LyricsNormalizer(ttmlService);
-const source = {kind: 'provider', providerId: 'kugou', candidateId: 'hash', manuallySelected: false} as const;
+const source = {kind: 'provider', providerId: 'kugou', candidateId: 'hash'} as const;
 
 describe('KRC parser', () => {
     it('解码 Unicode、offset、逐字时间、翻译与音译并立即生成 TTML', () => {

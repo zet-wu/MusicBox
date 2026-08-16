@@ -394,8 +394,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.invoke('lyrics:saveToLocal', lyricsDir, title, artist, album, content, format),
         readCanonical: (trackId: string) => ipcRenderer.invoke('lyrics:readCanonical', trackId),
         getBinding: (trackId: string) => ipcRenderer.invoke('lyrics:getBinding', trackId),
-        saveCanonical: (trackId: string, ttml: string, source: unknown) =>
-            ipcRenderer.invoke('lyrics:saveCanonical', trackId, ttml, source),
+        saveCanonical: (trackId: string, ttml: string, source: unknown, selectionMode: 'auto' | 'manual') =>
+            ipcRenderer.invoke('lyrics:saveCanonical', trackId, ttml, source, selectionMode),
         clearBinding: (trackId: string) => ipcRenderer.invoke('lyrics:clearBinding', trackId),
         providerRequest: (
             requestId: string,

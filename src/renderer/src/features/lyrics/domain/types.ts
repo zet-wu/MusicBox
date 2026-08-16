@@ -51,8 +51,9 @@ export type LyricsSourceRef =
         kind: 'provider';
         providerId: string;
         candidateId: string;
-        manuallySelected: boolean;
     };
+
+export type LyricsSelectionMode = 'auto' | 'manual';
 
 export interface LyricsDocument {
     ttmlText: string;
@@ -88,6 +89,7 @@ export interface LyricsBinding {
     trackId: string;
     canonicalTtmlPath: string;
     source: LyricsSourceRef;
+    selectionMode: LyricsSelectionMode;
     updatedAt: number;
 }
 

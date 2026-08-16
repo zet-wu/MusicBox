@@ -9,7 +9,7 @@ const ttmlService = new TtmlDocumentService({
     serializer: new XMLSerializer()
 });
 const normalizer = new LyricsNormalizer(ttmlService);
-const source = {kind: 'provider', providerId: 'fixture', candidateId: '1', manuallySelected: false} as const;
+const source = {kind: 'provider', providerId: 'fixture', candidateId: '1'} as const;
 
 describe('LyricsNormalizer', () => {
     it('保留 TTML 的逐字、翻译、Ruby、背景人声和对唱结构', () => {

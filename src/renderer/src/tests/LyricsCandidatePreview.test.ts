@@ -25,7 +25,7 @@ function preview(words: number, format: LyricsCandidatePreview['format']): Lyric
                     isDuet: false
                 }]
             },
-            source: {kind: 'provider', providerId: 'test', candidateId: 'candidate', manuallySelected: true}
+            source: {kind: 'provider', providerId: 'test', candidateId: 'candidate'}
         }
     };
 }

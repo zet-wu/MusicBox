@@ -22,26 +22,34 @@ const track = {
     duration: 180,
     filePath: 'C:\\Music\\Song.flac'
 };
-const source = {kind: 'provider', providerId: 'test', candidateId: 'candidate', manuallySelected: true} as const;
+const source = {kind: 'provider', providerId: 'test', candidateId: 'candidate'} as const;
 const document = {ttmlText: '<tt/>', ttml: {metadata: {}, lines: []}, render: {metadata: [], lines: []}, source};
 const normalizer = {
     fromTtml: vi.fn(() => document),
     fromPayload: vi.fn(() => document),
     fromLrc: vi.fn(() => document)
 };
+const manualSources = [
+    source,
+    {kind: 'local', path: 'Song.lrc'},
+    {kind: 'embedded', trackId: 'track-1'}
+] as const;
 
 describe('LyricsService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        gateway.saveCanonical.mockResolvedValue({success: true, binding: {trackId: 'track-1', source}});
+        gateway.saveCanonical.mockResolvedValue({success: true, binding: {trackId: 'track-1', source, selectionMode: 'manual'}});
         gateway.clearBinding.mockResolvedValue({success: true, cleared: true});
     });
 
-    it('优先读取持久化 manual binding，不被自动搜索覆盖', async () => {
+    it.each(manualSources)('优先读取持久化 manual $kind binding，不被自动搜索覆盖', async manualSource => {
         gateway.readCanonical.mockResolvedValue({
             success: true,
             ttml: '<tt/>',
-            binding: {trackId: 'track-1', canonicalTtmlPath: 'canonical.ttml', source, updatedAt: 1}
+            binding: {
+                trackId: 'track-1', canonicalTtmlPath: 'canonical.ttml', source: manualSource,
+                selectionMode: 'manual', updatedAt: 1
+            }
         });
         const provider = {id: 'test', displayName: 'Test', search: vi.fn(), fetch: vi.fn()};
         const registry = new LyricsProviderRegistry();
@@ -77,7 +85,6 @@ describe('LyricsService', () => {
         await service.applyCandidate(
             {trackId: 'track-1', title: 'Song', artists: ['Artist']},
             {providerId: 'test', candidateId: 'candidate', title: 'Song', artists: ['Artist'], identityScore: 100, qualityScore: 0},
-            true,
             new AbortController().signal
         );
 
@@ -85,7 +92,7 @@ describe('LyricsService', () => {
             {kind: 'ttml', ttml: '<tt/>'},
             expect.objectContaining({source})
         );
-        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source);
+        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source, 'manual');
     });
 
     it('预览候选时返回实际获取的原始格式', async () => {
@@ -129,7 +136,7 @@ describe('LyricsService', () => {
 
         expect(result.document).toBe(document);
         expect(provider.fetch).not.toHaveBeenCalled();
-        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source);
+        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', source, 'manual');
     });
 
     it('高匹配在线逐字歌词优先于本地逐行歌词', async () => {
@@ -142,7 +149,7 @@ describe('LyricsService', () => {
         const onlineDocument = {
             ...document,
             ttml: {metadata: {timingMode: 'Word'}, lines: []},
-            source: {kind: 'provider', providerId: 'test', candidateId: 'word', manuallySelected: false}
+            source: {kind: 'provider', providerId: 'test', candidateId: 'word'}
         };
         const testNormalizer = {
             fromLrc: vi.fn(() => localDocument),
@@ -167,7 +174,7 @@ describe('LyricsService', () => {
         const result = await service.load(track, new AbortController().signal);
 
         expect(result.document).toBe(onlineDocument);
-        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', onlineDocument.source);
+        expect(gateway.saveCanonical).toHaveBeenCalledWith('track-1', '<tt/>', onlineDocument.source, 'auto');
     });
 
     it('同一 identity 分箱内优先尝试高质量逐字候选', async () => {
@@ -175,12 +182,12 @@ describe('LyricsService', () => {
         const lineDocument = {
             ...document,
             ttml: {metadata: {timingMode: 'Line'}, lines: []},
-            source: {kind: 'provider', providerId: 'test', candidateId: 'line', manuallySelected: false}
+            source: {kind: 'provider', providerId: 'test', candidateId: 'line'}
         };
         const wordDocument = {
             ...document,
             ttml: {metadata: {timingMode: 'Word'}, lines: []},
-            source: {kind: 'provider', providerId: 'test', candidateId: 'word', manuallySelected: false}
+            source: {kind: 'provider', providerId: 'test', candidateId: 'word'}
         };
         const provider = {
             id: 'test', displayName: 'Test',

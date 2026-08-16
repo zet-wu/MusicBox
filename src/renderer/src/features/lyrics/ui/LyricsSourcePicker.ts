@@ -147,7 +147,7 @@ export class LyricsSourcePicker {
         }
         const source = result.binding.source;
         const description = source.kind === 'provider'
-            ? `${source.providerId} · ${source.manuallySelected ? '手动选择' : '自动匹配'}`
+            ? `${source.providerId} · ${result.binding.selectionMode === 'manual' ? '手动选择' : '自动匹配'}`
             : source.kind === 'local' ? `本地 · ${source.path}` : '音频内嵌';
         this.content.innerHTML = `<article class="lyrics-candidate current"><strong>当前使用</strong><p></p><div class="lyrics-candidate__badges"></div></article>`;
         const paragraph = this.content.querySelector('p');

@@ -5,6 +5,7 @@ import type {
     LyricsCandidate,
     LyricsCandidatePreview,
     LyricsDocument,
+    LyricsSelectionMode,
     LyricsSourceRef,
     TrackLyricsQuery
 } from '../domain/types';
@@ -66,7 +67,7 @@ export class LyricsService {
             const document = local.kind === 'ttml'
                 ? this.normalizer.fromTtml(local.content, this.createContext(query, source))
                 : this.normalizer.fromLrc(local.content, this.createContext(query, source));
-            if (isWordTimed(document)) return this.persist(query.trackId, document);
+            if (isWordTimed(document)) return this.persist(query.trackId, document, 'auto');
             fallback ??= {document, needsPersistence: true};
         }
 
@@ -74,7 +75,7 @@ export class LyricsService {
         if (embedded) {
             const source: LyricsSourceRef = {kind: 'embedded', trackId: query.trackId};
             const document = this.normalizer.fromPayload(embedded, this.createContext(query, source));
-            if (isWordTimed(document)) return this.persist(query.trackId, document);
+            if (isWordTimed(document)) return this.persist(query.trackId, document, 'auto');
             fallback ??= {document, needsPersistence: true};
         }
 
@@ -88,8 +89,8 @@ export class LyricsService {
         for (const candidate of candidates) {
             if (signal.aborted) throw signal.reason;
             try {
-                const document = await this.fetchCandidate(query, candidate, false, signal);
-                if (isWordTimed(document)) return this.persist(query.trackId, document);
+                const document = await this.fetchCandidate(query, candidate, signal);
+                if (isWordTimed(document)) return this.persist(query.trackId, document, 'auto');
                 onlineLineTimed ??= document;
             } catch (error) {
                 if (signal.aborted) throw error;
@@ -99,25 +100,24 @@ export class LyricsService {
 
         if (fallback) {
             return fallback.needsPersistence
-                ? this.persist(query.trackId, fallback.document)
+                ? this.persist(query.trackId, fallback.document, 'auto')
                 : {document: fallback.document, binding: fallback.binding};
         }
-        if (onlineLineTimed) return this.persist(query.trackId, onlineLineTimed);
+        if (onlineLineTimed) return this.persist(query.trackId, onlineLineTimed, 'auto');
         return {document: null, error: '未找到歌词'};
     }
 
     async applyCandidate(
         query: TrackLyricsQuery,
         candidate: LyricsCandidate,
-        manuallySelected: boolean,
         signal: AbortSignal
     ): Promise<LyricsLoadResult> {
-        const document = await this.fetchCandidate(query, candidate, manuallySelected, signal);
-        return this.persist(query.trackId, document);
+        const document = await this.fetchCandidate(query, candidate, signal);
+        return this.persist(query.trackId, document, 'manual');
     }
 
     async applyPreview(query: TrackLyricsQuery, preview: LyricsCandidatePreview): Promise<LyricsLoadResult> {
-        return this.persist(query.trackId, preview.document);
+        return this.persist(query.trackId, preview.document, 'manual');
     }
 
     async previewCandidate(
@@ -131,8 +131,7 @@ export class LyricsService {
         const source: LyricsSourceRef = {
             kind: 'provider',
             providerId: candidate.providerId,
-            candidateId: candidate.candidateId,
-            manuallySelected: true
+            candidateId: candidate.candidateId
         };
         return {
             document: this.normalizer.fromPayload(payload, this.createContext(query, source)),
@@ -147,8 +146,12 @@ export class LyricsService {
         if (!result.success) throw new Error(result.error ?? '清除歌词绑定失败');
     }
 
-    private async persist(trackId: string, document: LyricsDocument): Promise<LyricsLoadResult> {
-        const saved = await lyricsGateway.saveCanonical(trackId, document.ttmlText, document.source);
+    private async persist(
+        trackId: string,
+        document: LyricsDocument,
+        selectionMode: LyricsSelectionMode
+    ): Promise<LyricsLoadResult> {
+        const saved = await lyricsGateway.saveCanonical(trackId, document.ttmlText, document.source, selectionMode);
         if (!saved.success) {
             console.warn(`⚠️ Lyrics: canonical TTML 保存失败: ${saved.error ?? '未知错误'}`);
         }
@@ -158,7 +161,6 @@ export class LyricsService {
     private async fetchCandidate(
         query: TrackLyricsQuery,
         candidate: LyricsCandidate,
-        manuallySelected: boolean,
         signal: AbortSignal
     ): Promise<LyricsDocument> {
         const provider = this.providers.get(candidate.providerId);
@@ -167,8 +169,7 @@ export class LyricsService {
         const source: LyricsSourceRef = {
             kind: 'provider',
             providerId: candidate.providerId,
-            candidateId: candidate.candidateId,
-            manuallySelected
+            candidateId: candidate.candidateId
         };
         return this.normalizer.fromPayload(payload, this.createContext(query, source));
     }
@@ -185,7 +186,7 @@ export class LyricsService {
 }
 
 function isManualBinding(binding: LyricsBinding): boolean {
-    return binding.source.kind === 'provider' && binding.source.manuallySelected;
+    return binding.selectionMode === 'manual';
 }
 
 function isWordTimed(document: LyricsDocument): boolean {

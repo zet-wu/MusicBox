@@ -1,6 +1,6 @@
 import {ElectronNamespaceAdapter} from './ElectronBridge';
 import type {EmbeddedLyricsData} from '@api/types/electron';
-import type {LyricsBinding, LyricsSourceRef} from '@/features/lyrics/domain/types';
+import type {LyricsBinding, LyricsSelectionMode, LyricsSourceRef} from '@/features/lyrics/domain/types';
 
 export interface LocalLyricsFileResult {
     success: boolean;
@@ -69,12 +69,12 @@ class LyricsGateway extends ElectronNamespaceAdapter<'lyrics'> {
         return this.call('getBinding', trackId);
     }
 
-    saveCanonical(trackId: string, ttml: string, source: LyricsSourceRef): Promise<{
+    saveCanonical(trackId: string, ttml: string, source: LyricsSourceRef, selectionMode: LyricsSelectionMode): Promise<{
         success: boolean;
         binding?: LyricsBinding;
         error?: string;
     }> {
-        return this.call('saveCanonical', trackId, ttml, source);
+        return this.call('saveCanonical', trackId, ttml, source, selectionMode);
     }
 
     clearBinding(trackId: string): Promise<{success: boolean; cleared?: boolean; error?: string}> {
