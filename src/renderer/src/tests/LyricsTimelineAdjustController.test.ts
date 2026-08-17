@@ -123,7 +123,7 @@ describe('LyricsTimelineAdjustController', () => {
     });
 
     it('长按分段加速期间不保存，松开后只保存累计偏移', async () => {
-        const shift = vi.fn().mockResolvedValue({document: lyricDocument(9200), appliedDeltaMs: -800});
+        const shift = vi.fn().mockResolvedValue({document: lyricDocument(4450), appliedDeltaMs: -5550});
         const result = createController(shift);
         result.controller.setEditableDocument(lyricDocument());
 
@@ -131,12 +131,17 @@ describe('LyricsTimelineAdjustController', () => {
         await vi.advanceTimersByTimeAsync(1300);
 
         expect(shift).not.toHaveBeenCalled();
-        expect(result.setTimelinePreviewDelta.mock.calls.map(call => call[0]))
-            .toEqual([-100, -200, -300, -400, -500, -600, -800]);
+        expect(result.setTimelinePreviewDelta).toHaveBeenLastCalledWith(-700);
+
+        await vi.advanceTimersByTimeAsync(1200);
+        expect(result.setTimelinePreviewDelta).toHaveBeenLastCalledWith(-2050);
+
+        await vi.advanceTimersByTimeAsync(1600);
+        expect(result.setTimelinePreviewDelta).toHaveBeenLastCalledWith(-5550);
 
         result.earlierButton.dispatchEvent(event('pointerup', {pointerId: 3}));
         await vi.waitFor(() => expect(shift).toHaveBeenCalledOnce());
-        expect(shift.mock.calls[0][1]).toBe(-800);
+        expect(shift.mock.calls[0][1]).toBe(-5550);
     });
 
     it('键盘 click 仍只提交一次 100ms', async () => {

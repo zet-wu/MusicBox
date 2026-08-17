@@ -6,8 +6,8 @@ import {desktopLyricsService} from '@/features/desktopLyrics/service/DesktopLyri
 import type {AddLyricsDomListener} from './LyricsDomEvents';
 import type {LyricsTrack} from './LyricsTypes';
 
-const INITIAL_REPEAT_DELAY_MS = 400;
-const REPEAT_INTERVAL_MS = 170;
+const INITIAL_REPEAT_DELAY_MS = 300;
+const REPEAT_INTERVAL_MS = 50;
 
 interface LyricsTimelineAdjustElements {
     container: HTMLElement;
@@ -175,10 +175,10 @@ export class LyricsTimelineAdjustController {
     }
 
     private getStepMagnitude(elapsedMs: number): number {
-        if (elapsedMs < 1200) return 100;
-        if (elapsedMs < 2400) return 200;
-        if (elapsedMs < 4000) return 500;
-        return 1000;
+        if (elapsedMs < 1200) return 25;
+        if (elapsedMs < 2400) return 50;
+        if (elapsedMs < 4000) return 100;
+        return 200;
     }
 
     private cancelGesture(): void {
