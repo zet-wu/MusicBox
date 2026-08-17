@@ -38,6 +38,7 @@ export class AmllLyricsView {
     private lastFrameTime = performance.now();
     private currentDocument: LyricsDocument | null = null;
     private currentTimeSeconds = 0;
+    private timelinePreviewDeltaMs = 0;
 
     constructor(options: AmllLyricsViewOptions) {
         this.container = options.container;
@@ -59,6 +60,7 @@ export class AmllLyricsView {
     }
 
     setDocument(document: LyricsDocument, initialTimeSeconds = 0): void {
+        this.clearTimelinePreview({refresh: false});
         this.currentDocument = document;
         this.currentTimeSeconds = initialTimeSeconds;
         this.hideState();
@@ -67,12 +69,14 @@ export class AmllLyricsView {
     }
 
     showLoading(): void {
+        this.clearTimelinePreview({refresh: false});
         this.currentDocument = null;
         this.player.setLyricLines([]);
         this.showState('正在加载歌词...');
     }
 
     showNoLyrics(): void {
+        this.clearTimelinePreview({refresh: false});
         this.currentDocument = null;
         this.player.setLyricLines([]);
         this.showState('暂无歌词', '请欣赏音乐');
@@ -81,12 +85,23 @@ export class AmllLyricsView {
     handlePlaybackPositionChanged(positionSeconds: number, isSeek = false): void {
         if (!this.isVisible()) return;
         this.currentTimeSeconds = positionSeconds;
-        this.player.setCurrentTime(positionSeconds * 1000, isSeek);
+        this.applyEffectiveTime(isSeek);
     }
 
     setPlaying(isPlaying: boolean): void {
+        this.applyEffectiveTime();
         if (isPlaying) this.player.resume();
         else this.player.pause();
+    }
+
+    setTimelinePreviewDelta(deltaMs: number): void {
+        this.timelinePreviewDeltaMs = Number.isFinite(deltaMs) ? Math.trunc(deltaMs) : 0;
+        this.applyEffectiveTime();
+    }
+
+    clearTimelinePreview(options: {refresh?: boolean} = {}): void {
+        this.timelinePreviewDeltaMs = 0;
+        if (options.refresh !== false) this.applyEffectiveTime();
     }
 
     reset(): void {
@@ -132,8 +147,17 @@ export class AmllLyricsView {
             : lyricsAppearanceSettingsService.getSettings(settingsStore.load());
         this.player.setLyricLines(
             projectLyricsForDisplay(this.currentDocument.render.lines, settings),
-            this.currentTimeSeconds * 1000
+            this.getEffectiveTimeMs()
         );
+    }
+
+    private applyEffectiveTime(isSeek = false): void {
+        this.player.setCurrentTime(this.getEffectiveTimeMs(), isSeek);
+        this.player.update(0);
+    }
+
+    private getEffectiveTimeMs(): number {
+        return Math.max(0, this.currentTimeSeconds * 1000 - this.timelinePreviewDeltaMs);
     }
 
     private startAnimationLoop(): void {

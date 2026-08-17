@@ -1,7 +1,7 @@
 import {DOMImplementation, DOMParser, XMLSerializer} from '@xmldom/xmldom';
 import type {TTMLResult} from '@applemusic-like-lyrics/ttml';
 import {describe, expect, it} from 'vitest';
-import {shiftTimeline} from '@/features/lyrics/format/TtmlTimelineEditor';
+import {constrainTimelineDelta, shiftTimeline} from '@/features/lyrics/format/TtmlTimelineEditor';
 import {TtmlDocumentService} from '@/features/lyrics/format/TtmlDocumentService';
 
 const fixture: TTMLResult = {
@@ -37,6 +37,16 @@ const fixture: TTMLResult = {
 };
 
 describe('shiftTimeline', () => {
+    it('使用与最终变换一致且不修改输入的预览边界', () => {
+        const snapshot = structuredClone(fixture);
+
+        expect(constrainTimelineDelta(fixture, -1000)).toBe(-100);
+        expect(constrainTimelineDelta(fixture, 250)).toBe(250);
+        expect(constrainTimelineDelta({...fixture, lines: [{...fixture.lines[0], startTime: 0}]}, -100)).toBe(0);
+        expect(constrainTimelineDelta(fixture, -1000)).toBe(shiftTimeline(fixture, -1000).appliedDeltaMs);
+        expect(fixture).toEqual(snapshot);
+    });
+
     it('将所有时间节点统一向后移动并保持内容与时长', () => {
         const result = shiftTimeline(fixture, 100);
         const line = result.document.lines[0];

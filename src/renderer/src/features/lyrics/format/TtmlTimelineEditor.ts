@@ -12,13 +12,18 @@ export interface TimelineShiftResult {
     appliedDeltaMs: number;
 }
 
-export function shiftTimeline(document: TTMLResult, requestedDeltaMs: number): TimelineShiftResult {
+export function constrainTimelineDelta(document: TTMLResult, requestedDeltaMs: number): number {
     const normalizedDelta = Math.trunc(requestedDeltaMs);
     const earliestStart = findEarliestTimedStart(document);
     const constrainedDelta = normalizedDelta < 0 && earliestStart !== null
         ? Math.max(normalizedDelta, -earliestStart)
         : normalizedDelta;
-    const appliedDeltaMs = constrainedDelta === 0 ? 0 : constrainedDelta;
+    return constrainedDelta === 0 ? 0 : constrainedDelta;
+}
+
+export function shiftTimeline(document: TTMLResult, requestedDeltaMs: number): TimelineShiftResult {
+    const constrainedDelta = constrainTimelineDelta(document, requestedDeltaMs);
+    const appliedDeltaMs = constrainedDelta;
 
     return {
         document: {

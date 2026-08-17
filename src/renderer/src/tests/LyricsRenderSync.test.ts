@@ -72,4 +72,40 @@ describe('AmllLyricsView', () => {
         expect(player.calcLayout).toHaveBeenCalledOnce();
         expect(player.dispose).toHaveBeenCalledOnce();
     });
+
+    it('使用虚拟时间偏移预览且不重建歌词行', async () => {
+        const {AmllLyricsView} = await import('@/features/lyrics/ui/AmllLyricsView');
+        const player = Object.assign(new EventTarget(), {
+            getElement: vi.fn(() => fakeElement()),
+            setLyricLines: vi.fn(),
+            setCurrentTime: vi.fn(),
+            pause: vi.fn(),
+            resume: vi.fn(),
+            update: vi.fn(),
+            resetScroll: vi.fn(),
+            calcLayout: vi.fn(),
+            dispose: vi.fn()
+        });
+        const view = new AmllLyricsView({
+            container: fakeElement(),
+            isVisible: () => true,
+            seek: vi.fn(),
+            createPlayer: () => player
+        });
+
+        view.handlePlaybackPositionChanged(10);
+        view.setTimelinePreviewDelta(-100);
+        view.handlePlaybackPositionChanged(11);
+        view.setTimelinePreviewDelta(100);
+        view.clearTimelinePreview();
+
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(1, 10_000, false);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(2, 10_100, false);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(3, 11_100, false);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(4, 10_900, false);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(5, 11_000, false);
+        expect(player.setLyricLines).not.toHaveBeenCalled();
+
+        view.destroy();
+    });
 });
