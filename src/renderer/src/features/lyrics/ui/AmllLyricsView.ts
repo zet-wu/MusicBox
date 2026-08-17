@@ -96,12 +96,12 @@ export class AmllLyricsView {
 
     setTimelinePreviewDelta(deltaMs: number): void {
         this.timelinePreviewDeltaMs = Number.isFinite(deltaMs) ? Math.trunc(deltaMs) : 0;
-        this.applyEffectiveTime();
+        this.applyEffectiveTime(true);
     }
 
     clearTimelinePreview(options: {refresh?: boolean} = {}): void {
         this.timelinePreviewDeltaMs = 0;
-        if (options.refresh !== false) this.applyEffectiveTime();
+        if (options.refresh !== false) this.applyEffectiveTime(true);
     }
 
     reset(): void {

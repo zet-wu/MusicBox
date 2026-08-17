@@ -74,7 +74,7 @@ export class DesktopAmllLyricsView {
     updateTimelinePreview(deltaMs: number): number | null {
         if (!Number.isFinite(deltaMs)) return null;
         this.timelinePreviewDeltaMs = Math.trunc(deltaMs);
-        this.applyEffectiveTime();
+        this.applyEffectiveTime(true);
         return this.timelinePreviewDeltaMs;
     }
 
@@ -123,8 +123,8 @@ export class DesktopAmllLyricsView {
         this.animationFrame = null;
     }
 
-    private applyEffectiveTime(): void {
-        this.player.setCurrentTime(this.getEffectiveTimeMs());
+    private applyEffectiveTime(isSeek = false): void {
+        this.player.setCurrentTime(this.getEffectiveTimeMs(), isSeek);
         this.player.update(0);
         this.decorateLineState();
     }

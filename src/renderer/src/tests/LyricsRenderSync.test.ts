@@ -94,16 +94,20 @@ describe('AmllLyricsView', () => {
         });
 
         view.handlePlaybackPositionChanged(10);
+        view.setPlaying(false);
         view.setTimelinePreviewDelta(-100);
         view.handlePlaybackPositionChanged(11);
         view.setTimelinePreviewDelta(100);
         view.clearTimelinePreview();
 
         expect(player.setCurrentTime).toHaveBeenNthCalledWith(1, 10_000, false);
-        expect(player.setCurrentTime).toHaveBeenNthCalledWith(2, 10_100, false);
-        expect(player.setCurrentTime).toHaveBeenNthCalledWith(3, 11_100, false);
-        expect(player.setCurrentTime).toHaveBeenNthCalledWith(4, 10_900, false);
-        expect(player.setCurrentTime).toHaveBeenNthCalledWith(5, 11_000, false);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(2, 10_000, false);
+        expect(player.pause.mock.invocationCallOrder[0])
+            .toBeLessThan(player.setCurrentTime.mock.invocationCallOrder[2]);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(3, 10_100, true);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(4, 11_100, false);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(5, 10_900, true);
+        expect(player.setCurrentTime).toHaveBeenNthCalledWith(6, 11_000, true);
         expect(player.setLyricLines).not.toHaveBeenCalled();
 
         view.destroy();

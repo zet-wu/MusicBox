@@ -64,11 +64,11 @@ describe('DesktopAmllLyricsView', () => {
         })], 0);
         expect(stateElement.hidden).toBe(true);
         expect(playerElement.hidden).toBe(false);
-        expect(player.setCurrentTime).toHaveBeenCalledWith(1500);
-        expect(player.setCurrentTime).toHaveBeenCalledWith(1600);
-        expect(player.setCurrentTime).toHaveBeenCalledWith(2100);
-        expect(player.setCurrentTime).toHaveBeenCalledWith(1900);
-        expect(player.setCurrentTime).toHaveBeenCalledWith(2000);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(1500, false);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(1600, true);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(2100, false);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(1900, true);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(2000, true);
         expect(player.setLyricLines).toHaveBeenCalledTimes(1);
         expect(player.resume).toHaveBeenCalledOnce();
         expect(player.pause).toHaveBeenCalledTimes(2);
@@ -77,6 +77,6 @@ describe('DesktopAmllLyricsView', () => {
 
         view.reset();
         view.updatePosition(3);
-        expect(player.setCurrentTime).toHaveBeenLastCalledWith(3000);
+        expect(player.setCurrentTime).toHaveBeenLastCalledWith(3000, false);
     });
 });
