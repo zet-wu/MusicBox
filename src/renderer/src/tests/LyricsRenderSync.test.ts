@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 function fakeElement() {
-    return {
+    return Object.assign(new EventTarget(), {
         hidden: false,
         textContent: '',
         className: '',
@@ -9,7 +9,7 @@ function fakeElement() {
         append: vi.fn(),
         appendChild: vi.fn(),
         replaceChildren: vi.fn()
-    } as unknown as HTMLElement;
+    }) as unknown as HTMLElement;
 }
 
 describe('AmllLyricsView', () => {
@@ -31,12 +31,16 @@ describe('AmllLyricsView', () => {
             pause: vi.fn(),
             resume: vi.fn(),
             update: vi.fn(),
+            resetScroll: vi.fn(),
+            calcLayout: vi.fn(),
             dispose: vi.fn()
         });
+        const container = fakeElement();
+        const seek = vi.fn();
         const view = new AmllLyricsView({
-            container: fakeElement(),
+            container,
             isVisible: () => true,
-            seek: vi.fn(),
+            seek,
             createPlayer: () => player
         });
         const lyrics = [{
@@ -52,10 +56,20 @@ describe('AmllLyricsView', () => {
             source: {kind: 'embedded', trackId: 'track'}
         }, 15);
         view.handlePlaybackPositionChanged(16, true);
+        container.dispatchEvent(new Event('mouseleave'));
+
+        expect(player.resetScroll).toHaveBeenCalledOnce();
+        expect(player.calcLayout).toHaveBeenCalledWith(false, false);
+        expect(player.setLyricLines).toHaveBeenCalledTimes(1);
+        expect(seek).not.toHaveBeenCalled();
+
         view.destroy();
+        container.dispatchEvent(new Event('mouseleave'));
 
         expect(player.setLyricLines).toHaveBeenCalledWith(lyrics, 15_000);
         expect(player.setCurrentTime).toHaveBeenCalledWith(16_000, true);
+        expect(player.resetScroll).toHaveBeenCalledOnce();
+        expect(player.calcLayout).toHaveBeenCalledOnce();
         expect(player.dispose).toHaveBeenCalledOnce();
     });
 });

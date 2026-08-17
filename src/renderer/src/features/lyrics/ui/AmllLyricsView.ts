@@ -15,6 +15,8 @@ interface AmllPlayerPort extends EventTarget {
     pause(): void;
     resume(): void;
     update(delta?: number): void;
+    resetScroll(): void;
+    calcLayout(sync?: boolean, force?: boolean): Promise<void> | void;
     onResize?(): void;
     dispose(): void;
 }
@@ -48,6 +50,7 @@ export class AmllLyricsView {
         this.container.textContent = '';
         this.container.classList.add('amll-lyrics-host');
         this.container.append(this.player.getElement(), this.stateElement);
+        this.container.addEventListener('mouseleave', this.handleMouseLeave);
         this.player.addEventListener('line-click', this.handleLineClick);
         if (typeof window !== 'undefined') {
             window.addEventListener(LYRICS_DISPLAY_SETTINGS_CHANGED_EVENT, this.handleDisplaySettingsChanged);
@@ -94,6 +97,7 @@ export class AmllLyricsView {
     destroy(): void {
         if (this.animationFrame !== null) cancelAnimationFrame(this.animationFrame);
         this.animationFrame = null;
+        this.container.removeEventListener('mouseleave', this.handleMouseLeave);
         this.player.removeEventListener('line-click', this.handleLineClick);
         if (typeof window !== 'undefined') {
             window.removeEventListener(LYRICS_DISPLAY_SETTINGS_CHANGED_EVENT, this.handleDisplaySettingsChanged);
@@ -107,6 +111,11 @@ export class AmllLyricsView {
         const lineEvent = event as LyricLineMouseEvent;
         const line = lineEvent.line?.getLine();
         if (line) void this.seek(line.startTime / 1000);
+    };
+
+    private readonly handleMouseLeave = (): void => {
+        this.player.resetScroll();
+        void this.player.calcLayout(false, false);
     };
 
     private readonly handleDisplaySettingsChanged = (): void => {
