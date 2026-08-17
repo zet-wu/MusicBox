@@ -7,8 +7,7 @@ export type DisplaySettingsMap = Record<string, DisplaySettingValue>;
 export interface DesktopLyricsDisplaySettings extends DisplaySettingsMap {
     displayMode: string;
     layoutMode: string;
-    themeColor: string;
-    fontColor: string;
+    color: string;
     opacity: number;
     fontSize: number;
 }
@@ -25,8 +24,7 @@ class DisplayModeSettingsService {
         return {
             displayMode: String(desktopLyricsSettings.displayMode || 'default'),
             layoutMode: String(desktopLyricsSettings.layoutMode || 'default'),
-            themeColor: String(desktopLyricsSettings.themeColor || '#64b5f6'),
-            fontColor: String(desktopLyricsSettings.fontColor || '#000'),
+            color: String(desktopLyricsSettings.color || '#ffffff'),
             opacity: typeof desktopLyricsSettings.opacity === 'number' ? desktopLyricsSettings.opacity : 0.9,
             fontSize: typeof desktopLyricsSettings.fontSize === 'number' ? desktopLyricsSettings.fontSize : 48
         };

@@ -392,6 +392,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.invoke('lyrics:searchLocalFiles', lyricsDir, title, artist, album, extension),
         saveToLocal: (lyricsDir: string, title: string, artist: string, album: string, content: string, format: string) =>
             ipcRenderer.invoke('lyrics:saveToLocal', lyricsDir, title, artist, album, content, format),
+        readCanonical: (trackId: string) => ipcRenderer.invoke('lyrics:readCanonical', trackId),
+        getBinding: (trackId: string) => ipcRenderer.invoke('lyrics:getBinding', trackId),
+        saveCanonical: (trackId: string, ttml: string, source: unknown, selectionMode: 'auto' | 'manual') =>
+            ipcRenderer.invoke('lyrics:saveCanonical', trackId, ttml, source, selectionMode),
+        clearBinding: (trackId: string) => ipcRenderer.invoke('lyrics:clearBinding', trackId),
+        providerRequest: (
+            requestId: string,
+            url: string,
+            options?: {method?: string; headers?: Record<string, string>; body?: string}
+        ) => ipcRenderer.invoke('lyrics:providerRequest', requestId, url, options),
+        cancelProviderRequest: (requestId: string) => ipcRenderer.invoke('lyrics:cancelProviderRequest', requestId),
 
         // 内嵌歌词
         getEmbedded: (filePath: string) => ipcRenderer.invoke('lyrics:getEmbedded', filePath),
@@ -483,6 +494,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         updatePlaybackState: (state: any) => ipcRenderer.invoke('desktopLyrics:updatePlaybackState', state),
         updateLyrics: (lyricsData: any) => ipcRenderer.invoke('desktopLyrics:updateLyrics', lyricsData),
         updatePosition: (position: any) => ipcRenderer.invoke('desktopLyrics:updatePosition', position),
+        updateTimelinePreview: (deltaMs: number) => ipcRenderer.invoke('desktopLyrics:updateTimelinePreview', deltaMs),
         updateTrack: (trackInfo: any) => ipcRenderer.invoke('desktopLyrics:updateTrack', trackInfo),
         updateSettings: (settings: any) => ipcRenderer.invoke('desktopLyrics:updateSettings', settings),
 
@@ -511,6 +523,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             const wrapper = (_event: any, position: any) => callback(position);
             ipcRenderer.on('playback:positionChanged', wrapper);
             return () => ipcRenderer.removeListener('playback:positionChanged', wrapper);
+        },
+        onTimelinePreviewChanged: (callback: (deltaMs: number) => void) => {
+            const wrapper = (_event: any, deltaMs: number) => callback(deltaMs);
+            ipcRenderer.on('lyrics:timelinePreviewChanged', wrapper);
+            return () => ipcRenderer.removeListener('lyrics:timelinePreviewChanged', wrapper);
         },
         onTrackChanged: (callback: (trackInfo: any) => void) => {
             const wrapper = (_event: any, trackInfo: any) => callback(trackInfo);

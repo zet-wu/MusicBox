@@ -1,6 +1,5 @@
 import {settingsShellService} from "@/features/appShell/service";
 import {localCoverManager} from "@/features/mediaAssets/service/LocalCoverManager";
-import {localLyricsManager} from "@/features/mediaAssets/service/LocalLyricsManager";
 import {mediaAssetsService} from "@/features/mediaAssets/service/MediaAssetsService";
 
 interface DirectoryResult {
@@ -17,10 +16,6 @@ class MediaDirectorySettingsService {
         }
 
         return result.filePaths[0];
-    }
-
-    applyLyricsDirectory(directory: string): void {
-        localLyricsManager.setLyricsDirectory(directory);
     }
 
     applyCoverDirectory(directory: string): void {

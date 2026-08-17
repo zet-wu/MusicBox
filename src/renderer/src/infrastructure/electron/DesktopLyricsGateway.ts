@@ -1,6 +1,6 @@
 import {ElectronNamespaceAdapter} from './ElectronBridge';
 import type {Result, Unsubscribe} from '@api/types/common';
-import type {LyricLine} from '@api/types/lyrics';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {DesktopLyricsPlaybackState} from '@api/types/playback';
 import type {DesktopLyricsSettings, MusicBoxSettings} from '@api/types/settings';
 import type {Track} from '@api/types/library';
@@ -18,7 +18,7 @@ class DesktopLyricsGateway extends ElectronNamespaceAdapter<'desktopLyrics'> {
         return this.call('updateTrack', track);
     }
 
-    updateLyrics(lyrics: LyricLine[] | string): Promise<unknown> {
+    updateLyrics(lyrics: AmllLyricLine[]): Promise<unknown> {
         return this.call('updateLyrics', lyrics);
     }
 
@@ -28,6 +28,10 @@ class DesktopLyricsGateway extends ElectronNamespaceAdapter<'desktopLyrics'> {
 
     updatePosition(position: number): Promise<unknown> {
         return this.call('updatePosition', position);
+    }
+
+    updateTimelinePreview(deltaMs: number): Promise<unknown> {
+        return this.call('updateTimelinePreview', deltaMs);
     }
 
     toggle(): Promise<{success: boolean; visible?: boolean; error?: string}> {
@@ -68,6 +72,10 @@ class DesktopLyricsGateway extends ElectronNamespaceAdapter<'desktopLyrics'> {
 
     onPositionChanged(handler: (position: number) => void): Unsubscribe {
         return this.on('onPositionChanged', handler);
+    }
+
+    onTimelinePreviewChanged(handler: (deltaMs: number) => void): Unsubscribe {
+        return this.on('onTimelinePreviewChanged', handler);
     }
 
     onPlaybackStateChanged(handler: (state: DesktopLyricsPlaybackState) => void): Unsubscribe {

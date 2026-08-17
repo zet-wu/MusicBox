@@ -1,5 +1,6 @@
 import type {LyricsLayoutElements} from "@ui/widgets/lyrics/LyricsLayoutController";
 import type {LyricsPlaybackControlElements} from "@ui/widgets/lyrics/LyricsPlaybackControlsController";
+import type {LyricsTimelineAdjustElements} from './LyricsTimelineAdjustController';
 
 interface LyricsElements {
     page: HTMLElement;
@@ -11,6 +12,7 @@ interface LyricsElements {
     lyricsDisplay: HTMLElement;
     layout: LyricsLayoutElements;
     playback: LyricsPlaybackControlElements;
+    timelineAdjust: LyricsTimelineAdjustElements;
 }
 
 function resolveLyricsElements(root: Element | null): LyricsElements {
@@ -31,6 +33,11 @@ function resolveLyricsElements(root: Element | null): LyricsElements {
         trackTitle: queryRequired(page, '#lyrics-track-title'),
         trackArtist: queryRequired(page, '#lyrics-track-artist'),
         lyricsDisplay: queryRequired(page, '#lyrics-display'),
+        timelineAdjust: {
+            container: queryRequired(page, '#lyrics-timeline-adjust'),
+            earlierButton: queryRequired<HTMLButtonElement>(page, '#lyrics-timeline-earlier'),
+            laterButton: queryRequired<HTMLButtonElement>(page, '#lyrics-timeline-later')
+        },
         layout: {
             page,
             fullscreenBtn,

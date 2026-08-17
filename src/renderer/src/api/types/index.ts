@@ -14,5 +14,4 @@ export * from './settings';
 export * from './events';
 export * from './electron';
 export * from './network';
-export * from './lyrics';
 export * from './cover';

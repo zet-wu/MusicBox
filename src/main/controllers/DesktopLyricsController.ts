@@ -85,6 +85,12 @@ export class DesktopLyricsController extends BaseController {
         return {success: true};
     }
 
+    @IpcHandle('desktopLyrics:updateTimelinePreview')
+    updateTimelinePreview(deltaMs: number): { success: boolean } {
+        this.windowManager.sendToDesktopLyrics('lyrics:timelinePreviewChanged', deltaMs);
+        return {success: true};
+    }
+
     @IpcHandle('desktopLyrics:updateTrack')
     updateTrack(trackInfo: any): { success: boolean } {
         this.windowManager.sendToDesktopLyrics('track:changed', trackInfo);

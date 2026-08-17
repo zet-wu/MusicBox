@@ -1,35 +1,46 @@
 import type {LyricsAppearanceSettings} from "./LyricsAppearanceSettingsService";
 
 export interface LyricsAppearanceSettingsElements {
-    highlightOpacitySlider: HTMLInputElement | null;
-    highlightOpacityValue: HTMLElement | null;
-    highlightColorInput: HTMLInputElement | null;
-    highlightColorValue: HTMLElement | null;
+    colorModeSelect: HTMLSelectElement | null;
+    textColorInput: HTMLInputElement | null;
+    textColorValue: HTMLElement | null;
+    fontFamilySelect: HTMLSelectElement | null;
+    customFontContainer: HTMLElement | null;
+    customLatinFontInput: HTMLInputElement | null;
+    customCjkFontInput: HTMLInputElement | null;
+    fontSizeSelect: HTMLSelectElement | null;
+    showTranslationToggle: HTMLInputElement | null;
+    showRomanizationToggle: HTMLInputElement | null;
+    showRubyToggle: HTMLInputElement | null;
 }
 
 class LyricsAppearanceSettingsRenderer {
     initialize(elements: LyricsAppearanceSettingsElements, settings: LyricsAppearanceSettings): void {
-        this.updateOpacity(elements, settings.highlightOpacity);
-        this.updateColor(elements, settings.highlightColor);
+        if (elements.colorModeSelect) elements.colorModeSelect.value = settings.colorMode;
+        this.updateTextColor(elements, settings.textColor);
+        this.updateAvailability(elements, settings.colorMode);
+        if (elements.fontFamilySelect) elements.fontFamilySelect.value = settings.fontFamily;
+        if (elements.customLatinFontInput) elements.customLatinFontInput.value = settings.customLatinFont;
+        if (elements.customCjkFontInput) elements.customCjkFontInput.value = settings.customCjkFont;
+        this.updateFontAvailability(elements, settings.fontFamily);
+        if (elements.fontSizeSelect) elements.fontSizeSelect.value = settings.fontSize === null ? 'auto' : String(settings.fontSize);
+        if (elements.showTranslationToggle) elements.showTranslationToggle.checked = settings.showTranslation;
+        if (elements.showRomanizationToggle) elements.showRomanizationToggle.checked = settings.showRomanization;
+        if (elements.showRubyToggle) elements.showRubyToggle.checked = settings.showRuby;
     }
 
-    updateOpacity(elements: LyricsAppearanceSettingsElements, opacity: number): void {
-        if (elements.highlightOpacitySlider) {
-            elements.highlightOpacitySlider.value = String(opacity);
-        }
-
-        if (elements.highlightOpacityValue) {
-            elements.highlightOpacityValue.textContent = opacity.toFixed(1);
-        }
+    updateTextColor(elements: LyricsAppearanceSettingsElements, color: string): void {
+        if (elements.textColorInput) elements.textColorInput.value = color;
+        if (elements.textColorValue) elements.textColorValue.textContent = color;
     }
 
-    updateColor(elements: LyricsAppearanceSettingsElements, color: string): void {
-        if (elements.highlightColorInput) {
-            elements.highlightColorInput.value = color;
-        }
+    updateAvailability(elements: LyricsAppearanceSettingsElements, mode: 'auto' | 'custom'): void {
+        if (elements.textColorInput) elements.textColorInput.disabled = mode !== 'custom';
+    }
 
-        if (elements.highlightColorValue) {
-            elements.highlightColorValue.textContent = color;
+    updateFontAvailability(elements: LyricsAppearanceSettingsElements, fontFamily: string): void {
+        if (elements.customFontContainer) {
+            elements.customFontContainer.hidden = fontFamily !== 'custom';
         }
     }
 }

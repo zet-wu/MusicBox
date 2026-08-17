@@ -1,5 +1,5 @@
 import {mediaFileDialogService} from "@/features/media/service";
-import {embeddedLyricsManager} from "@/features/mediaAssets/service/EmbeddedLyricsManager";
+import {lyricsGateway} from '@/infrastructure/electron';
 
 interface DebugEmbeddedLyricsResult {
     success: boolean;
@@ -13,12 +13,6 @@ interface DebugEmbeddedLyricsResult {
         textLength?: number;
         timestampCount?: number;
         textSample?: string;
-    };
-    conversionResult?: {
-        success: boolean;
-        lrcLength?: number;
-        error?: string;
-        lrcSample?: string;
     };
 }
 
@@ -38,7 +32,22 @@ class EmbeddedLyricsDiagnosticsService {
         }
 
         const filePath = filePaths[0];
-        const debugResult = await embeddedLyricsManager.debugEmbeddedLyrics(filePath) as DebugEmbeddedLyricsResult;
+        const result = await lyricsGateway.getEmbedded(filePath);
+        const lyrics = result.lyrics;
+        const debugResult: DebugEmbeddedLyricsResult = {
+            success: result.success,
+            error: result.error,
+            lyricsAnalysis: lyrics ? {
+                type: lyrics.type,
+                format: lyrics.format,
+                language: lyrics.language,
+                description: lyrics.description,
+                synchronized: lyrics.synchronized,
+                textLength: lyrics.text?.length ?? 0,
+                timestampCount: lyrics.timestamps?.length ?? 0,
+                textSample: lyrics.text?.slice(0, 500)
+            } : undefined
+        };
 
         return {
             selected: true,
@@ -77,21 +86,6 @@ class EmbeddedLyricsDiagnosticsService {
                 reportLines.push(`=== 歌词预览 ===`, analysis.textSample, ``);
             }
 
-            if (debugResult.conversionResult) {
-                const conversion = debugResult.conversionResult;
-                reportLines.push(
-                    `=== LRC转换 ===`,
-                    `转换成功: ${conversion.success ? '是' : '否'}`,
-                    `LRC长度: ${conversion.lrcLength} 字符`
-                );
-
-                if (conversion.error) {
-                    reportLines.push(`转换错误: ${conversion.error}`);
-                }
-                if (conversion.lrcSample) {
-                    reportLines.push(``, `=== LRC预览 ===`, conversion.lrcSample);
-                }
-            }
         } else {
             reportLines.push(`错误: ${debugResult.error || '未知错误'}`);
         }

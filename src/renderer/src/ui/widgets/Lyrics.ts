@@ -7,6 +7,8 @@ import {formatTime} from "@/utils";
 import {LyricsWidgetComposition} from "@ui/widgets/lyrics/LyricsWidgetComposition";
 import type {PlayMode} from "@api/types/playback";
 import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
+import type {LyricsDocumentAppliedDetail} from '@/features/lyrics/ui/LyricsSourcePicker';
+import {toTrackLyricsQuery} from '@/features/lyrics/service/LyricsService';
 
 class Lyrics extends Component {
     public isVisible: boolean;
@@ -37,6 +39,11 @@ class Lyrics extends Component {
                 this.hide();
             }
         });
+        this.addEventListenerManaged(window, 'lyrics:document-applied', event => {
+            const detail = (event as CustomEvent<LyricsDocumentAppliedDetail>).detail;
+            if (!this.currentTrack || toTrackLyricsQuery(this.currentTrack).trackId !== detail.trackId) return;
+            this.composition.applyDocument(detail.document);
+        });
     }
 
     async show(track: LyricsTrack | null): Promise<void> {
@@ -59,14 +66,12 @@ class Lyrics extends Component {
         if (track) {
             await this.updateTrackInfo(track);
         }
-
-        this.setTimeoutManaged(() => {
-            this.composition.elements.lyricsDisplay.scrollTop = 0;
-        }, 50);
+        this.composition.syncCurrentPlaybackState(true);
     }
 
     hide(): void {
         this.isVisible = false;
+        this.currentTrack = null;
         this.composition.elements.page.classList.remove('show');
         this.composition.resetAfterHide();
 
@@ -95,14 +100,6 @@ class Lyrics extends Component {
 
     async togglePlayPause(): Promise<void> {
         await this.composition.togglePlayPause();
-    }
-
-    updateProgress(currentTime: number, duration: number): void {
-        this.composition.updateProgress(currentTime, duration);
-    }
-
-    updatePlayButton(): void {
-        this.composition.updatePlayButton();
     }
 
     formatTime(seconds: number): string {

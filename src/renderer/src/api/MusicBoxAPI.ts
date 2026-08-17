@@ -14,6 +14,7 @@ import type {PlaylistCoverDataResult} from '@/features/library/service/LibraryDa
 import type {Result} from '@api/types/common';
 import type {CacheValidationResult} from '@api/types/events';
 import type {LibraryIndexRebuildResult} from '@api/types/electron';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {
     DesktopLyricsPlaybackState,
     PlaybackQueueSnapshot,
@@ -22,7 +23,6 @@ import type {
     QueueMutationResult,
     PlaybackStateName
 } from '@api/types/playback';
-import type {LyricLine} from '@api/types/lyrics';
 import type {DesktopLyricsSettings, MusicBoxSettings, WasapiShareMode} from '@api/types/settings';
 import type {Track} from '@api/types/track';
 
@@ -75,7 +75,8 @@ export class MusicBoxAPI extends EventEmitter {
                 currentTrack: this.playbackRuntimeState.currentTrack,
                 isPlaying: this.playbackRuntimeState.isPlaying,
                 position: this.playbackRuntimeState.position
-            })
+            }),
+            getCurrentSettings: () => cacheManager.getLocalCache<MusicBoxSettings>('musicbox-settings') || {}
         });
         this.audioEngineAdapter = new AudioEngineAdapter({
             getNextTrackIndex: () => this.getNextTrackIndex(),
@@ -930,7 +931,7 @@ export class MusicBoxAPI extends EventEmitter {
 
     async syncToDesktopLyrics(
         type: 'track' | 'playbackState' | 'position' | 'lyrics',
-        data: Track | DesktopLyricsPlaybackState | number | LyricLine[] | string | null
+        data: Track | DesktopLyricsPlaybackState | number | AmllLyricLine[] | null
     ): Promise<void> {
         return await this.desktopLyricsSync.syncToDesktopLyrics(type, data);
     }

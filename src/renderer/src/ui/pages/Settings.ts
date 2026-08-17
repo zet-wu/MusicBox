@@ -175,21 +175,24 @@ class Settings extends Component {
         // 开发者工具按钮
         this.developerToolsBtn = this.element.querySelector('#developer-tools');
 
-        // 歌词高亮透明度设置
-        this.lyricsHighlightOpacitySlider = this.element.querySelector('#lyrics-highlight-opacity-slider');
-        this.lyricsHighlightOpacityValue = this.element.querySelector('#lyrics-highlight-opacity-value');
-
-        // 歌词高亮颜色设置
-        this.lyricsHighlightColor = this.element.querySelector('#lyrics-highlight-color');
-        this.lyricsHighlightColorValue = this.element.querySelector('#lyrics-highlight-color-value');
+        // 歌词颜色设置
+        this.lyricsColorMode = this.element.querySelector('#lyrics-color-mode');
+        this.lyricsColor = this.element.querySelector('#lyrics-color');
+        this.lyricsColorValue = this.element.querySelector('#lyrics-color-value');
+        this.lyricsFontFamily = this.element.querySelector('#lyrics-font-family');
+        this.lyricsCustomFontContainer = this.element.querySelector('#lyrics-custom-font-container');
+        this.lyricsCustomLatinFont = this.element.querySelector('#lyrics-custom-latin-font');
+        this.lyricsCustomCjkFont = this.element.querySelector('#lyrics-custom-cjk-font');
+        this.lyricsFontSize = this.element.querySelector('#lyrics-font-size');
+        this.lyricsShowTranslation = this.element.querySelector('#lyrics-show-translation');
+        this.lyricsShowRomanization = this.element.querySelector('#lyrics-show-romanization');
+        this.lyricsShowRuby = this.element.querySelector('#lyrics-show-ruby');
 
         // 桌面歌词设置元素
         this.dlDisplayModeSelect = this.element.querySelector('#dl-display-mode-select');
         this.dlLayoutModeSelect = this.element.querySelector('#dl-layout-mode-select');
-        this.dlThemeColor = this.element.querySelector('#dl-theme-color');
-        this.dlThemeColorValue = this.element.querySelector('#dl-theme-color-value');
-        this.dlFontColor = this.element.querySelector('#dl-font-color');
-        this.dlFontColorValue = this.element.querySelector('#dl-font-color-value');
+        this.dlColor = this.element.querySelector('#dl-color');
+        this.dlColorValue = this.element.querySelector('#dl-color-value');
         this.dlOpacitySlider = this.element.querySelector('#dl-opacity-slider');
         this.dlOpacityValue = this.element.querySelector('#dl-opacity-value');
         this.dlFontSizeSlider = this.element.querySelector('#dl-font-size-slider');
@@ -303,19 +306,11 @@ class Settings extends Component {
             });
         }
 
-        if (this.dlThemeColor) {
-            this.addEventListenerManaged(this.dlThemeColor, 'input', (e: Event) => {
+        if (this.dlColor) {
+            this.addEventListenerManaged(this.dlColor, 'input', (e: Event) => {
                 const color = getInputTarget(e).value;
-                displayModeSettingsRenderer.updateDesktopLyricsValue(this.getDesktopLyricsElements(), 'themeColor', color);
-                this.updateDesktopLyricsSetting('themeColor', color);
-            });
-        }
-
-        if (this.dlFontColor) {
-            this.addEventListenerManaged(this.dlFontColor, 'input', (e: Event) => {
-                const color = getInputTarget(e).value;
-                displayModeSettingsRenderer.updateDesktopLyricsValue(this.getDesktopLyricsElements(), 'fontColor', color);
-                this.updateDesktopLyricsSetting('fontColor', color);
+                displayModeSettingsRenderer.updateDesktopLyricsValue(this.getDesktopLyricsElements(), 'color', color);
+                this.updateDesktopLyricsSetting('color', color);
             });
         }
 
@@ -625,14 +620,12 @@ class Settings extends Component {
         return {
             displayModeSelect: this.dlDisplayModeSelect,
             layoutModeSelect: this.dlLayoutModeSelect,
-            themeColorInput: this.dlThemeColor,
-            themeColorValue: this.dlThemeColorValue,
+            colorInput: this.dlColor,
+            colorValue: this.dlColorValue,
             opacitySlider: this.dlOpacitySlider,
             opacityValue: this.dlOpacityValue,
             fontSizeSlider: this.dlFontSizeSlider,
-            fontSizeValue: this.dlFontSizeValue,
-            fontColorInput: this.dlFontColor,
-            fontColorValue: this.dlFontColorValue
+            fontSizeValue: this.dlFontSizeValue
         };
     }
 
@@ -695,10 +688,17 @@ class Settings extends Component {
             clearCoverCacheButton: this.clearCoverCacheBtn,
             cacheStatsDescription: this.cacheStatsDescription,
             testEmbeddedLyricsButton: this.testEmbeddedLyricsBtn,
-            lyricsHighlightOpacitySlider: this.lyricsHighlightOpacitySlider,
-            lyricsHighlightOpacityValue: this.lyricsHighlightOpacityValue,
-            lyricsHighlightColorInput: this.lyricsHighlightColor,
-            lyricsHighlightColorValue: this.lyricsHighlightColorValue
+            lyricsColorModeSelect: this.lyricsColorMode,
+            lyricsColorInput: this.lyricsColor,
+            lyricsColorValue: this.lyricsColorValue,
+            lyricsFontFamilySelect: this.lyricsFontFamily,
+            lyricsCustomFontContainer: this.lyricsCustomFontContainer,
+            lyricsCustomLatinFontInput: this.lyricsCustomLatinFont,
+            lyricsCustomCjkFontInput: this.lyricsCustomCjkFont,
+            lyricsFontSizeSelect: this.lyricsFontSize,
+            lyricsShowTranslationToggle: this.lyricsShowTranslation,
+            lyricsShowRomanizationToggle: this.lyricsShowRomanization,
+            lyricsShowRubyToggle: this.lyricsShowRuby
         };
     }
 

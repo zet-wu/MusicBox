@@ -10,6 +10,7 @@ import {WindowManager} from './WindowManager';
 import {ConfigManager} from './ConfigManager';
 import {BaseController} from '../decorators/IpcHandler';
 import {registerAudioStreamProtocol} from '../services/audio/AudioStreamProtocol';
+import {LyricsPersistenceService} from '../services/lyrics/LyricsPersistenceService';
 
 interface LibraryScanner {
     migratePlaylistCovers(): Promise<void>;
@@ -433,7 +434,7 @@ export class Application {
             new ExtensionsController(extensionInstaller, extensionStorageService, this.windowManager),
             new CoversController(),
             new EqualizerPresetController(this.windowManager),
-            new LyricsController(networkFileAdapter),
+            new LyricsController(networkFileAdapter, new LyricsPersistenceService(app.getPath('userData'))),
             trayController,
             new HttpServerController()
         ];

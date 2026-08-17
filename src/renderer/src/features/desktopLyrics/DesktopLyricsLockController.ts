@@ -10,6 +10,7 @@ export class DesktopLyricsLockController {
         private readonly elements: Pick<DesktopLyricsElements, 'container' | 'controlsBar' | 'lockBtn' | 'lockIcon' | 'unlockIcon'>,
         private readonly windowService: DesktopLyricsWindowService = desktopLyricsWindowService
     ) {
+        this.updateLockPresentation();
     }
 
     get locked(): boolean {
@@ -65,8 +66,8 @@ export class DesktopLyricsLockController {
     private updateLockPresentation(): void {
         this.elements.container.classList.toggle('locked', this.isLocked);
         this.elements.lockBtn.classList.toggle('locked', this.isLocked);
-        this.elements.lockBtn.title = this.isLocked ? '解锁' : '锁定';
-        this.elements.lockIcon.style.display = this.isLocked ? 'none' : 'block';
-        this.elements.unlockIcon.style.display = this.isLocked ? 'block' : 'none';
+        this.elements.lockBtn.title = this.isLocked ? '已锁定（点击解锁）' : '未锁定（点击锁定）';
+        this.elements.lockIcon.style.display = this.isLocked ? 'block' : 'none';
+        this.elements.unlockIcon.style.display = this.isLocked ? 'none' : 'block';
     }
 }

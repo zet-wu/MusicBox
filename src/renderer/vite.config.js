@@ -128,7 +128,7 @@ export default defineConfig({
   
   // 优化依赖预构建
   optimizeDeps: {
-    include: ['dayjs', 'fuse.js'],
+    include: ['dayjs', 'fuzzball'],
     exclude: []
   }
 });

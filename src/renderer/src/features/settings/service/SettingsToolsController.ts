@@ -12,6 +12,8 @@ import {mediaDirectorySettingsService} from "./MediaDirectorySettingsService";
 import {appConfirmationService} from "@/features/appShell/service";
 import type {SettingValue} from "./SettingsStore";
 import type {SettingsListenerScope} from "./SettingsListenerScope";
+import {desktopLyricsService} from '@/features/desktopLyrics/service/DesktopLyricsService';
+import {settingsStore} from './SettingsStore';
 
 export interface SettingsToolsElements {
     selectLyricsFolderButton: HTMLElement | null;
@@ -24,10 +26,17 @@ export interface SettingsToolsElements {
     clearCoverCacheButton: HTMLButtonElement | null;
     cacheStatsDescription: HTMLElement | null;
     testEmbeddedLyricsButton: HTMLButtonElement | null;
-    lyricsHighlightOpacitySlider: HTMLInputElement | null;
-    lyricsHighlightOpacityValue: HTMLElement | null;
-    lyricsHighlightColorInput: HTMLInputElement | null;
-    lyricsHighlightColorValue: HTMLElement | null;
+    lyricsColorModeSelect: HTMLSelectElement | null;
+    lyricsColorInput: HTMLInputElement | null;
+    lyricsColorValue: HTMLElement | null;
+    lyricsFontFamilySelect: HTMLSelectElement | null;
+    lyricsCustomFontContainer: HTMLElement | null;
+    lyricsCustomLatinFontInput: HTMLInputElement | null;
+    lyricsCustomCjkFontInput: HTMLInputElement | null;
+    lyricsFontSizeSelect: HTMLSelectElement | null;
+    lyricsShowTranslationToggle: HTMLInputElement | null;
+    lyricsShowRomanizationToggle: HTMLInputElement | null;
+    lyricsShowRubyToggle: HTMLInputElement | null;
 }
 
 interface SettingsToolsCallbacks {
@@ -43,20 +52,17 @@ class SettingsToolsController {
         this.bindLyricsAppearanceEvents(elements, callbacks, scope);
     }
 
-    initializeLyricsAppearance(settings: MusicBoxSettings, elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks): void {
+    initializeLyricsAppearance(settings: MusicBoxSettings, elements: SettingsToolsElements, _callbacks: SettingsToolsCallbacks): void {
         const lyricsAppearanceSettings = lyricsAppearanceSettingsService.getSettings(settings);
         lyricsAppearanceSettingsRenderer.initialize(this.toLyricsAppearanceElements(elements), lyricsAppearanceSettings);
-        this.applyLyricsHighlightOpacity(lyricsAppearanceSettings.highlightOpacity, callbacks);
-        this.applyLyricsHighlightColor(lyricsAppearanceSettings.highlightColor);
+        lyricsAppearanceSettingsService.applyTextColor(lyricsAppearanceSettings);
+        lyricsAppearanceSettingsService.applyTypography(lyricsAppearanceSettings);
     }
 
     initializeLyricsDirectory(settings: MusicBoxSettings, elements: SettingsToolsElements): void {
         const lyricsDirectory = typeof settings.lyricsDirectory === 'string' ? settings.lyricsDirectory : '';
         mediaDirectorySettingsRenderer.updateDirectory(this.toMediaDirectoryElements(elements), 'lyrics', lyricsDirectory || null);
 
-        if (lyricsDirectory) {
-            mediaDirectorySettingsService.applyLyricsDirectory(lyricsDirectory);
-        }
     }
 
     async initializeCoverCacheDirectory(settings: MusicBoxSettings, elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks): Promise<void> {
@@ -100,7 +106,6 @@ class SettingsToolsController {
 
             callbacks.updateSetting('lyricsDirectory', selectedPath);
             mediaDirectorySettingsRenderer.updateDirectory(this.toMediaDirectoryElements(elements), 'lyrics', selectedPath);
-            mediaDirectorySettingsService.applyLyricsDirectory(selectedPath);
         } catch (error) {
             console.error('❌ Settings: 选择歌词目录失败:', error);
         }
@@ -267,28 +272,81 @@ class SettingsToolsController {
     }
 
     private bindLyricsAppearanceEvents(elements: SettingsToolsElements, callbacks: SettingsToolsCallbacks, scope: SettingsListenerScope): void {
-        scope.listen(elements.lyricsHighlightOpacitySlider, 'input', () => {
-            const value = parseFloat(elements.lyricsHighlightOpacitySlider?.value || '1');
-            lyricsAppearanceSettingsRenderer.updateOpacity(this.toLyricsAppearanceElements(elements), value);
-            callbacks.updateSetting('lyricsHighlightOpacity', value);
-            this.applyLyricsHighlightOpacity(value, callbacks);
+        scope.listen(elements.lyricsColorModeSelect, 'change', () => {
+            const mode = elements.lyricsColorModeSelect?.value === 'custom' ? 'custom' : 'auto';
+            const textColor = elements.lyricsColorInput?.value || '#335eea';
+            callbacks.updateSetting('lyricsColorMode', mode);
+            lyricsAppearanceSettingsRenderer.updateAvailability(this.toLyricsAppearanceElements(elements), mode);
+            lyricsAppearanceSettingsService.applyTextColor({colorMode: mode, textColor});
         });
 
-        scope.listen(elements.lyricsHighlightColorInput, 'input', () => {
-            const color = elements.lyricsHighlightColorInput?.value || '#335eea';
-            lyricsAppearanceSettingsRenderer.updateColor(this.toLyricsAppearanceElements(elements), color);
-            callbacks.updateSetting('lyricsHighlightColor', color);
-            this.applyLyricsHighlightColor(color);
+        scope.listen(elements.lyricsColorInput, 'input', () => {
+            const color = elements.lyricsColorInput?.value || '#335eea';
+            lyricsAppearanceSettingsRenderer.updateTextColor(this.toLyricsAppearanceElements(elements), color);
+            callbacks.updateSetting('lyricsColor', color);
+            this.applyCustomLyricsColor(elements);
+        });
+
+        scope.listen(elements.lyricsFontFamilySelect, 'change', () => {
+            callbacks.updateSetting('lyricsFontFamily', elements.lyricsFontFamilySelect?.value || 'inherit');
+            lyricsAppearanceSettingsRenderer.updateFontAvailability(
+                this.toLyricsAppearanceElements(elements),
+                elements.lyricsFontFamilySelect?.value || 'inherit'
+            );
+            this.applyLyricsTypography(elements);
+        });
+
+        scope.listen(elements.lyricsCustomLatinFontInput, 'input', () => {
+            callbacks.updateSetting('lyricsCustomLatinFont', elements.lyricsCustomLatinFontInput?.value.trim() || '');
+            this.applyLyricsTypography(elements);
+        });
+
+        scope.listen(elements.lyricsCustomCjkFontInput, 'input', () => {
+            callbacks.updateSetting('lyricsCustomCjkFont', elements.lyricsCustomCjkFontInput?.value.trim() || '');
+            this.applyLyricsTypography(elements);
+        });
+
+        scope.listen(elements.lyricsFontSizeSelect, 'change', () => {
+            const value = elements.lyricsFontSizeSelect?.value ?? 'auto';
+            callbacks.updateSetting('lyricsFontSize', value === 'auto' ? null : Number(value));
+            this.applyLyricsTypography(elements);
+        });
+
+        this.bindLyricsDisplayToggle(elements.lyricsShowTranslationToggle, 'lyricsShowTranslation', callbacks, scope);
+        this.bindLyricsDisplayToggle(elements.lyricsShowRomanizationToggle, 'lyricsShowRomanization', callbacks, scope);
+        this.bindLyricsDisplayToggle(elements.lyricsShowRubyToggle, 'lyricsShowRuby', callbacks, scope);
+    }
+
+    private applyCustomLyricsColor(elements: SettingsToolsElements): void {
+        lyricsAppearanceSettingsService.applyTextColor({
+            colorMode: 'custom',
+            textColor: elements.lyricsColorInput?.value || '#335eea'
         });
     }
 
-    private applyLyricsHighlightOpacity(opacity: number, callbacks: SettingsToolsCallbacks): void {
-        lyricsAppearanceSettingsService.applyHighlightOpacity(opacity);
-        callbacks.emit('lyricsHighlightOpacityChanged', opacity);
+    private applyLyricsTypography(elements: SettingsToolsElements): void {
+        const value = elements.lyricsFontSizeSelect?.value ?? 'auto';
+        const settings = lyricsAppearanceSettingsService.getSettings({
+            lyricsFontFamily: elements.lyricsFontFamilySelect?.value || 'inherit',
+            lyricsCustomLatinFont: elements.lyricsCustomLatinFontInput?.value || '',
+            lyricsCustomCjkFont: elements.lyricsCustomCjkFontInput?.value || '',
+            lyricsFontSize: value === 'auto' ? null : Number(value)
+        });
+        lyricsAppearanceSettingsService.applyTypography(settings);
+        lyricsAppearanceSettingsService.notifyDisplaySettingsChanged();
+        void desktopLyricsService.updateSettings(settingsStore.load());
     }
 
-    private applyLyricsHighlightColor(color: string): void {
-        lyricsAppearanceSettingsService.applyHighlightColor(color);
+    private bindLyricsDisplayToggle(
+        element: HTMLInputElement | null,
+        key: string,
+        callbacks: SettingsToolsCallbacks,
+        scope: SettingsListenerScope
+    ): void {
+        scope.listen(element, 'change', () => {
+            callbacks.updateSetting(key, Boolean(element?.checked));
+            lyricsAppearanceSettingsService.notifyDisplaySettingsChanged();
+        });
     }
 
     private toMediaDirectoryElements(elements: SettingsToolsElements) {
@@ -316,10 +374,17 @@ class SettingsToolsController {
 
     private toLyricsAppearanceElements(elements: SettingsToolsElements) {
         return {
-            highlightOpacitySlider: elements.lyricsHighlightOpacitySlider,
-            highlightOpacityValue: elements.lyricsHighlightOpacityValue,
-            highlightColorInput: elements.lyricsHighlightColorInput,
-            highlightColorValue: elements.lyricsHighlightColorValue
+            colorModeSelect: elements.lyricsColorModeSelect,
+            textColorInput: elements.lyricsColorInput,
+            textColorValue: elements.lyricsColorValue,
+            fontFamilySelect: elements.lyricsFontFamilySelect,
+            customFontContainer: elements.lyricsCustomFontContainer,
+            customLatinFontInput: elements.lyricsCustomLatinFontInput,
+            customCjkFontInput: elements.lyricsCustomCjkFontInput,
+            fontSizeSelect: elements.lyricsFontSizeSelect,
+            showTranslationToggle: elements.lyricsShowTranslationToggle,
+            showRomanizationToggle: elements.lyricsShowRomanizationToggle,
+            showRubyToggle: elements.lyricsShowRubyToggle
         };
     }
 }

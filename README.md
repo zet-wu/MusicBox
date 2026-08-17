@@ -34,7 +34,8 @@
 - ✅ 支持flac, mp3, wav, ogg, m4a, aac, wma等多种音乐格式
 - 🔧 强大的插件系统
 - 🎶 支持 WASAPI 音频独占模式
-- 📄 支持逐字歌词（使用 TTML 格式歌词）
+- 📄 使用 AMLL core 支持 TTML 格式歌词，支持逐字、翻译、注音、对唱等高级功能
+- ☁️ 支持从AMLL、网易、QQ、酷狗在线获取歌词，兼容YRC、KRC、QRC等格式
 - 🤏 支持迷你播放器
 - 📔 支持在线获取歌曲封面和歌词
 - ⌨️ 支持自定义局内/全局快捷键
@@ -51,7 +52,6 @@
 ## 📔 TODOS
 - WASAPI 模式下的 Windows 媒体浮层同步
 - 分离文本与代码，i18n 支持
-- 支持更多来源的在线歌词，支持歌词翻译
 - 完善上游的首页音乐可视化、专注模式等功能
 - 更多的主题和外观选项
 
@@ -193,7 +193,8 @@ npm run build:linux
 ![MusicBox 应用截图](docs/images/6.png)
 ![MusicBox 应用截图](docs/images/7.png)
 ![MusicBox 应用截图](docs/images/8.png)
-
+![MusicBox 应用截图](docs/images/9.png)
+![MusicBox 应用截图](docs/images/10.png)
 ---
 
 <p align="center">

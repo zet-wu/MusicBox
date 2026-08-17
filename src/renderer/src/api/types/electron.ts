@@ -1,6 +1,7 @@
 import type {Result, Unsubscribe} from './common';
 import type {CacheStatistics, GetTracksOptions, Playlist, Track} from './library';
-import type {LyricLine} from './lyrics';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
+import type {LyricsBinding, LyricsSelectionMode, LyricsSourceRef} from '@/features/lyrics/domain/types';
 import type {DesktopLyricsPlaybackState} from './playback';
 import type {DesktopLyricsSettings, MusicBoxSettings, WasapiShareMode} from './settings';
 import type {CacheValidationResult, ScanProgress} from './events';
@@ -234,8 +235,9 @@ export interface ElectronDesktopLyricsAPI {
     toggle(): Promise<{success: boolean; visible?: boolean; error?: string}>;
     isVisible(): Promise<boolean>;
     updatePlaybackState(state: DesktopLyricsPlaybackState): Promise<unknown>;
-    updateLyrics(lyricsData: LyricLine[] | string): Promise<unknown>;
+    updateLyrics(lyricsData: AmllLyricLine[]): Promise<unknown>;
     updatePosition(position: number): Promise<unknown>;
+    updateTimelinePreview(deltaMs: number): Promise<unknown>;
     updateTrack(trackInfo: Track | null): Promise<unknown>;
     updateSettings(settings: DesktopLyricsSettings | MusicBoxSettings): Promise<Result>;
     setPosition(x: number, y: number): Promise<unknown>;
@@ -247,8 +249,9 @@ export interface ElectronDesktopLyricsAPI {
     getSize(): Promise<[number, number]>;
     centerOnScreen(): Promise<unknown>;
     onPlaybackStateChanged(callback: (state: DesktopLyricsPlaybackState) => void): Unsubscribe;
-    onLyricsUpdated(callback: (lyricsData: LyricLine[] | string) => void): Unsubscribe;
+    onLyricsUpdated(callback: (lyricsData: AmllLyricLine[]) => void): Unsubscribe;
     onPositionChanged(callback: (position: number) => void): Unsubscribe;
+    onTimelinePreviewChanged(callback: (deltaMs: number) => void): Unsubscribe;
     onTrackChanged(callback: (trackInfo: Track | null) => void): Unsubscribe;
     onSettingsChanged(callback: (settings: DesktopLyricsSettings) => void): Unsubscribe;
 }
@@ -284,6 +287,26 @@ export interface ElectronLyricsAPI {
         content: string,
         format: string
     ): Promise<{success: boolean; filePath?: string; fileName?: string; error?: string}>;
+    readCanonical(trackId: string): Promise<{
+        success: boolean;
+        binding?: LyricsBinding;
+        ttml?: string;
+        error?: string;
+    }>;
+    getBinding(trackId: string): Promise<{success: boolean; binding?: LyricsBinding | null; error?: string}>;
+    saveCanonical(
+        trackId: string,
+        ttml: string,
+        source: LyricsSourceRef,
+        selectionMode: LyricsSelectionMode
+    ): Promise<{success: boolean; binding?: LyricsBinding; error?: string}>;
+    clearBinding(trackId: string): Promise<{success: boolean; cleared?: boolean; error?: string}>;
+    providerRequest(
+        requestId: string,
+        url: string,
+        options?: {method?: string; headers?: Record<string, string>; body?: string}
+    ): Promise<{status: number; statusText: string; body: string; headers: Record<string, string>}>;
+    cancelProviderRequest(requestId: string): Promise<void>;
     getEmbedded(filePath: string): Promise<{success: boolean; lyrics?: EmbeddedLyricsData; source?: string; error?: string}>;
 }
 

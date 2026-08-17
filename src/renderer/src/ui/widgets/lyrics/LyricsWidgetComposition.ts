@@ -5,12 +5,16 @@ import {LyricsLayoutController} from "@ui/widgets/lyrics/LyricsLayoutController"
 import {LyricsLoaderController} from "@ui/widgets/lyrics/LyricsLoaderController";
 import {LyricsPlaybackControlsController} from "@ui/widgets/lyrics/LyricsPlaybackControlsController";
 import {LyricsPlaybackStateController} from "@ui/widgets/lyrics/LyricsPlaybackStateController";
-import {LyricsRenderController} from "@ui/widgets/lyrics/LyricsRenderController";
+import {AmllLyricsView} from '@/features/lyrics/ui/AmllLyricsView';
 import {LyricsTrackInfoController} from "@ui/widgets/lyrics/LyricsTrackInfoController";
 import type {PlayMode} from "@api/types/playback";
 import type {AddLyricsDomListener} from "@ui/widgets/lyrics/LyricsDomEvents";
 import type {LyricsElements} from "@ui/widgets/lyrics/LyricsElementRegistry";
 import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
+import type {LyricsDocument} from '@/features/lyrics/domain/types';
+import {getLyricsSourcePicker} from '@/features/lyrics/ui/LyricsSourcePicker';
+import {LyricsTimelineAdjustController} from './LyricsTimelineAdjustController';
+import {desktopLyricsService} from '@/features/desktopLyrics/service/DesktopLyricsService';
 
 interface LyricsWidgetCompositionOptions {
     root: Element | null;
@@ -28,8 +32,9 @@ class LyricsWidgetComposition {
     private readonly lyricsLoader: LyricsLoaderController;
     private readonly playbackControls: LyricsPlaybackControlsController;
     private readonly playbackStateController: LyricsPlaybackStateController;
-    private readonly renderController: LyricsRenderController;
+    private readonly lyricsView: AmllLyricsView;
     private readonly trackInfoController: LyricsTrackInfoController;
+    private readonly timelineAdjustController: LyricsTimelineAdjustController;
     private readonly addDomListener: AddLyricsDomListener;
     private readonly isVisible: () => boolean;
     private readonly getCurrentTrack: () => LyricsTrack | null;
@@ -56,26 +61,40 @@ class LyricsWidgetComposition {
             isVisible: this.isVisible
         });
 
-        this.renderController = new LyricsRenderController({
-            lyricsDisplay: this.elements.lyricsDisplay,
+        this.lyricsView = new AmllLyricsView({
+            container: this.elements.lyricsDisplay,
             isVisible: this.isVisible,
             seek: async (time) => {
                 await playbackUiStateService.seek(time);
             }
         });
 
-        this.lyricsLoader = new LyricsLoaderController({
-            setLyrics: (lyrics) => {
-                this.renderController.setLyrics(lyrics);
+        this.timelineAdjustController = new LyricsTimelineAdjustController({
+            elements: this.elements.timelineAdjust,
+            addDomListener: this.addDomListener,
+            getCurrentTrack: this.getCurrentTrack,
+            setTimelinePreviewDelta: deltaMs => {
+                this.lyricsView.setTimelinePreviewDelta(deltaMs);
+                void desktopLyricsService.syncTimelinePreview(deltaMs);
             },
-            renderLyrics: () => {
-                this.renderController.renderLyrics();
+            clearTimelinePreview: options => {
+                this.lyricsView.clearTimelinePreview(options);
+                void desktopLyricsService.syncTimelinePreview(0);
+            }
+        });
+
+        this.lyricsLoader = new LyricsLoaderController({
+            setDocument: (document, editableCanonical) => {
+                this.lyricsView.setDocument(document, playbackUiStateService.getState().position);
+                this.timelineAdjustController.setEditableDocument(editableCanonical ? document : null);
             },
             showLoading: () => {
-                this.renderController.showLoading();
+                this.lyricsView.showLoading();
+                this.timelineAdjustController.setEditableDocument(null);
             },
             showNoLyrics: () => {
-                this.renderController.showNoLyrics();
+                this.lyricsView.showNoLyrics();
+                this.timelineAdjustController.setEditableDocument(null);
             }
         });
 
@@ -87,19 +106,20 @@ class LyricsWidgetComposition {
 
         this.playbackStateController = new LyricsPlaybackStateController({
             isVisible: this.isVisible,
-            onPositionChanged: (position) => {
-                this.renderController.handlePlaybackPositionChanged(position);
+            onPositionChanged: (position, duration) => {
+                this.lyricsView.handlePlaybackPositionChanged(position);
+                this.playbackControls.updateProgress(position, duration);
             },
             onPlaybackStateChanged: (isPlaying) => {
                 this.playbackControls.setPlaying(isPlaying);
-                this.renderController.setPlaying(isPlaying);
+                this.lyricsView.setPlaying(isPlaying);
             },
             onDurationChanged: (duration) => {
                 this.playbackControls.updateDuration(duration);
             },
             onTrackChanged: (track) => {
                 this.setCurrentTrack(track);
-                return this.updateTrackInfo(track);
+                return this.updateTrackAndPlaybackState(track);
             },
             onVolumeChanged: (volume) => {
                 this.playbackControls.setVolumeFromRuntime(volume);
@@ -134,24 +154,36 @@ class LyricsWidgetComposition {
         this.addDomListener(this.elements.closeBtn, 'click', () => {
             this.onClose();
         });
+        this.addDomListener(this.elements.lyricsDisplay, 'contextmenu', event => {
+            event.preventDefault();
+            const track = this.getCurrentTrack();
+            if (track) void getLyricsSourcePicker().open(track);
+        });
 
         this.layoutController.bind();
+        this.timelineAdjustController.bind();
         this.playbackControls.bind();
         this.playbackStateController.bind();
         this.bound = true;
     }
 
     resetAfterHide(): void {
+        this.timelineAdjustController.setEditableDocument(null);
         this.trackInfoController.reset();
         this.lyricsLoader.reset();
-        this.renderController.setPlaying(false);
-        this.renderController.resetPlaybackPosition();
+        this.coverArtController.reset();
+        this.lyricsView.reset();
+        if (this.layoutController.isFullscreen()) {
+            this.layoutController.exitFullscreen();
+        }
+        this.layoutController.resetLayoutState();
     }
 
     destroy(): void {
         this.playbackStateController.destroy();
         this.coverArtController.destroy();
-        this.renderController.reset();
+        this.timelineAdjustController.destroy();
+        this.lyricsView.destroy();
         this.layoutController.resetLayoutState();
         this.bound = false;
     }
@@ -162,20 +194,18 @@ class LyricsWidgetComposition {
 
     async initializeControls(): Promise<void> {
         await this.playbackControls.initialize();
-        this.renderController.setPlaying(playbackUiStateService.getState().isPlaying);
+        this.lyricsView.setPlaying(playbackUiStateService.getState().isPlaying);
+    }
+
+    syncCurrentPlaybackState(forceScroll = false): void {
+        const state = playbackUiStateService.getState();
+        this.playbackControls.updateProgress(state.position, state.duration);
+        this.lyricsView.setPlaying(state.isPlaying);
+        this.lyricsView.handlePlaybackPositionChanged(state.position, forceScroll);
     }
 
     async togglePlayPause(): Promise<void> {
         await this.playbackControls.togglePlayPause();
-    }
-
-    updateProgress(currentTime: number, duration: number): void {
-        this.playbackControls.updateProgress(currentTime, duration);
-    }
-
-    updatePlayButton(): void {
-        this.playbackControls.setPlaying(playbackUiStateService.getState().isPlaying);
-        this.renderController.setPlaying(playbackUiStateService.getState().isPlaying);
     }
 
     async setVolume(volume: number): Promise<void> {
@@ -208,6 +238,21 @@ class LyricsWidgetComposition {
 
     resetLayoutState(): void {
         this.layoutController.resetLayoutState();
+    }
+
+    applyDocument(document: LyricsDocument): void {
+        this.lyricsView.setDocument(document, playbackUiStateService.getState().position);
+        this.timelineAdjustController.setEditableDocument(document);
+        this.syncCurrentPlaybackState(true);
+    }
+
+    private async updateTrackAndPlaybackState(track: LyricsTrack | null): Promise<void> {
+        if (!track) {
+            this.onClose();
+            return;
+        }
+        await this.updateTrackInfo(track);
+        this.syncCurrentPlaybackState(true);
     }
 }
 

@@ -1,5 +1,5 @@
 import type {Result} from '@api/types/common';
-import type {LyricLine} from '@api/types/lyrics';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {DesktopLyricsSettings, MusicBoxSettings} from '@api/types/settings';
 import type {Track} from '@api/types/track';
 import {DesktopLyricsSync} from './DesktopLyricsSync';
@@ -13,6 +13,7 @@ export type DesktopLyricsPlaybackSnapshot = {
 
 interface DesktopLyricsServiceDependencies {
     getPlaybackSnapshot(): DesktopLyricsPlaybackSnapshot;
+    getSettings(): MusicBoxSettings;
 }
 
 export class DesktopLyricsService {
@@ -25,7 +26,8 @@ export class DesktopLyricsService {
                 currentTrack: null,
                 isPlaying: false,
                 position: 0
-            })
+            }),
+            getSettings: () => ({})
         };
         this.sync = new DesktopLyricsSync({
             getCurrentState: () => {
@@ -35,7 +37,8 @@ export class DesktopLyricsService {
                     isPlaying: snapshot.isPlaying,
                     position: snapshot.position
                 };
-            }
+            },
+            getCurrentSettings: () => this.dependencies.getSettings()
         });
     }
 
@@ -59,8 +62,12 @@ export class DesktopLyricsService {
         return await this.sync.updateDesktopLyricsSettings(settings);
     }
 
-    async syncLyrics(lyrics: LyricLine[] | string): Promise<void> {
+    async syncLyrics(lyrics: AmllLyricLine[]): Promise<void> {
         await this.sync.syncToDesktopLyrics('lyrics', lyrics);
+    }
+
+    async syncTimelinePreview(deltaMs: number): Promise<void> {
+        await this.sync.syncToDesktopLyrics('timelinePreview', deltaMs);
     }
 }
 

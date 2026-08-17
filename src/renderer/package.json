@@ -15,14 +15,21 @@
     "build:css": "sass src/styles/main.scss public/styles/main.css --style=compressed"
   },
   "dependencies": {
+    "@applemusic-like-lyrics/core": "0.5.2",
+    "@applemusic-like-lyrics/lyric": "1.0.2",
+    "@applemusic-like-lyrics/ttml": "1.0.1",
     "@tanstack/virtual-core": "3.17.7",
     "dayjs": "^1.11.7",
-    "fuse.js": "^6.6.2",
+    "fuzzball": "2.2.6",
     "lru-cache": "11.5.2",
-    "p-queue": "9.3.3"
+    "opencc-js": "^1.4.1",
+    "p-queue": "9.3.3",
+    "pako": "2.1.0"
   },
   "devDependencies": {
+    "@types/pako": "2.0.4",
     "@vitejs/plugin-legacy": "^8.0.1",
+    "@xmldom/xmldom": "0.9.11",
     "chokidar": "^3.6.0",
     "concurrently": "^7.6.0",
     "esbuild": "^0.28.0",

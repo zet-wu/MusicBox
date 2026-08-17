@@ -1,0 +1,242 @@
+.lyrics-source-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.56);
+    backdrop-filter: blur(8px);
+  }
+
+  &__dialog {
+    position: absolute;
+    inset: 6vh 7vw;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    min-width: 720px;
+    overflow: hidden;
+    color: var(--color-text);
+    background: var(--color-primary-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  }
+
+  &__header,
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    border-color: var(--color-border);
+
+    h2,
+    p {
+      margin: 0;
+    }
+
+    p {
+      margin-top: 0.25rem;
+      color: var(--color-text-secondary);
+    }
+
+    button {
+      padding: 0.55rem 0.85rem;
+      color: inherit;
+      background: var(--color-secondary-bg);
+      border: 0;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+
+      &.primary {
+        color: white;
+        background: var(--color-primary);
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+    }
+  }
+
+  &__header {
+    border-bottom: 1px solid var(--color-border);
+
+    > button {
+      width: 2.5rem;
+      height: 2.5rem;
+      padding: 0;
+      font-size: 1.5rem;
+    }
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.75rem var(--spacing-lg);
+    overflow-x: auto;
+    border-bottom: 1px solid var(--color-border);
+
+    button {
+      flex: 0 0 auto;
+      padding: 0.55rem 0.9rem;
+      color: var(--color-text-secondary);
+      background: transparent;
+      border: 0;
+      border-radius: 999px;
+      cursor: pointer;
+
+      &.active {
+        color: var(--color-text);
+        background: var(--color-secondary-bg);
+      }
+    }
+  }
+
+  &__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.8fr);
+    min-height: 0;
+  }
+
+  &__results,
+  &__preview {
+    min-height: 0;
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+  }
+
+  &__preview {
+    border-left: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+
+    div {
+      margin-bottom: 1rem;
+      color: var(--color-text);
+    }
+
+    small {
+      display: block;
+      margin-top: 0.2rem;
+      color: var(--color-text-secondary);
+    }
+  }
+
+  &__loading,
+  &__empty {
+    display: grid;
+    place-items: center;
+    min-height: 180px;
+    color: var(--color-text-secondary);
+    text-align: center;
+  }
+
+  &__footer {
+    border-top: 1px solid var(--color-border);
+
+    > div {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+
+  &__status {
+    color: var(--color-text-secondary);
+  }
+}
+
+.lyrics-candidate {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-bottom: 0.65rem;
+  padding: 0.9rem 6rem 0.9rem 1rem;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-secondary-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+
+  &:hover,
+  &.selected {
+    border-color: var(--color-primary);
+  }
+
+  &.current {
+    cursor: default;
+  }
+
+  strong,
+  p {
+    display: block;
+    margin: 0;
+  }
+
+  p {
+    margin-top: 0.3rem;
+    color: var(--color-text-secondary);
+  }
+
+  &__badges {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.65rem;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.45rem;
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    background: rgba(var(--color-primary-rgb), 0.12);
+    border-radius: 999px;
+
+    &.error {
+      color: var(--color-text-secondary);
+      background: var(--color-primary-bg);
+    }
+  }
+
+  &__score {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 860px) {
+  .lyrics-source-picker {
+    &__dialog {
+      inset: 2vh 2vw;
+      min-width: 0;
+    }
+
+    &__body {
+      grid-template-columns: 1fr;
+    }
+
+    &__preview {
+      display: none;
+    }
+
+    &__footer {
+      align-items: flex-start;
+      flex-direction: column;
+
+      > div {
+        flex-wrap: wrap;
+      }
+    }
+  }
+}

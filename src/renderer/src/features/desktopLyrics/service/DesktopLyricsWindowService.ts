@@ -1,5 +1,5 @@
 import type {Result, Unsubscribe} from '@api/types/common';
-import type {LyricLine} from '@api/types/lyrics';
+import type {AmllLyricLine} from '@applemusic-like-lyrics/ttml';
 import type {DesktopLyricsPlaybackState} from '@api/types/playback';
 import type {DesktopLyricsSettings, MusicBoxSettings} from '@api/types/settings';
 import type {Track} from '@api/types/library';
@@ -30,12 +30,16 @@ export class DesktopLyricsWindowService {
         return desktopLyricsGateway.updateSettings(settings);
     }
 
-    onLyricsUpdated(handler: (lyricsData: LyricLine[] | string | unknown) => void): Unsubscribe {
+    onLyricsUpdated(handler: (lyricsData: AmllLyricLine[] | unknown) => void): Unsubscribe {
         return desktopLyricsGateway.onLyricsUpdated(handler);
     }
 
     onPositionChanged(handler: (position: number) => void): Unsubscribe {
         return desktopLyricsGateway.onPositionChanged(handler);
+    }
+
+    onTimelinePreviewChanged(handler: (deltaMs: number) => void): Unsubscribe {
+        return desktopLyricsGateway.onTimelinePreviewChanged(handler);
     }
 
     onPlaybackStateChanged(handler: (state: DesktopLyricsPlaybackState) => void): Unsubscribe {

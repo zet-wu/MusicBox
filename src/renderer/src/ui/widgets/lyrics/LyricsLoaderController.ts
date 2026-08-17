@@ -1,77 +1,81 @@
 import {desktopLyricsService} from "@/features/desktopLyrics/service/DesktopLyricsService";
-import {lyricsContentService} from "@/features/mediaAssets/service/LyricsContentService";
-import type {LyricsTrack, RenderLyricLine} from "@ui/widgets/lyrics/LyricsTypes";
+import {getLyricsService} from '@/features/lyrics/service/defaultLyricsServices';
+import type {LyricsDocument} from '@/features/lyrics/domain/types';
+import type {LyricsService} from '@/features/lyrics/service/LyricsService';
+import {getLyricsTrackIdentity, type LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 
 interface LyricsLoaderControllerOptions {
-    setLyrics: (lyrics: RenderLyricLine[]) => void;
-    renderLyrics: () => void;
+    setDocument: (document: LyricsDocument, editableCanonical: boolean) => void;
     showLoading: () => void;
     showNoLyrics: () => void;
+    service?: LyricsService;
 }
 
 class LyricsLoaderController {
-    private readonly setLyrics: (lyrics: RenderLyricLine[]) => void;
-    private readonly renderLyrics: () => void;
+    private readonly setDocument: (document: LyricsDocument, editableCanonical: boolean) => void;
     private readonly showLoading: () => void;
     private readonly showNoLyrics: () => void;
-    private lastLoadedLyricsPath: string | null = null;
-    private lastLoadedTrackId: string | null = null;
-    private loadingLyrics = false;
+    private loadGeneration = 0;
+    private currentTrackIdentity: string | null = null;
+    private abortController: AbortController | null = null;
+    private readonly service: LyricsService;
 
     constructor(options: LyricsLoaderControllerOptions) {
-        this.setLyrics = options.setLyrics;
-        this.renderLyrics = options.renderLyrics;
+        this.setDocument = options.setDocument;
         this.showLoading = options.showLoading;
         this.showNoLyrics = options.showNoLyrics;
+        this.service = options.service ?? getLyricsService();
     }
 
     reset(): void {
-        this.lastLoadedLyricsPath = null;
-        this.loadingLyrics = false;
+        this.loadGeneration++;
+        this.currentTrackIdentity = null;
+        this.abortController?.abort();
+        this.abortController = null;
     }
 
     async loadLyrics(track: LyricsTrack): Promise<void> {
-        if (!track || !track.title || !track.artist) {
+        if (!track) {
             this.showNoLyrics();
             return;
         }
 
-        const trackPath = track.filePath || track.path || `${track.title}_${track.artist}`;
-        const trackId = `${track.title}_${track.artist}_${track.album || ''}`;
-
-        if (this.loadingLyrics || this.lastLoadedLyricsPath === trackPath) {
+        const trackIdentity = getLyricsTrackIdentity(track);
+        if (this.currentTrackIdentity === trackIdentity) {
             return;
         }
 
-        if (this.lastLoadedTrackId === trackId) {
-            return;
-        }
+        const generation = ++this.loadGeneration;
+        this.currentTrackIdentity = trackIdentity;
+        this.abortController?.abort();
+        this.abortController = new AbortController();
 
-        this.loadingLyrics = true;
-        this.lastLoadedLyricsPath = trackPath;
-        this.lastLoadedTrackId = trackId;
-
-        if (!track.lyrics) {
-            this.showLoading();
-        }
+        this.showLoading();
 
         try {
-            const result = await lyricsContentService.loadTrackLyrics(track);
-            if (result.success && result.lyrics.length > 0) {
-                const lyrics = result.lyrics as RenderLyricLine[];
-                this.setLyrics(lyrics);
-                this.renderLyrics();
-                await desktopLyricsService.syncLyrics(lyrics);
+            const result = await this.service.load(track, this.abortController.signal);
+            if (!this.isCurrentLoad(generation, trackIdentity)) {
+                return;
+            }
+
+            if (result.document && result.document.render.lines.length > 0) {
+                this.setDocument(result.document, Boolean(result.binding));
+                await desktopLyricsService.syncLyrics(result.document.render.lines);
             } else {
                 this.showNoLyrics();
                 console.log(`❌ Lyrics: ${result.error || '歌词获取失败'}`);
             }
         } catch (error) {
+            if (!this.isCurrentLoad(generation, trackIdentity)) {
+                return;
+            }
             console.error('❌ Lyrics: 歌词加载失败:', error);
             this.showNoLyrics();
-        } finally {
-            this.loadingLyrics = false;
         }
+    }
+
+    private isCurrentLoad(generation: number, trackIdentity: string): boolean {
+        return generation === this.loadGeneration && trackIdentity === this.currentTrackIdentity;
     }
 }
 

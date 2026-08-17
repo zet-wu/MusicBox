@@ -34,13 +34,10 @@ export class PlaybackUIFacade {
         return Boolean(this.app.components.lyrics?.isVisible);
     }
 
-    async showLyricsForTrack(track: Track | null): Promise<void> {
-        if (this.isLyricsVisible()) {
-            await this.app.components.lyrics?.show(track);
-        }
-    }
-
     async toggleLyricsForTrack(track: Track | null): Promise<void> {
+        if (!track && !this.isLyricsVisible()) {
+            return;
+        }
         await this.app.components.lyrics?.toggle(track);
     }
 
@@ -80,15 +77,4 @@ export class PlaybackUIFacade {
         }
     }
 
-    updateLyricsProgress(position: number, duration: number): void {
-        if (this.isLyricsVisible()) {
-            this.app.components.lyrics?.updateProgress(position, duration);
-        }
-    }
-
-    updateLyricsPlayButton(): void {
-        if (this.isLyricsVisible()) {
-            this.app.components.lyrics?.updatePlayButton();
-        }
-    }
 }

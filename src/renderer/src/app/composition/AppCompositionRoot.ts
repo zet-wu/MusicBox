@@ -37,6 +37,7 @@ import {appShellRuntimeHost} from '@/features/appShell/service';
 import type {AudioEngineManagerBridge} from '@/features/equalizer/service';
 import {ContentMountManager} from '@/app/runtime/components/ContentMountManager';
 import {MainContentScrollCoordinator} from '@/app/runtime/MainContentScrollCoordinator';
+import {settingsStore} from '@/features/settings/service/SettingsStore';
 
 interface AppCompositionRootOptions {
     app: MusicBoxCompositionHost;
@@ -302,7 +303,8 @@ export function createAppComposition({
 
 function configureSharedFeatureDependencies(): void {
     desktopLyricsService.configure({
-        getPlaybackSnapshot: () => playbackController.getPlaybackSnapshot()
+        getPlaybackSnapshot: () => playbackController.getPlaybackSnapshot(),
+        getSettings: () => settingsStore.load()
     });
     equalizerService.configure({
         getEqualizer: <T = unknown>() => playbackService.getEqualizer<T>(),

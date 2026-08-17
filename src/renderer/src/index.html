@@ -345,6 +345,12 @@
                 </svg>
                 <span id="context-add-to-custom-playlist-label">添加到歌单</span>
             </div>
+            <div class="context-menu-item" id="context-select-lyrics">
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M12 3V13.55A4 4 0 1 0 14 17V7H19V3H12Z"/>
+                </svg>
+                <span>选择歌词...</span>
+            </div>
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" id="context-edit-info">
                 <svg class="icon" viewBox="0 0 24 24">
@@ -754,27 +760,128 @@
                     <div class="settings-section" data-section="lyrics">
                         <h2 class="section-title">歌词设置</h2>
 
-                        <!-- 高亮歌词 -->
                         <div class="settings-item">
                             <div class="item-info">
-                                <label class="item-label">歌词高亮透明度</label>
-                                <p class="item-description">调节当前播放歌词行的高亮背景透明度，数值越小背景越透明</p>
+                                <label class="item-label">歌词颜色模式</label>
+                                <p class="item-description">默认跟随浅色或深色主题，也可以使用自定义颜色</p>
                             </div>
                             <div class="item-control">
-                                <input type="range" id="lyrics-highlight-opacity-slider" class="settings-slider"
-                                       min="0" max="1" step="0.1" value="1">
-                                <span class="slider-value" id="lyrics-highlight-opacity-value">1.0</span>
+                                <select class="settings-select" id="lyrics-color-mode">
+                                    <option value="auto">跟随主题</option>
+                                    <option value="custom">自定义</option>
+                                </select>
                             </div>
                         </div>
 
                         <div class="settings-item">
                             <div class="item-info">
-                                <label class="item-label">高亮颜色</label>
-                                <p class="item-description">调节高亮扫过后歌词的颜色</p>
+                                <label class="item-label">歌词颜色</label>
+                                <p class="item-description">设置 AMLL 使用的基础文字颜色，逐字进度由原生透明度遮罩呈现</p>
                             </div>
                             <div class="item-control">
-                                <input type="color" class="color-picker" id="lyrics-highlight-color" value="#335eea">
-                                <span class="color-value" id="lyrics-highlight-color-value">#335eea</span>
+                                <input type="color" class="color-picker" id="lyrics-color" value="#335eea">
+                                <span class="color-value" id="lyrics-color-value">#335eea</span>
+                            </div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="item-info">
+                                <label class="item-label">歌词字体</label>
+                                <p class="item-description">设置应用内 AMLL 歌词使用的字体族</p>
+                            </div>
+                            <div class="item-control">
+                                <select class="settings-select" id="lyrics-font-family">
+                                    <option value="inherit">跟随应用</option>
+                                    <option value="system">系统无衬线</option>
+                                    <option value="cjk-sans">中日韩无衬线</option>
+                                    <option value="serif">衬线字体</option>
+                                    <option value="monospace">等宽字体</option>
+                                    <option value="custom">自定义字体</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="lyrics-custom-font-container" hidden>
+                            <div class="settings-item">
+                                <div class="item-info">
+                                    <label class="item-label" for="lyrics-custom-latin-font">拉丁字体</label>
+                                    <p class="item-description">用于拉丁字母、数字和半角标点；留空时跟随 CJK 字体</p>
+                                </div>
+                                <div class="item-control">
+                                    <input type="text" class="settings-text-input" id="lyrics-custom-latin-font"
+                                           placeholder="例如：Inter" maxlength="100">
+                                </div>
+                            </div>
+
+                            <div class="settings-item">
+                                <div class="item-info">
+                                    <label class="item-label" for="lyrics-custom-cjk-font">CJK 字体</label>
+                                    <p class="item-description">用于中日韩字符和全角标点；留空时跟随拉丁字体</p>
+                                </div>
+                                <div class="item-control">
+                                    <input type="text" class="settings-text-input" id="lyrics-custom-cjk-font"
+                                           placeholder="例如：霞鹜文楷" maxlength="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="item-info">
+                                <label class="item-label">歌词字号</label>
+                                <p class="item-description">使用 AMLL 自适应字号，或选择固定大小</p>
+                            </div>
+                            <div class="item-control">
+                                <select class="settings-select" id="lyrics-font-size">
+                                    <option value="auto">自适应（默认）</option>
+                                    <option value="20">20px</option>
+                                    <option value="24">24px</option>
+                                    <option value="28">28px</option>
+                                    <option value="32">32px</option>
+                                    <option value="36">36px</option>
+                                    <option value="40">40px</option>
+                                    <option value="48">48px</option>
+                                    <option value="56">56px</option>
+                                    <option value="64">64px</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="item-info">
+                                <label class="item-label">显示翻译</label>
+                                <p class="item-description">显示来源或 TTML 明确提供的行级翻译</p>
+                            </div>
+                            <div class="item-control">
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="lyrics-show-translation" class="toggle-input" checked>
+                                    <label for="lyrics-show-translation" class="toggle-label"></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="item-info">
+                                <label class="item-label">显示罗马字注音</label>
+                                <p class="item-description">显示行级和逐字 romanization</p>
+                            </div>
+                            <div class="item-control">
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="lyrics-show-romanization" class="toggle-input" checked>
+                                    <label for="lyrics-show-romanization" class="toggle-label"></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="item-info">
+                                <label class="item-label">显示假名注音</label>
+                                <p class="item-description">显示 TTML 中已有的 Ruby / 假名标注</p>
+                            </div>
+                            <div class="item-control">
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="lyrics-show-ruby" class="toggle-input" checked>
+                                    <label for="lyrics-show-ruby" class="toggle-label"></label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1050,23 +1157,12 @@
 
                         <div class="settings-item">
                             <div class="item-info">
-                                <label class="item-label">高亮颜色</label>
-                                <p class="item-description">调节高亮扫过后歌词的颜色</p>
+                                <label class="item-label">桌面歌词颜色</label>
+                                <p class="item-description">独立设置桌面歌词的单色显示效果</p>
                             </div>
                             <div class="item-control">
-                                <input type="color" class="color-picker" id="dl-theme-color" value="#64b5f6">
-                                <span class="color-value" id="dl-theme-color-value">#64b5f6</span>
-                            </div>
-                        </div>
-
-                        <div class="settings-item">
-                            <div class="item-info">
-                                <label class="item-label">字体颜色</label>
-                                <p class="item-description">调节未高亮的字体颜色</p>
-                            </div>
-                            <div class="item-control">
-                                <input type="color" class="color-picker" id="dl-font-color" value="#000">
-                                <span class="color-value" id="dl-font-color-value">#000</span>
+                                <input type="color" class="color-picker" id="dl-color" value="#ffffff">
+                                <span class="color-value" id="dl-color-value">#ffffff</span>
                             </div>
                         </div>
 
@@ -1084,13 +1180,13 @@
 
                         <div class="settings-item">
                             <div class="item-info">
-                                <label class="item-label">字体大小</label>
-                                <p class="item-description">调节当前歌词的字体大小</p>
+                                <label class="item-label">桌面歌词字号</label>
+                                <p class="item-description">独立设置桌面歌词的字号大小</p>
                             </div>
                             <div class="item-control">
                                 <input type="range" class="settings-slider" id="dl-font-size-slider"
-                                       min="25" max="57" step="1" value="30">
-                                <span class="slider-value" id="dl-font-size-value">30px</span>
+                                       min="20" max="64" step="1" value="48">
+                                <span class="slider-value" id="dl-font-size-value">48px</span>
                             </div>
                         </div>
                     </div>
@@ -1495,6 +1591,10 @@
                 <!-- 左侧：封面和歌曲信息 -->
                 <div class="lyrics-left-side">
                     <div class="lyrics-cover-section">
+                        <div class="lyrics-timeline-adjust" id="lyrics-timeline-adjust" hidden aria-label="调整歌词时间轴">
+                            <button type="button" id="lyrics-timeline-earlier" title="歌词提前：单击 0.1 秒，长按连续加速" aria-label="歌词提前：单击 0.1 秒，长按连续加速"></button>
+                            <button type="button" id="lyrics-timeline-later" title="歌词延后：单击 0.1 秒，长按连续加速" aria-label="歌词延后：单击 0.1 秒，长按连续加速"></button>
+                        </div>
                         <!-- 封面容器 -->
                         <div class="lyrics-cover-container">
                             <img class="lyrics-cover-image" id="lyrics-cover-image" src="assets/images/default-cover.svg" alt="封面">
@@ -1574,14 +1674,7 @@
                 <!-- 右侧：歌词显示 -->
                 <div class="lyrics-right-side">
                     <div class="lyrics-container">
-                        <div class="lyrics-display" id="lyrics-display">
-                            <div class="lyrics-text">
-                                <div class="lyrics-line-spacer"></div>
-                                <p class="lyrics-line">暂无歌词</p>
-                                <p class="lyrics-line">请欣赏音乐</p>
-                                <div class="lyrics-line-spacer"></div>
-                            </div>
-                        </div>
+                        <div class="lyrics-display" id="lyrics-display"></div>
                     </div>
                 </div>
             </div>

@@ -15,6 +15,5 @@ export {TrayAPI, trayAPI} from './TrayAPI';
 export {WindowAPI, windowAPI} from './WindowAPI';
 export {LibraryAPI, libraryAPI} from './LibraryAPI';
 export {NetworkAPI, networkAPI} from './NetworkAPI';
-export {LyricsAPI, lyricsAPI} from './LyricsAPI';
 export {CoverAPI, coverAPI} from './CoverAPI';
 export {UpdateAPI, updateAPI} from './UpdateAPI';

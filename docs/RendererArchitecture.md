@@ -31,8 +31,9 @@ src/renderer/src/features/
   events/                  应用事件服务
   extensions/              插件管理功能
   library/                 音乐库来源管理、索引重建、扫描、元数据编辑
+  lyrics/                  canonical TTML、provider、来源编排和 AMLL Core 渲染
   media/                   文件选择、音频读取、媒体文件系统
-  mediaAssets/             歌词、封面、本地/在线/内嵌资源
+  mediaAssets/             封面和其他媒体资源
   networkDrive/            SMB / WebDAV 网络磁盘
   playback/                播放队列、状态、音频引擎、UI 绑定
   playlists/               歌单数据、播放、封面、文件导入与目录绑定
@@ -53,10 +54,11 @@ src/renderer/src/infrastructure/electron/
 
 src/renderer/src/shared/
   cache/                   renderer 本地缓存
-  lyrics/                  歌词时间线和逐字渲染共享逻辑
   network/                 网络请求 client
   types/                   app contracts
 ```
+
+歌词以 TTML 为唯一 canonical 表示，统一管线和手动来源选择器见 [歌词系统架构](LyricsArchitecture.md)。
 
 ## 依赖方向
 

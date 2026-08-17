@@ -28,6 +28,7 @@ class ContextMenu extends Component {
     private addToPlaylistLabel!: HTMLElement;
     private addToCustomPlaylistItem!: HTMLElement;
     private addToCustomPlaylistLabel!: HTMLElement;
+    private selectLyricsItem!: HTMLElement;
     private editInfoItem!: HTMLElement;
     private deleteItem!: HTMLElement;
     private batchDeleteItem!: HTMLElement;
@@ -79,6 +80,7 @@ class ContextMenu extends Component {
         this.playNextItem.style.display = collectionActionsOnly && !hasCollectionTracks ? 'none' : '';
         this.addToPlaylistItem.style.display = collectionActionsOnly && !hasCollectionTracks ? 'none' : '';
         this.addToCustomPlaylistItem.style.display = collectionActionsOnly && !hasCollectionTracks ? 'none' : '';
+        this.selectLyricsItem.style.display = isMulti || collectionActionsOnly || !track ? 'none' : '';
         this.editInfoItem.style.display = isPlaylistCollection || (!isMulti && !collectionActionsOnly) ? '' : 'none';
         this.deleteItem.style.display = isPlaylistCollection || (!isMulti && !collectionActionsOnly) ? '' : 'none';
         this.batchDeleteItem.style.display = isMulti && !collectionActionsOnly ? '' : 'none';
@@ -142,6 +144,7 @@ class ContextMenu extends Component {
         this.addToCustomPlaylistLabel = this.element.querySelector(
             '#context-add-to-custom-playlist-label'
         ) as HTMLElement;
+        this.selectLyricsItem = this.element.querySelector('#context-select-lyrics') as HTMLElement;
         this.editInfoItem = this.element.querySelector('#context-edit-info') as HTMLElement;
         this.deleteItem = this.element.querySelector('#context-delete') as HTMLElement;
         this.batchDeleteItem = this.element.querySelector('#context-batch-delete') as HTMLElement;
@@ -181,6 +184,11 @@ class ContextMenu extends Component {
                 tracks: this.selectedTrackItems,
                 index: this.currentIndex
             });
+            this.hide();
+        });
+
+        this.addEventListenerManaged(this.selectLyricsItem, 'click', () => {
+            this.emit('selectLyrics', {track: this.currentTrack, index: this.currentIndex});
             this.hide();
         });
 
