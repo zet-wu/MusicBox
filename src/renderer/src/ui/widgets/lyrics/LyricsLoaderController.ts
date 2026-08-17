@@ -50,9 +50,7 @@ class LyricsLoaderController {
         this.abortController?.abort();
         this.abortController = new AbortController();
 
-        if (!track.lyrics) {
-            this.showLoading();
-        }
+        this.showLoading();
 
         try {
             const result = await this.service.load(track, this.abortController.signal);

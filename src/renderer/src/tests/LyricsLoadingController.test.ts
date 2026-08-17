@@ -58,15 +58,16 @@ describe('LyricsLoaderController', () => {
             .mockImplementationOnce(() => new Promise(resolve => resolveFirst = resolve))
             .mockResolvedValueOnce({document: createDocument('第二首'), binding: {trackId: 'track'}});
         const setDocument = vi.fn();
+        const showLoading = vi.fn();
         const controller = new LyricsLoaderController({
             setDocument,
-            showLoading: vi.fn(),
+            showLoading,
             showNoLyrics: vi.fn(),
             service: {load} as never
         });
 
         const firstLoad = controller.loadLyrics(createTrack('file-a', 'A.flac'));
-        await controller.loadLyrics(createTrack('file-b', 'B.flac'));
+        await controller.loadLyrics({...createTrack('file-b', 'B.flac'), lyrics: '已有歌词'});
         resolveFirst({document: createDocument('第一首'), binding: {trackId: 'track'}});
         await firstLoad;
 
@@ -74,6 +75,7 @@ describe('LyricsLoaderController', () => {
         expect(setDocument).toHaveBeenCalledWith(createDocument('第二首'), true);
         const firstSignal = load.mock.calls[0][1] as AbortSignal;
         expect(firstSignal.aborted).toBe(true);
+        expect(showLoading).toHaveBeenCalledTimes(2);
     });
 
     it('canonical 保存失败时仍显示歌词但标记为不可编辑', async () => {
