@@ -14,6 +14,7 @@ import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 import type {LyricsDocument} from '@/features/lyrics/domain/types';
 import {getLyricsSourcePicker} from '@/features/lyrics/ui/LyricsSourcePicker';
 import {LyricsTimelineAdjustController} from './LyricsTimelineAdjustController';
+import {desktopLyricsService} from '@/features/desktopLyrics/service/DesktopLyricsService';
 
 interface LyricsWidgetCompositionOptions {
     root: Element | null;
@@ -72,8 +73,14 @@ class LyricsWidgetComposition {
             elements: this.elements.timelineAdjust,
             addDomListener: this.addDomListener,
             getCurrentTrack: this.getCurrentTrack,
-            setTimelinePreviewDelta: deltaMs => this.lyricsView.setTimelinePreviewDelta(deltaMs),
-            clearTimelinePreview: options => this.lyricsView.clearTimelinePreview(options)
+            setTimelinePreviewDelta: deltaMs => {
+                this.lyricsView.setTimelinePreviewDelta(deltaMs);
+                void desktopLyricsService.syncTimelinePreview(deltaMs);
+            },
+            clearTimelinePreview: options => {
+                this.lyricsView.clearTimelinePreview(options);
+                void desktopLyricsService.syncTimelinePreview(0);
+            }
         });
 
         this.lyricsLoader = new LyricsLoaderController({

@@ -38,6 +38,10 @@ export class DesktopLyricsWindowService {
         return desktopLyricsGateway.onPositionChanged(handler);
     }
 
+    onTimelinePreviewChanged(handler: (deltaMs: number) => void): Unsubscribe {
+        return desktopLyricsGateway.onTimelinePreviewChanged(handler);
+    }
+
     onPlaybackStateChanged(handler: (state: DesktopLyricsPlaybackState) => void): Unsubscribe {
         return desktopLyricsGateway.onPlaybackStateChanged(handler);
     }

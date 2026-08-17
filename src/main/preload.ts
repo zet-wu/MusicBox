@@ -494,6 +494,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         updatePlaybackState: (state: any) => ipcRenderer.invoke('desktopLyrics:updatePlaybackState', state),
         updateLyrics: (lyricsData: any) => ipcRenderer.invoke('desktopLyrics:updateLyrics', lyricsData),
         updatePosition: (position: any) => ipcRenderer.invoke('desktopLyrics:updatePosition', position),
+        updateTimelinePreview: (deltaMs: number) => ipcRenderer.invoke('desktopLyrics:updateTimelinePreview', deltaMs),
         updateTrack: (trackInfo: any) => ipcRenderer.invoke('desktopLyrics:updateTrack', trackInfo),
         updateSettings: (settings: any) => ipcRenderer.invoke('desktopLyrics:updateSettings', settings),
 
@@ -522,6 +523,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             const wrapper = (_event: any, position: any) => callback(position);
             ipcRenderer.on('playback:positionChanged', wrapper);
             return () => ipcRenderer.removeListener('playback:positionChanged', wrapper);
+        },
+        onTimelinePreviewChanged: (callback: (deltaMs: number) => void) => {
+            const wrapper = (_event: any, deltaMs: number) => callback(deltaMs);
+            ipcRenderer.on('lyrics:timelinePreviewChanged', wrapper);
+            return () => ipcRenderer.removeListener('lyrics:timelinePreviewChanged', wrapper);
         },
         onTrackChanged: (callback: (trackInfo: any) => void) => {
             const wrapper = (_event: any, trackInfo: any) => callback(trackInfo);

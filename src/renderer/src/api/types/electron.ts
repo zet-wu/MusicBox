@@ -237,6 +237,7 @@ export interface ElectronDesktopLyricsAPI {
     updatePlaybackState(state: DesktopLyricsPlaybackState): Promise<unknown>;
     updateLyrics(lyricsData: AmllLyricLine[]): Promise<unknown>;
     updatePosition(position: number): Promise<unknown>;
+    updateTimelinePreview(deltaMs: number): Promise<unknown>;
     updateTrack(trackInfo: Track | null): Promise<unknown>;
     updateSettings(settings: DesktopLyricsSettings | MusicBoxSettings): Promise<Result>;
     setPosition(x: number, y: number): Promise<unknown>;
@@ -250,6 +251,7 @@ export interface ElectronDesktopLyricsAPI {
     onPlaybackStateChanged(callback: (state: DesktopLyricsPlaybackState) => void): Unsubscribe;
     onLyricsUpdated(callback: (lyricsData: AmllLyricLine[]) => void): Unsubscribe;
     onPositionChanged(callback: (position: number) => void): Unsubscribe;
+    onTimelinePreviewChanged(callback: (deltaMs: number) => void): Unsubscribe;
     onTrackChanged(callback: (trackInfo: Track | null) => void): Unsubscribe;
     onSettingsChanged(callback: (settings: DesktopLyricsSettings) => void): Unsubscribe;
 }

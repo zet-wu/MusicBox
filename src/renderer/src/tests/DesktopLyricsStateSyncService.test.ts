@@ -5,6 +5,7 @@ const gateway = vi.hoisted(() => ({
     updateSettings: vi.fn(),
     updatePlaybackState: vi.fn(),
     updatePosition: vi.fn(),
+    updateTimelinePreview: vi.fn(),
     updateTrack: vi.fn(),
     updateLyrics: vi.fn()
 }));
@@ -34,5 +35,18 @@ describe('DesktopLyricsStateSyncService', () => {
         expect(gateway.updateSettings).toHaveBeenCalledWith(settings);
         expect(gateway.updateSettings.mock.invocationCallOrder[0])
             .toBeLessThan(gateway.updatePlaybackState.mock.invocationCallOrder[0]);
+        expect(gateway.updateTimelinePreview).toHaveBeenCalledWith(0);
+    });
+
+    it('仅同步桌面歌词预览偏移数字', async () => {
+        const service = new DesktopLyricsStateSyncService({
+            getCurrentState: () => ({currentTrack: null, isPlaying: false, position: 0}),
+            getCurrentSettings: () => ({})
+        });
+
+        await service.syncToDesktopLyrics('timelinePreview', -500);
+
+        expect(gateway.updateTimelinePreview).toHaveBeenCalledWith(-500);
+        expect(gateway.updateLyrics).not.toHaveBeenCalled();
     });
 });

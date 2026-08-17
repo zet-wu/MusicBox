@@ -30,6 +30,10 @@ class DesktopLyricsGateway extends ElectronNamespaceAdapter<'desktopLyrics'> {
         return this.call('updatePosition', position);
     }
 
+    updateTimelinePreview(deltaMs: number): Promise<unknown> {
+        return this.call('updateTimelinePreview', deltaMs);
+    }
+
     toggle(): Promise<{success: boolean; visible?: boolean; error?: string}> {
         return this.call('toggle');
     }
@@ -68,6 +72,10 @@ class DesktopLyricsGateway extends ElectronNamespaceAdapter<'desktopLyrics'> {
 
     onPositionChanged(handler: (position: number) => void): Unsubscribe {
         return this.on('onPositionChanged', handler);
+    }
+
+    onTimelinePreviewChanged(handler: (deltaMs: number) => void): Unsubscribe {
+        return this.on('onTimelinePreviewChanged', handler);
     }
 
     onPlaybackStateChanged(handler: (state: DesktopLyricsPlaybackState) => void): Unsubscribe {

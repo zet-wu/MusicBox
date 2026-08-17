@@ -37,12 +37,18 @@ class DesktopLyrics {
         this.currentPosition = 0;
 
         this.init();
+        window.addEventListener('beforeunload', () => this.destroy(), {once: true});
     }
 
     init(): void {
         this.eventBinder.bind();
         this.settingsController.loadSettings();
         void this.settingsController.applySettings();
+    }
+
+    destroy(): void {
+        this.eventBinder.destroy();
+        this.lyricsView.destroy();
     }
 }
 

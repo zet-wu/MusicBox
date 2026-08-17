@@ -5,7 +5,7 @@ import type {DesktopLyricsPlaybackState} from '@api/types/playback';
 import type {Track} from '@api/types/track';
 import type {MusicBoxSettings} from '@api/types/settings';
 
-export type DesktopLyricsSyncType = 'track' | 'playbackState' | 'position' | 'lyrics';
+export type DesktopLyricsSyncType = 'track' | 'playbackState' | 'position' | 'lyrics' | 'timelinePreview';
 
 export interface CurrentDesktopLyricsState {
     currentTrack: Track | null;
@@ -44,6 +44,9 @@ export class DesktopLyricsStateSyncService {
                     break;
                 case 'lyrics':
                     await desktopLyricsGateway.updateLyrics(data as AmllLyricLine[]);
+                    break;
+                case 'timelinePreview':
+                    await desktopLyricsGateway.updateTimelinePreview(data as number);
                     break;
             }
         } catch (error) {
@@ -84,6 +87,7 @@ export class DesktopLyricsStateSyncService {
             });
 
             await this.syncToDesktopLyrics('position', position);
+            await this.syncToDesktopLyrics('timelinePreview', 0);
         } catch (error) {
             console.error('❌ 同步当前状态到桌面歌词失败:', error);
         }

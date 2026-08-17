@@ -51,6 +51,10 @@ describe('DesktopAmllLyricsView', () => {
 
         view.updateLyrics(lines);
         view.updatePosition(1.5);
+        view.updateTimelinePreview(-100);
+        view.updatePosition(2);
+        view.updateTimelinePreview(100);
+        view.updateTimelinePreview(0);
         view.setPlaying(true);
         view.setPlaying(false);
 
@@ -61,9 +65,18 @@ describe('DesktopAmllLyricsView', () => {
         expect(stateElement.hidden).toBe(true);
         expect(playerElement.hidden).toBe(false);
         expect(player.setCurrentTime).toHaveBeenCalledWith(1500);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(1600);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(2100);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(1900);
+        expect(player.setCurrentTime).toHaveBeenCalledWith(2000);
+        expect(player.setLyricLines).toHaveBeenCalledTimes(1);
         expect(player.resume).toHaveBeenCalledOnce();
         expect(player.pause).toHaveBeenCalledTimes(2);
         expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
         expect(groupElement.dataset.desktopActive).toBe('true');
+
+        view.reset();
+        view.updatePosition(3);
+        expect(player.setCurrentTime).toHaveBeenLastCalledWith(3000);
     });
 });

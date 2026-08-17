@@ -65,6 +65,10 @@ export class DesktopLyricsService {
     async syncLyrics(lyrics: AmllLyricLine[]): Promise<void> {
         await this.sync.syncToDesktopLyrics('lyrics', lyrics);
     }
+
+    async syncTimelinePreview(deltaMs: number): Promise<void> {
+        await this.sync.syncToDesktopLyrics('timelinePreview', deltaMs);
+    }
 }
 
 export const desktopLyricsService = new DesktopLyricsService();

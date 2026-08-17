@@ -5,6 +5,7 @@ import type {DesktopLyricsLockController} from './DesktopLyricsLockController';
 import type {DesktopAmllLyricsView} from './DesktopAmllLyricsView';
 import type {DesktopLyricsSettingsController} from './DesktopLyricsSettingsController';
 import type {DesktopLyricsElements, DesktopLyricsSettings} from './DesktopLyricsTypes';
+import type {Unsubscribe} from '@api/types/common';
 
 interface DesktopLyricsEventBinderOptions {
     elements: DesktopLyricsElements;
@@ -16,12 +17,18 @@ interface DesktopLyricsEventBinderOptions {
 }
 
 export class DesktopLyricsEventBinder {
+    private readonly unsubscribeIpcEvents: Unsubscribe[] = [];
+
     constructor(private readonly options: DesktopLyricsEventBinderOptions) {
     }
 
     bind(): void {
         this.bindDomEvents();
         this.bindIpcEvents();
+    }
+
+    destroy(): void {
+        for (const unsubscribe of this.unsubscribeIpcEvents.splice(0)) unsubscribe();
     }
 
     private bindDomEvents(): void {
@@ -41,30 +48,34 @@ export class DesktopLyricsEventBinder {
     private bindIpcEvents(): void {
         const {lyricsView, settingsController, setPlaybackState} = this.options;
 
-        desktopLyricsWindowService.onLyricsUpdated((lyricsData) => {
+        this.unsubscribeIpcEvents.push(desktopLyricsWindowService.onLyricsUpdated((lyricsData) => {
             lyricsView.updateLyrics(lyricsData);
-        });
+        }));
 
-        desktopLyricsWindowService.onPositionChanged((position) => {
+        this.unsubscribeIpcEvents.push(desktopLyricsWindowService.onPositionChanged((position) => {
             const normalizedPosition = lyricsView.updatePosition(position);
             if (normalizedPosition !== null) {
                 setPlaybackState({position: normalizedPosition});
             }
-        });
+        }));
 
-        desktopLyricsWindowService.onPlaybackStateChanged((state: DesktopLyricsPlaybackState) => {
+        this.unsubscribeIpcEvents.push(desktopLyricsWindowService.onTimelinePreviewChanged((deltaMs) => {
+            lyricsView.updateTimelinePreview(deltaMs);
+        }));
+
+        this.unsubscribeIpcEvents.push(desktopLyricsWindowService.onPlaybackStateChanged((state: DesktopLyricsPlaybackState) => {
             const isPlaying = state?.isPlaying || false;
             lyricsView.setPlaying(isPlaying);
             setPlaybackState({isPlaying});
-        });
+        }));
 
-        desktopLyricsWindowService.onTrackChanged((_track: Track | null) => {
+        this.unsubscribeIpcEvents.push(desktopLyricsWindowService.onTrackChanged((_track: Track | null) => {
             setPlaybackState({position: 0});
             lyricsView.reset();
-        });
+        }));
 
-        desktopLyricsWindowService.onSettingsChanged((settings) => {
+        this.unsubscribeIpcEvents.push(desktopLyricsWindowService.onSettingsChanged((settings) => {
             void settingsController.updateSettings(settings as Partial<DesktopLyricsSettings>);
-        });
+        }));
     }
 }

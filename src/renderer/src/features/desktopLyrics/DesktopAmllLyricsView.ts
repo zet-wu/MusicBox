@@ -33,6 +33,7 @@ export class DesktopAmllLyricsView {
     private animationFrame: number | null = null;
     private lastFrameTime = performance.now();
     private currentPositionSeconds = 0;
+    private timelinePreviewDeltaMs = 0;
     private isPlaying = false;
 
     constructor(private readonly options: DesktopAmllLyricsViewOptions) {
@@ -54,8 +55,9 @@ export class DesktopAmllLyricsView {
             this.reset();
             return;
         }
+        this.timelinePreviewDeltaMs = 0;
         const projected = projectLyricsForDesktop(lines as DesktopLyricLine[]);
-        this.player.setLyricLines(projected, this.currentPositionSeconds * 1000);
+        this.player.setLyricLines(projected, this.getEffectiveTimeMs());
         this.player.update(0);
         this.decorateLineState();
         this.stateElement.hidden = projected.length > 0;
@@ -65,17 +67,22 @@ export class DesktopAmllLyricsView {
     updatePosition(positionSeconds: number): number | null {
         if (!Number.isFinite(positionSeconds)) return null;
         this.currentPositionSeconds = positionSeconds;
-        this.player.setCurrentTime(positionSeconds * 1000);
-        this.player.update(0);
-        this.decorateLineState();
+        this.applyEffectiveTime();
         return positionSeconds;
+    }
+
+    updateTimelinePreview(deltaMs: number): number | null {
+        if (!Number.isFinite(deltaMs)) return null;
+        this.timelinePreviewDeltaMs = Math.trunc(deltaMs);
+        this.applyEffectiveTime();
+        return this.timelinePreviewDeltaMs;
     }
 
     setPlaying(isPlaying: boolean): void {
         if (this.isPlaying === isPlaying) return;
         this.isPlaying = isPlaying;
         if (isPlaying) {
-            this.player.setCurrentTime(this.currentPositionSeconds * 1000);
+            this.applyEffectiveTime();
             this.player.resume();
             this.startAnimationLoop();
             return;
@@ -86,6 +93,7 @@ export class DesktopAmllLyricsView {
 
     reset(): void {
         this.currentPositionSeconds = 0;
+        this.timelinePreviewDeltaMs = 0;
         this.player.setLyricLines([]);
         this.stateElement.hidden = false;
         this.player.getElement().hidden = true;
@@ -113,6 +121,16 @@ export class DesktopAmllLyricsView {
     private stopAnimationLoop(): void {
         if (this.animationFrame !== null) cancelAnimationFrame(this.animationFrame);
         this.animationFrame = null;
+    }
+
+    private applyEffectiveTime(): void {
+        this.player.setCurrentTime(this.getEffectiveTimeMs());
+        this.player.update(0);
+        this.decorateLineState();
+    }
+
+    private getEffectiveTimeMs(): number {
+        return Math.max(0, this.currentPositionSeconds * 1000 - this.timelinePreviewDeltaMs);
     }
 
     private decorateLineState(): void {
