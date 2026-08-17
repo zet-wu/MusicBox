@@ -71,7 +71,9 @@ class LyricsWidgetComposition {
         this.timelineAdjustController = new LyricsTimelineAdjustController({
             elements: this.elements.timelineAdjust,
             addDomListener: this.addDomListener,
-            getCurrentTrack: this.getCurrentTrack
+            getCurrentTrack: this.getCurrentTrack,
+            setTimelinePreviewDelta: deltaMs => this.lyricsView.setTimelinePreviewDelta(deltaMs),
+            clearTimelinePreview: options => this.lyricsView.clearTimelinePreview(options)
         });
 
         this.lyricsLoader = new LyricsLoaderController({
@@ -159,6 +161,7 @@ class LyricsWidgetComposition {
     }
 
     resetAfterHide(): void {
+        this.timelineAdjustController.setEditableDocument(null);
         this.trackInfoController.reset();
         this.lyricsLoader.reset();
         this.coverArtController.reset();
@@ -172,6 +175,7 @@ class LyricsWidgetComposition {
     destroy(): void {
         this.playbackStateController.destroy();
         this.coverArtController.destroy();
+        this.timelineAdjustController.destroy();
         this.lyricsView.destroy();
         this.layoutController.resetLayoutState();
         this.bound = false;
