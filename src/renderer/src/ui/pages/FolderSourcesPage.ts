@@ -74,8 +74,8 @@ export class FolderSourcesPage extends Component {
         this.masterDetailHost.attachSurface(this.directorySurface);
         this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
             onBack: () => void this.showDirectoryList(),
-            onTrackPlayed: (track, index, tracks, mode) => {
-                this.emit('trackPlayed', track, index, tracks, mode);
+            onTrackPlayed: (track, index, tracks) => {
+                this.emit('trackPlayed', track, index, tracks);
             },
             onPlayAll: tracks => this.emit('playAllTracks', tracks),
             onAppendAll: tracks => this.emit('appendAllTracks', tracks),

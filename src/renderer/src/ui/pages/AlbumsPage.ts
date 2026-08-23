@@ -112,8 +112,8 @@ class AlbumsPage extends Component {
         this.masterDetailHost.attachSurface(this.albumSurface);
         this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
             onBack: () => void this.closeAlbumDetail(),
-            onTrackPlayed: (track, index, tracks, mode) => {
-                this.emit('trackPlayed', track, index, tracks, mode);
+            onTrackPlayed: (track, index, tracks) => {
+                this.emit('trackPlayed', track, index, tracks);
             },
             onPlayAll: (tracks) => {
                 this.emit('playAllTracks', tracks);

@@ -1,5 +1,4 @@
 export type WasapiShareMode = 'exclusive' | 'shared';
-export type PlaylistDoubleClickMode = 'shuffle' | 'sequence';
 export type PlaylistInfoAlignment = 'left' | 'center' | 'right';
 export type ArtistViewMode = 'grid' | 'list';
 export type AlbumViewMode = 'grid' | 'list';
@@ -33,7 +32,6 @@ export interface MusicBoxSettings {
     showTrackCovers?: boolean;
     autoFetchMissingTrackCovers?: boolean;
     gaplessPlayback?: boolean;
-    playlistDoubleClickMode?: PlaylistDoubleClickMode;
     playlistInfoAlignment?: PlaylistInfoAlignment;
     lyricsFontFamily?: string;
     lyricsCustomLatinFont?: string;

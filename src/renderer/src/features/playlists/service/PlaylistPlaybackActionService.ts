@@ -1,9 +1,5 @@
 import type {Track} from "@api/types/library";
-import type {PlaylistDoubleClickMode} from "@api/types/settings";
 import {appNotificationService} from "@/features/appShell/service";
-import {cacheManager} from "@/shared/cache";
-import type {MusicBoxSettings} from "@api/types/settings";
-import {resolvePlaylistDoubleClickMode} from "@/features/playlists/domain/PlaylistDoubleClickMode";
 
 export class PlaylistPlaybackActionService {
     getPlayableTracks(tracks: Track[]): Track[] | null {
@@ -18,11 +14,6 @@ export class PlaylistPlaybackActionService {
     getShuffledPlayableTracks(tracks: Track[]): Track[] | null {
         const playableTracks = this.getPlayableTracks(tracks);
         return playableTracks ? this.shuffleTracks(playableTracks) : null;
-    }
-
-    getDoubleClickMode(): PlaylistDoubleClickMode {
-        const settings = (cacheManager.getLocalCache('musicbox-settings') || {}) as MusicBoxSettings;
-        return resolvePlaylistDoubleClickMode(settings);
     }
 
     shuffleTracks(tracks: Track[]): Track[] {

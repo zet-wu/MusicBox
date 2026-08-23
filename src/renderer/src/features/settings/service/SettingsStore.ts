@@ -4,7 +4,6 @@ import type {
     AlbumViewMode,
     ArtistViewMode,
     FolderSourceViewMode,
-    PlaylistDoubleClickMode,
     PlaylistInfoAlignment,
     PlaylistViewMode
 } from "@api/types/settings";
@@ -15,7 +14,6 @@ export interface SettingsInitialValues {
     language: string;
     autoplay: boolean;
     rememberPosition: boolean;
-    playlistDoubleClickMode: PlaylistDoubleClickMode;
     playlistInfoAlignment: PlaylistInfoAlignment;
     desktopLyrics: boolean;
     statistics: boolean;
@@ -76,7 +74,6 @@ class SettingsStore {
             language: this.getString(settings, 'language', 'zh-CN'),
             autoplay: this.getBoolean(settings, 'autoplay', false),
             rememberPosition: this.getBoolean(settings, 'rememberPosition', false),
-            playlistDoubleClickMode: settings.playlistDoubleClickMode === 'sequence' ? 'sequence' : 'shuffle',
             playlistInfoAlignment: this.getPlaylistInfoAlignment(settings),
             desktopLyrics: this.getBoolean(settings, 'desktopLyrics', true),
             statistics: this.getBoolean(settings, 'statistics', true),

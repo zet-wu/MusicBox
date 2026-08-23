@@ -1,11 +1,9 @@
 import type {Track} from "@api/types/library";
-import type {PlaylistDoubleClickMode} from "@api/types/settings";
 import type {Unsubscribe} from "@api/types/common";
 import {favoriteService} from "@/features/library/service/FavoriteService";
 import {libraryPageDataService} from "@/features/library/service/LibraryPageDataService";
 import {CoverLoadQueue} from "@/features/mediaAssets/service/CoverLoadQueue";
 import {coverLookupService} from "@/features/mediaAssets/service/CoverLookupService";
-import {playlistPlaybackActionService} from "@/features/playlists/service/PlaylistPlaybackActionService";
 import {
     trackCoverDisplayPreferenceService,
     trackCoverNetworkPreferenceService
@@ -45,7 +43,7 @@ interface TrackCollectionRow {
 
 export interface TrackCollectionDetailCallbacks {
     onBack(): void;
-    onTrackPlayed(track: Track, index: number, tracks: Track[], mode: PlaylistDoubleClickMode): void;
+    onTrackPlayed(track: Track, index: number, tracks: Track[]): void;
     onPlayAll(tracks: Track[]): void;
     onAppendAll(tracks: Track[]): void;
     onTrackRightClick(
@@ -379,12 +377,7 @@ export class TrackCollectionDetail {
         const index = this.getRowIndex(row);
         const track = index === null ? null : this.model?.tracks[index];
         if (track && index !== null && this.model) {
-            this.callbacks.onTrackPlayed(
-                track,
-                index,
-                this.model.tracks,
-                playlistPlaybackActionService.getDoubleClickMode()
-            );
+            this.callbacks.onTrackPlayed(track, index, this.model.tracks);
         }
     }
 

@@ -956,13 +956,7 @@ class PlaylistDetailPage extends Component {
 
     async playTrack(track: PlaylistDetailTrack, index: number): Promise<void> {
         try {
-            this.emit(
-                'trackPlayed',
-                track,
-                index,
-                this.tracks,
-                playlistPlaybackActionService.getDoubleClickMode()
-            );
+            this.emit('trackPlayed', track, index, this.tracks);
         } catch (error) {
             console.error('❌ PlaylistDetailPage: 播放歌曲失败', error);
         }

@@ -1,6 +1,5 @@
 import type {Playlist} from "@api/types/playlist";
 import type {Track} from "@api/types/track";
-import type {PlaylistDoubleClickMode} from "@api/types/settings";
 import type {ContentUIFacade} from "@/app/runtime/ui/ContentUIFacade";
 import type {DialogUIFacade} from "@/app/runtime/ui/DialogUIFacade";
 import type {PlaybackUIFacade} from "@/app/runtime/ui/PlaybackUIFacade";
@@ -26,7 +25,7 @@ export interface PageComponentBindingHost {
         track: Track,
         index: number,
         tracks: Track[],
-        mode?: PlaylistDoubleClickMode
+        mode?: 'shuffle' | 'sequence'
     ): Promise<void>;
     addTracksToQueue(tracks: Track[]): Promise<void>;
     addToPlaylist(track: Track): void;

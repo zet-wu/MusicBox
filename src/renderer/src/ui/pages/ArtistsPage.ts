@@ -105,8 +105,8 @@ class ArtistsPage extends Component {
         this.masterDetailHost.attachSurface(this.artistSurface);
         this.trackCollectionDetail = new TrackCollectionDetail(this.detailRoot, {
             onBack: () => void this.closeArtistDetail(),
-            onTrackPlayed: (track, index, tracks, mode) => {
-                this.emit('trackPlayed', track, index, tracks, mode);
+            onTrackPlayed: (track, index, tracks) => {
+                this.emit('trackPlayed', track, index, tracks);
             },
             onPlayAll: (tracks) => {
                 this.emit('playAllTracks', tracks);
