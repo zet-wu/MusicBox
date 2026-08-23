@@ -1579,10 +1579,6 @@
                 <!-- 左侧：封面和歌曲信息 -->
                 <div class="lyrics-left-side">
                     <div class="lyrics-cover-section">
-                        <div class="lyrics-timeline-adjust" id="lyrics-timeline-adjust" hidden aria-label="调整歌词时间轴">
-                            <button type="button" id="lyrics-timeline-earlier" title="歌词提前：单击 0.1 秒，长按连续加速" aria-label="歌词提前：单击 0.1 秒，长按连续加速"></button>
-                            <button type="button" id="lyrics-timeline-later" title="歌词延后：单击 0.1 秒，长按连续加速" aria-label="歌词延后：单击 0.1 秒，长按连续加速"></button>
-                        </div>
                         <!-- 封面容器 -->
                         <div class="lyrics-cover-container">
                             <img class="lyrics-cover-image" id="lyrics-cover-image" src="assets/images/default-cover.svg" alt="封面">
@@ -1663,6 +1659,12 @@
                 <div class="lyrics-right-side">
                     <div class="lyrics-container">
                         <div class="lyrics-display" id="lyrics-display"></div>
+                        <div class="lyrics-timeline-adjust" id="lyrics-timeline-adjust" hidden aria-label="调整歌词时间轴">
+                            <div class="lyrics-timeline-adjust-controls">
+                                <button type="button" id="lyrics-timeline-later" title="歌词延后：单击 0.1 秒，长按连续加速" aria-label="歌词延后：单击 0.1 秒，长按连续加速">+</button>
+                                <button type="button" id="lyrics-timeline-earlier" title="歌词提前：单击 0.1 秒，长按连续加速" aria-label="歌词提前：单击 0.1 秒，长按连续加速">−</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
