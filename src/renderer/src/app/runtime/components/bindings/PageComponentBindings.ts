@@ -98,11 +98,10 @@ export class PageComponentBindings {
                     components.artistsPage.on('trackPlayed', async (
                         track: Track,
                         index: number,
-                        tracks?: Track[],
-                        mode?: 'shuffle' | 'sequence'
+                        tracks?: Track[]
                     ) => {
                         if (tracks?.length) {
-                            await app.playTrackFromPlaylist(track, index, tracks, mode);
+                            await app.playTrackFromPlaylist(track, index, tracks);
                             return;
                         }
                         await app.handleTrackPlayed(track, index);
@@ -136,11 +135,10 @@ export class PageComponentBindings {
                     components.albumsPage.on('trackPlayed', async (
                         track: Track,
                         index: number,
-                        tracks?: Track[],
-                        mode?: 'shuffle' | 'sequence'
+                        tracks?: Track[]
                     ) => {
                         if (tracks?.length) {
-                            await app.playTrackFromPlaylist(track, index, tracks, mode);
+                            await app.playTrackFromPlaylist(track, index, tracks);
                             return;
                         }
                         await app.handleTrackPlayed(track, index);
@@ -197,10 +195,9 @@ export class PageComponentBindings {
                 components.folderSourcesPage?.on('trackPlayed', async (
                     track: Track,
                     index: number,
-                    tracks: Track[],
-                    mode: 'shuffle' | 'sequence'
+                    tracks: Track[]
                 ) => {
-                    await app.playTrackFromPlaylist(track, index, tracks, mode);
+                    await app.playTrackFromPlaylist(track, index, tracks);
                 });
                 components.folderSourcesPage?.on('playAllTracks', async (tracks: Track[]) => {
                     await app.handlePlayAllTracks(tracks);

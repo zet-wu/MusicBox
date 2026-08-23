@@ -91,8 +91,7 @@ export interface MusicBoxCompositionHost {
     playTrackFromPlaylist(
         track: Track,
         index: number,
-        tracks?: Track[],
-        mode?: 'shuffle' | 'sequence'
+        tracks?: Track[]
     ): Promise<void>;
     preloadTrackCovers(): Promise<void>;
     refreshLibrary(tracks?: Track[]): Promise<void>;
@@ -271,7 +270,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handleTrackPlayed: (track, index, tracks) => app.handleTrackPlayed(track, index, tracks),
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
             handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),
-            playTrackFromPlaylist: (track, index, tracks, mode) => app.playTrackFromPlaylist(track, index, tracks, mode),
+            playTrackFromPlaylist: (track, index, tracks) => app.playTrackFromPlaylist(track, index, tracks),
             addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
             addToPlaylist: (track) => app.addToPlaylist(track)
         },
@@ -324,7 +323,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handlePlayAllTracks: (tracks) => app.handlePlayAllTracks(tracks),
             handleShuffleAllTracks: (tracks) => app.handleShuffleAllTracks(tracks),
             addTracksToQueue: (tracks) => app.addTracksToQueue(tracks),
-            playTrackFromPlaylist: (track, index, tracks, mode) => app.playTrackFromPlaylist(track, index, tracks, mode),
+            playTrackFromPlaylist: (track, index, tracks) => app.playTrackFromPlaylist(track, index, tracks),
             handlePlaylistUpdated: (playlist) => app.handlePlaylistUpdated(playlist),
             handlePlaylistBindingsChanged: () => app.handlePlaylistBindingsChanged(),
             handlePlaylistCoverUpdated: (playlist) => app.handlePlaylistCoverUpdated(playlist)

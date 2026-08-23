@@ -522,10 +522,9 @@ export class MusicBoxApp extends EventEmitter {
     async playTrackFromPlaylist(
         track: Track,
         index: number,
-        tracks?: Track[],
-        mode?: 'shuffle' | 'sequence'
+        tracks?: Track[]
     ): Promise<void> {
-        await this.playbackController.playTrackFromPlaylist(track, index, tracks, mode);
+        await this.playbackController.playTrackFromPlaylist(track, index, tracks);
     }
 
     // 处理歌曲索引更改（用于 prev/next 按钮）

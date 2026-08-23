@@ -24,8 +24,7 @@ export interface PageComponentBindingHost {
     playTrackFromPlaylist(
         track: Track,
         index: number,
-        tracks: Track[],
-        mode?: 'shuffle' | 'sequence'
+        tracks: Track[]
     ): Promise<void>;
     addTracksToQueue(tracks: Track[]): Promise<void>;
     addToPlaylist(track: Track): void;

@@ -40,8 +40,7 @@ export interface PlaylistComponentBindingHost {
     playTrackFromPlaylist(
         track: Track,
         index: number,
-        tracks?: Track[],
-        mode?: 'shuffle' | 'sequence'
+        tracks?: Track[]
     ): Promise<void>;
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
     handlePlaylistBindingsChanged(): Promise<void>;
@@ -106,9 +105,9 @@ export function bindPlaylistComponentEvents({
 
     components.playlistDetailPage.on(
         'trackPlayed',
-        async (track: Track, index: number, tracks?: Track[], mode?: 'shuffle' | 'sequence') => {
+        async (track: Track, index: number, tracks?: Track[]) => {
         if (tracks && tracks.length > 0) {
-            await app.playTrackFromPlaylist(track, index, tracks, mode);
+            await app.playTrackFromPlaylist(track, index, tracks);
             return;
         }
 

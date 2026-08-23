@@ -248,6 +248,32 @@ describe('页面路由和最近播放索引', () => {
 });
 
 describe('页面来源播放队列', () => {
+    function createPlaybackController(playMode: 'sequence' | 'shuffle' | 'repeat-one') {
+        const setPlaylist = vi.fn().mockResolvedValue(true);
+        const setPlayMode = vi.fn().mockReturnValue(true);
+        const controller = new PlaybackAppController({
+            app: {
+                currentView: 'artists',
+                library: [],
+                filteredLibrary: [],
+                showError: vi.fn()
+            },
+            integrations: {
+                getLibraryTracks: vi.fn().mockResolvedValue([]),
+                setPlaylist,
+                restorePlaybackQueue: vi.fn().mockResolvedValue(true),
+                moveQueueEntry: vi.fn().mockReturnValue(true),
+                loadTrack: vi.fn().mockResolvedValue(true),
+                play: vi.fn().mockResolvedValue(true),
+                setPosition: vi.fn().mockResolvedValue(true),
+                setPlayMode,
+                getPlaybackSnapshot: vi.fn().mockReturnValue({playMode, playlist: []})
+            }
+        });
+
+        return {controller, setPlaylist, setPlayMode};
+    }
+
     it('单曲上下文来源会把页面下标归一为来源下标', async () => {
         const track = createTrack('context-track');
         const setPlaylist = vi.fn().mockResolvedValue(true);
@@ -274,5 +300,40 @@ describe('页面来源播放队列', () => {
         await controller.handleTrackPlayed(track, 8, [track]);
 
         expect(setPlaylist).toHaveBeenCalledWith([track], 0);
+    });
+
+    it.each(['sequence', 'repeat-one'] as const)('%s 模式保留来源顺序和歌曲索引', async (playMode) => {
+        const tracks = ['a', 'b', 'c', 'd'].map(fileId => createTrack(fileId));
+        const {controller, setPlaylist, setPlayMode} = createPlaybackController(playMode);
+
+        await controller.playTrackFromPlaylist(tracks[2], 2, tracks);
+
+        expect(setPlaylist).toHaveBeenCalledWith(tracks, 2);
+        expect(setPlayMode).not.toHaveBeenCalled();
+    });
+
+    it('shuffle 模式把点击歌曲置于队首且不重复', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0);
+        const tracks = ['a', 'b', 'c', 'd'].map(fileId => createTrack(fileId));
+        const clickedTrack = createTrack('c');
+        const {controller, setPlaylist, setPlayMode} = createPlaybackController('shuffle');
+
+        await controller.playTrackFromPlaylist(clickedTrack, 2, tracks);
+
+        const [queue, startIndex] = setPlaylist.mock.calls[0];
+        expect(startIndex).toBe(0);
+        expect(queue[0]).toBe(clickedTrack);
+        expect(queue.map((track: Track) => track.fileId).sort()).toEqual(['a', 'b', 'c', 'd']);
+        expect(queue.filter((track: Track) => track.fileId === 'c')).toHaveLength(1);
+        expect(setPlayMode).not.toHaveBeenCalled();
+    });
+
+    it('筛选列表只构造当前显示歌曲的队列', async () => {
+        const filteredTracks = [createTrack('b'), createTrack('d')];
+        const {controller, setPlaylist} = createPlaybackController('sequence');
+
+        await controller.handleTrackPlayed(filteredTracks[1], 1, filteredTracks);
+
+        expect(setPlaylist).toHaveBeenCalledWith(filteredTracks, 1);
     });
 });
