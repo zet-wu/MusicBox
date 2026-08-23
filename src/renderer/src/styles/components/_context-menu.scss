@@ -50,6 +50,23 @@
   margin: var(--spacing-xs) 0;
 }
 
+.lyrics-context-menu {
+  min-width: 220px;
+
+  .context-menu-item {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.45;
+      background: transparent;
+    }
+  }
+}
+
 /* 歌单封面右键菜单样式 */
 .cover-context-menu {
   position: fixed;

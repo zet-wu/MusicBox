@@ -12,9 +12,9 @@ import type {AddLyricsDomListener} from "@ui/widgets/lyrics/LyricsDomEvents";
 import type {LyricsElements} from "@ui/widgets/lyrics/LyricsElementRegistry";
 import type {LyricsTrack} from "@ui/widgets/lyrics/LyricsTypes";
 import type {LyricsDocument} from '@/features/lyrics/domain/types';
-import {getLyricsSourcePicker} from '@/features/lyrics/ui/LyricsSourcePicker';
 import {LyricsTimelineAdjustController} from './LyricsTimelineAdjustController';
 import {desktopLyricsService} from '@/features/desktopLyrics/service/DesktopLyricsService';
+import {LyricsContextMenu} from './LyricsContextMenu';
 
 interface LyricsWidgetCompositionOptions {
     root: Element | null;
@@ -35,6 +35,7 @@ class LyricsWidgetComposition {
     private readonly lyricsView: AmllLyricsView;
     private readonly trackInfoController: LyricsTrackInfoController;
     private readonly timelineAdjustController: LyricsTimelineAdjustController;
+    private readonly contextMenu: LyricsContextMenu;
     private readonly addDomListener: AddLyricsDomListener;
     private readonly isVisible: () => boolean;
     private readonly getCurrentTrack: () => LyricsTrack | null;
@@ -49,6 +50,7 @@ class LyricsWidgetComposition {
         this.setCurrentTrack = options.setCurrentTrack;
         this.onClose = options.onClose;
         this.elements = resolveLyricsElements(options.root);
+        this.contextMenu = new LyricsContextMenu();
 
         this.coverArtController = new LyricsCoverArtController({
             background: this.elements.background,
@@ -118,6 +120,7 @@ class LyricsWidgetComposition {
                 this.playbackControls.updateDuration(duration);
             },
             onTrackChanged: (track) => {
+                this.contextMenu.hide();
                 this.setCurrentTrack(track);
                 return this.updateTrackAndPlaybackState(track);
             },
@@ -157,7 +160,10 @@ class LyricsWidgetComposition {
         this.addDomListener(this.elements.lyricsDisplay, 'contextmenu', event => {
             event.preventDefault();
             const track = this.getCurrentTrack();
-            if (track) void getLyricsSourcePicker().open(track);
+            if (track) {
+                const mouseEvent = event as MouseEvent;
+                this.contextMenu.show(mouseEvent.clientX, mouseEvent.clientY, track);
+            }
         });
 
         this.layoutController.bind();
@@ -168,6 +174,7 @@ class LyricsWidgetComposition {
     }
 
     resetAfterHide(): void {
+        this.contextMenu.hide();
         this.timelineAdjustController.setEditableDocument(null);
         this.trackInfoController.reset();
         this.lyricsLoader.reset();
@@ -180,6 +187,7 @@ class LyricsWidgetComposition {
     }
 
     destroy(): void {
+        this.contextMenu.destroy();
         this.playbackStateController.destroy();
         this.coverArtController.destroy();
         this.timelineAdjustController.destroy();
