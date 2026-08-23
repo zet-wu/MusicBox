@@ -22,6 +22,13 @@ export interface EmbeddedLyricsResult {
     error?: string;
 }
 
+export interface LyricsExportResult {
+    success: boolean;
+    filePath?: string;
+    cancelled?: boolean;
+    error?: string;
+}
+
 class LyricsGateway extends ElectronNamespaceAdapter<'lyrics'> {
     constructor() {
         super('lyrics');
@@ -63,6 +70,10 @@ class LyricsGateway extends ElectronNamespaceAdapter<'lyrics'> {
         error?: string;
     }> {
         return this.call('readCanonical', trackId);
+    }
+
+    exportTtml(defaultName: string, content: string): Promise<LyricsExportResult> {
+        return this.call('exportTtml', defaultName, content);
     }
 
     getBinding(trackId: string): Promise<{success: boolean; binding?: LyricsBinding | null; error?: string}> {

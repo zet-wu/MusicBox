@@ -434,7 +434,11 @@ export class Application {
             new ExtensionsController(extensionInstaller, extensionStorageService, this.windowManager),
             new CoversController(),
             new EqualizerPresetController(this.windowManager),
-            new LyricsController(networkFileAdapter, new LyricsPersistenceService(app.getPath('userData'))),
+            new LyricsController(
+                networkFileAdapter,
+                new LyricsPersistenceService(app.getPath('userData')),
+                this.windowManager
+            ),
             trayController,
             new HttpServerController()
         ];

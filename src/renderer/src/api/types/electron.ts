@@ -293,6 +293,12 @@ export interface ElectronLyricsAPI {
         ttml?: string;
         error?: string;
     }>;
+    exportTtml(defaultName: string, content: string): Promise<{
+        success: boolean;
+        filePath?: string;
+        cancelled?: boolean;
+        error?: string;
+    }>;
     getBinding(trackId: string): Promise<{success: boolean; binding?: LyricsBinding | null; error?: string}>;
     saveCanonical(
         trackId: string,

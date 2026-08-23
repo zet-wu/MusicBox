@@ -2,8 +2,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import {net} from 'electron';
+import {dialog, net} from 'electron';
 import {BaseController, Controller, IpcHandle} from '../decorators/IpcHandler';
+import {WindowManager} from '../core/WindowManager';
 import {extractEmbeddedLyrics, getMimeTypeFromExtension} from '../utils/metadata';
 import {generateLyricsSearchPatterns, findBestLyricsMatch} from '../utils/FileSearch';
 import {NetworkFileAdapter} from '../services/network/NetworkFileAdapter';
@@ -18,6 +19,18 @@ interface DirCache {
     expiresAt: number;
 }
 
+interface LyricsExportResult {
+    success: boolean;
+    filePath?: string;
+    cancelled?: boolean;
+    error?: string;
+}
+
+const TTML_FILTERS: Electron.FileFilter[] = [
+    {name: 'TTML 歌词', extensions: ['ttml']},
+    {name: '所有文件', extensions: ['*']}
+];
+
 const DIR_CACHE_TTL = 60_000; // 60 秒
 
 @Controller('lyrics')
@@ -27,7 +40,8 @@ export class LyricsController extends BaseController {
 
     constructor(
         private networkFileAdapter: NetworkFileAdapter,
-        private lyricsPersistence: LyricsPersistenceService
+        private lyricsPersistence: LyricsPersistenceService,
+        private windowManager: WindowManager
     ) {
         super();
     }
@@ -63,6 +77,31 @@ export class LyricsController extends BaseController {
             return {success: true, binding};
         } catch (error: any) {
             return {success: false, error: error.message};
+        }
+    }
+
+    @IpcHandle('lyrics:exportTtml')
+    async exportTtml(defaultName: string, content: string): Promise<LyricsExportResult> {
+        if (typeof content !== 'string' || content.trim().length === 0) {
+            return {success: false, error: '没有可保存的 TTML 歌词'};
+        }
+
+        try {
+            const win = this.windowManager.getMainWindow();
+            const result = await dialog.showSaveDialog(win as any, {
+                title: '保存 TTML 歌词',
+                defaultPath: this.createTtmlFileName(defaultName),
+                filters: TTML_FILTERS
+            });
+
+            if (result.canceled || !result.filePath) {
+                return {success: false, cancelled: true};
+            }
+
+            await fs.promises.writeFile(result.filePath, content, 'utf-8');
+            return {success: true, filePath: result.filePath};
+        } catch (error) {
+            return {success: false, error: error instanceof Error ? error.message : String(error)};
         }
     }
 
@@ -237,6 +276,14 @@ export class LyricsController extends BaseController {
         } catch (error: any) {
             return {success: false, error: error.message};
         }
+    }
+
+    private createTtmlFileName(defaultName: string): string {
+        const safeName = (defaultName || 'lyrics')
+            .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+            .replace(/[. ]+$/g, '')
+            .trim() || 'lyrics';
+        return safeName.toLowerCase().endsWith('.ttml') ? safeName : `${safeName}.ttml`;
     }
 }
 
