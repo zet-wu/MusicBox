@@ -187,6 +187,10 @@ export class PlaybackQueue {
         return true;
     }
 
+    getIndexByQueueId(queueId: string): number {
+        return this.entries.findIndex((entry) => entry.queueId === queueId);
+    }
+
     getNextIndex(reason: QueueAdvanceReason): number {
         if (this.entries.length === 0) {
             return -1;
@@ -267,7 +271,7 @@ export class PlaybackQueue {
         if (!this.currentQueueId) {
             return -1;
         }
-        return this.entries.findIndex((entry) => entry.queueId === this.currentQueueId);
+        return this.getIndexByQueueId(this.currentQueueId);
     }
 
     getCurrentEntry(): QueueEntry | null {

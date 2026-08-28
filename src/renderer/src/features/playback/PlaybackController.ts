@@ -95,6 +95,10 @@ class PlaybackController {
         return await playbackService.setPlaylist(tracks, startIndex);
     }
 
+    async playQueueEntry(queueId: string): Promise<boolean> {
+        return await playbackService.playQueueEntry(queueId);
+    }
+
     async appendToQueue(tracks: Track[]): Promise<QueueMutationResult> {
         return await playbackService.appendToQueue(tracks);
     }

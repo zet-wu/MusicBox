@@ -80,4 +80,30 @@ describe('歌单描述编辑', () => {
         expect(updatePlaylistDetailInfo).not.toHaveBeenCalled();
         expect(refreshNavigationPlaylists).not.toHaveBeenCalled();
     });
+
+    it('播放队列双击使用 queueId 激活已有队列项', async () => {
+        const playQueueEntry = vi.fn().mockResolvedValue(true);
+        const controller = new PlaylistController({
+            app: {currentView: 'home'},
+            playback: {playQueueEntry},
+            ui: {}
+        } as any);
+
+        await controller.handlePlaylistTrackPlayed({title: '队列歌曲'} as any, 2, 'queue-2');
+
+        expect(playQueueEntry).toHaveBeenCalledWith('queue-2');
+    });
+
+    it('缺少 queueId 的播放队列双击不会退回为重建播放列表', async () => {
+        const playQueueEntry = vi.fn().mockResolvedValue(true);
+        const controller = new PlaylistController({
+            app: {currentView: 'home'},
+            playback: {playQueueEntry},
+            ui: {}
+        } as any);
+
+        await controller.handlePlaylistTrackPlayed({title: '队列歌曲'} as any, 2);
+
+        expect(playQueueEntry).not.toHaveBeenCalled();
+    });
 });

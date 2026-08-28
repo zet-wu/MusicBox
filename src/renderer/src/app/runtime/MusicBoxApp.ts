@@ -506,8 +506,8 @@ export class MusicBoxApp extends EventEmitter {
         this.playlistController.handlePlaylistTrackSelected(track, _index);
     }
 
-    async handlePlaylistTrackPlayed(track: Track, index: number): Promise<void> {
-        await this.playlistController.handlePlaylistTrackPlayed(track, index);
+    async handlePlaylistTrackPlayed(track: Track, index: number, queueId?: string): Promise<void> {
+        await this.playlistController.handlePlaylistTrackPlayed(track, index, queueId);
     }
 
     async handlePlaylistTrackRemoved(track: Track, index: number): Promise<void> {

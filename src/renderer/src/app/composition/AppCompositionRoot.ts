@@ -237,6 +237,7 @@ export function createAppComposition({
     const playlistController = new PlaylistController({
         app: hostPorts.playlist,
         playback: {
+            playQueueEntry: (queueId) => playbackController.playQueueEntry(queueId),
             setPlaylist: (tracks, startIndex) => playbackController.setPlaylist(tracks, startIndex),
             appendToQueue: (tracks) => playbackController.appendToQueue(tracks),
             playNext: (tracks) => playbackController.playNext(tracks),

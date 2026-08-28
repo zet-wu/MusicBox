@@ -140,4 +140,22 @@ describe('PlaybackQueue', () => {
         expect(queue.getNextIndex('track-ended')).toBe(0);
         expect(queue.getNextIndex('manual-next')).toBe(1);
     });
+
+    it('按 queueId 激活已有队列项时保持队列身份并从该项继续推进', () => {
+        const queue = createQueue();
+        const tracks = ['a', 'b', 'c', 'd'].map(createTrack);
+        queue.replaceQueue(tracks, {startIndex: 0});
+        const initialSnapshot = queue.getSnapshot();
+        const targetQueueId = initialSnapshot.entries[2].queueId;
+
+        const targetIndex = queue.getIndexByQueueId(targetQueueId);
+        expect(targetIndex).toBe(2);
+        expect(queue.commitCurrentIndex(targetIndex)).toBe(true);
+
+        expect(queue.getSnapshot().entries.map((entry) => entry.queueId)).toEqual(
+            initialSnapshot.entries.map((entry) => entry.queueId)
+        );
+        expect(queue.getSnapshot().currentQueueId).toBe(targetQueueId);
+        expect(queue.getNextIndex('manual-next')).toBe(3);
+    });
 });

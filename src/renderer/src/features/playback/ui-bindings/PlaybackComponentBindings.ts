@@ -33,7 +33,7 @@ export interface PlaybackComponentBindingHost {
     handleTrackPlayed(track: Track, index: number, tracks?: Track[]): Promise<void>;
     handleTrackIndexChanged(index: number): void;
     handlePlaylistTrackSelected(track: Track, index: number): void;
-    handlePlaylistTrackPlayed(track: Track, index: number): Promise<void>;
+    handlePlaylistTrackPlayed(track: Track, index: number, queueId?: string): Promise<void>;
     handlePlaylistTrackRemoved(track: Track, index: number): Promise<void>;
     handlePlaylistCleared(): Promise<void>;
     addToPlaylist(track: Track): void | Promise<void>;
@@ -56,6 +56,10 @@ interface PlaybackComponentBindingContext {
 interface TrackEventPayload {
     track: Track;
     index: number;
+}
+
+interface PlaylistTrackEventPayload extends TrackEventPayload {
+    queueId?: string;
 }
 
 interface ContextMenuPayload extends TrackEventPayload {
@@ -86,8 +90,8 @@ export function bindPlaybackComponentEvents({
         app.handlePlaylistTrackSelected(track, index);
     });
 
-    components.playlist.on('trackPlayed', async ({track, index}: TrackEventPayload) => {
-        await app.handlePlaylistTrackPlayed(track, index);
+    components.playlist.on('trackPlayed', async ({track, index, queueId}: PlaylistTrackEventPayload) => {
+        await app.handlePlaylistTrackPlayed(track, index, queueId);
     });
 
     components.playlist.on('trackRemoved', async ({track, index}: TrackEventPayload) => {

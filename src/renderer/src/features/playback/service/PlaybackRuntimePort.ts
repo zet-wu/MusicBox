@@ -49,6 +49,7 @@ export interface PlaybackRuntimePort {
     setVolume(volume: number): Promise<boolean>;
     setPosition(position: number): Promise<boolean>;
     setPlaylist(tracks: Track[], startIndex?: number): Promise<boolean>;
+    playQueueEntry(queueId: string): Promise<boolean>;
     appendToQueue(tracks: Track[]): Promise<QueueMutationResult>;
     playNext(tracks: Track[]): Promise<QueueMutationResult>;
     moveQueueEntry(queueId: string, targetIndex: number): boolean;

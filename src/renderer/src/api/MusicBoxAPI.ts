@@ -581,6 +581,63 @@ export class MusicBoxAPI extends EventEmitter {
         }
     }
 
+    async playQueueEntry(queueId: string): Promise<boolean> {
+        if (this._trackSwitchLock) {
+            return false;
+        }
+
+        const targetIndex = this.queue.getIndexByQueueId(queueId);
+        const queueTracks = this.queue.getTracks();
+        const targetTrack = queueTracks[targetIndex];
+        if (!targetTrack) {
+            console.warn(`⚠️ API: 找不到播放队列项: ${queueId}`);
+            return false;
+        }
+
+        const targetFilePath = this.getTrackFilePath(targetTrack);
+        if (!targetFilePath) {
+            console.warn(`⚠️ API: 播放队列项缺少文件路径: ${queueId}`);
+            return false;
+        }
+
+        this._trackSwitchLock = true;
+        try {
+            const playlistChanged = !this.hasSameTrackOrder(this.playlist, queueTracks);
+            if (this.audioEngine) {
+                if (!this.audioEngine.setPlaylist(queueTracks, targetIndex)) {
+                    return false;
+                }
+            } else if (!await audioGateway.setPlaylist(queueTracks)) {
+                return false;
+            }
+
+            const previousIndex = this.currentIndex;
+            this.playlist = queueTracks;
+            this.queue.commitCurrentIndex(targetIndex);
+            this.currentIndex = targetIndex;
+
+            if (playlistChanged) {
+                this.emit('playlistChanged', queueTracks);
+            }
+            if (previousIndex !== targetIndex) {
+                this.emit('trackIndexChanged', targetIndex);
+            }
+
+            const loaded = await this.loadTrack(targetFilePath);
+            if (!loaded) {
+                return false;
+            }
+
+            this.saveCurrentPlaybackState();
+            return await this.play();
+        } catch (error) {
+            console.error('❌ API: 播放队列项失败:', error);
+            return false;
+        } finally {
+            this._trackSwitchLock = false;
+        }
+    }
+
     async nextTrack(reason: QueueAdvanceReason = 'manual-next'): Promise<boolean> {
         try {
             // 防止快速切换时的竞态条件

@@ -110,6 +110,10 @@ export class PlaybackService {
         return await playbackApiAdapter.setPlaylist(tracks, startIndex);
     }
 
+    async playQueueEntry(queueId: string): Promise<boolean> {
+        return await playbackApiAdapter.playQueueEntry(queueId);
+    }
+
     async appendToQueue(tracks: Track[]): Promise<QueueMutationResult> {
         return await playbackApiAdapter.appendToQueue(tracks);
     }

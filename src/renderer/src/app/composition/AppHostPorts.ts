@@ -68,7 +68,7 @@ export interface MusicBoxCompositionHost {
     handlePlaylistCreated(playlist?: Playlist): Promise<void>;
     handlePlaylistRenamed(playlist?: Playlist): Promise<void>;
     handlePlaylistSelected(playlist: Playlist): Promise<void>;
-    handlePlaylistTrackPlayed(track: Track, index: number): Promise<void>;
+    handlePlaylistTrackPlayed(track: Track, index: number, queueId?: string): Promise<void>;
     handlePlaylistTrackRemoved(track: Track, index: number): Promise<void>;
     handlePlaylistTrackSelected(track: Track, index: number): void;
     handlePlaylistUpdated(playlist?: Playlist): Promise<void>;
@@ -290,7 +290,7 @@ export function createAppHostPorts(app: MusicBoxCompositionHost): AppHostPorts {
             handleTrackPlayed: (track, index, tracks) => app.handleTrackPlayed(track, index, tracks),
             handleTrackIndexChanged: (index) => app.handleTrackIndexChanged(index),
             handlePlaylistTrackSelected: (track, index) => app.handlePlaylistTrackSelected(track, index),
-            handlePlaylistTrackPlayed: (track, index) => app.handlePlaylistTrackPlayed(track, index),
+            handlePlaylistTrackPlayed: (track, index, queueId) => app.handlePlaylistTrackPlayed(track, index, queueId),
             handlePlaylistTrackRemoved: (track, index) => app.handlePlaylistTrackRemoved(track, index),
             handlePlaylistCleared: () => app.handlePlaylistCleared(),
             addToPlaylist: (track) => app.addToPlaylist(track),

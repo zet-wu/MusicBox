@@ -25,6 +25,7 @@ interface PlaylistUI {
 }
 
 interface PlaylistPlaybackIntegrations {
+    playQueueEntry(queueId: string): Promise<boolean>;
     setPlaylist(tracks: Track[], startIndex?: number): Promise<boolean>;
     appendToQueue(tracks: Track[]): Promise<QueueMutationResult>;
     playNext(tracks: Track[]): Promise<QueueMutationResult>;
@@ -48,8 +49,16 @@ export class PlaylistController {
         console.log('🎵 播放列表选择歌曲:', track.title);
     }
 
-    async handlePlaylistTrackPlayed(track: Track, index: number): Promise<void> {
-        await this.app.playTrackFromPlaylist(track, index);
+    async handlePlaylistTrackPlayed(_track: Track, _index: number, queueId?: string): Promise<void> {
+        if (!queueId) {
+            console.warn('⚠️ 播放队列项缺少 queueId，已取消播放请求');
+            return;
+        }
+
+        const played = await this.playback.playQueueEntry(queueId);
+        if (!played) {
+            console.warn(`⚠️ 播放队列项失败或已失效: ${queueId}`);
+        }
     }
 
     async handlePlaylistTrackRemoved(_track: Track, index: number): Promise<void> {
