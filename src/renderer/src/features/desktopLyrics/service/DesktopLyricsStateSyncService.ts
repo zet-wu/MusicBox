@@ -21,6 +21,7 @@ export interface DesktopLyricsStateSyncOptions {
 export class DesktopLyricsStateSyncService {
     private readonly getCurrentState: () => CurrentDesktopLyricsState;
     private readonly getCurrentSettings: () => MusicBoxSettings;
+    private lyricsLoadController: AbortController | null = null;
 
     constructor({getCurrentState, getCurrentSettings}: DesktopLyricsStateSyncOptions) {
         this.getCurrentState = getCurrentState;
@@ -54,10 +55,10 @@ export class DesktopLyricsStateSyncService {
         }
     }
 
-    async loadLyricsForDesktop(track: Track): Promise<void> {
+    async loadLyricsForDesktop(track: Track, signal: AbortSignal = new AbortController().signal): Promise<void> {
         try {
-            const result = await getLyricsService().load(track, new AbortController().signal);
-            if (result.document?.render.lines.length) {
+            const result = await getLyricsService().load(track, signal);
+            if (!signal.aborted && result.document?.render.lines.length) {
                 await this.syncToDesktopLyrics('lyrics', result.document.render.lines);
                 console.log(`🎵 loadLyricsForDesktop: canonical 歌词已同步`);
             }
@@ -94,9 +95,12 @@ export class DesktopLyricsStateSyncService {
     }
 
     private async syncTrack(track: Track | null): Promise<void> {
+        this.lyricsLoadController?.abort();
+        const controller = new AbortController();
+        this.lyricsLoadController = controller;
         await desktopLyricsGateway.updateTrack(track);
-        if (track && track.title && track.artist) {
-            await this.loadLyricsForDesktop(track);
+        if (!controller.signal.aborted && track && track.title && track.artist) {
+            void this.loadLyricsForDesktop(track, controller.signal);
         }
     }
 }
