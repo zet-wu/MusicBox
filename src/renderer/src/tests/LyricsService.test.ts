@@ -189,6 +189,37 @@ describe('LyricsService', () => {
         expect(provider.search).not.toHaveBeenCalled();
     });
 
+    it.each(['Line', 'Word'])('自动绑定的在线 %s 歌词再次播放时直接使用 canonical 缓存', async timingMode => {
+        const binding = {
+            trackId: 'track-1', canonicalTtmlPath: 'canonical.ttml', source,
+            selectionMode: 'auto' as const, updatedAt: 1
+        };
+        const cachedDocument = {...document, ttml: {metadata: {timingMode}, lines: []}};
+        gateway.readCanonical.mockResolvedValue({success: true, ttml: '<tt/>', binding});
+        const provider = {
+            id: 'test', displayName: 'Test',
+            search: vi.fn().mockResolvedValue([]), fetch: vi.fn()
+        };
+        const registry = new LyricsProviderRegistry();
+        registry.register(provider);
+        const service = new LyricsService({
+            providers: registry,
+            localSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            embeddedSource: {find: vi.fn().mockResolvedValue(null)} as never,
+            normalizer: {fromTtml: vi.fn(() => cachedDocument)} as never
+        });
+
+        const result = await service.load(track, new AbortController().signal);
+        const replayResult = await service.load(track, new AbortController().signal);
+
+        expect(provider.search).not.toHaveBeenCalled();
+        expect(provider.fetch).not.toHaveBeenCalled();
+        expect(result).toEqual({document: cachedDocument, binding});
+        expect(replayResult).toEqual({document: cachedDocument, binding});
+        expect(gateway.readCanonical).toHaveBeenCalledTimes(2);
+        expect(gateway.saveCanonical).not.toHaveBeenCalled();
+    });
+
     it('手动应用候选后保存 canonical TTML 与 manual provenance', async () => {
         const provider = {
             id: 'test',

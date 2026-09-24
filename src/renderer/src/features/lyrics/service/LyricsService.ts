@@ -53,7 +53,7 @@ export class LyricsService {
 
     async load(track: Track, signal: AbortSignal): Promise<LyricsLoadResult> {
         const query = toTrackLyricsQuery(track);
-        let fallback: {document: LyricsDocument; binding?: LyricsBinding; needsPersistence: boolean} | null = null;
+        let fallback: LyricsDocument | null = null;
         const persisted = await lyricsGateway.readCanonical(query.trackId);
         if (persisted.success && persisted.ttml && persisted.binding) {
             try {
@@ -61,10 +61,7 @@ export class LyricsService {
                     persisted.ttml,
                     this.createContext(query, persisted.binding.source)
                 );
-                if (isManualBinding(persisted.binding) || isWordTimed(document)) {
-                    return {document, binding: persisted.binding};
-                }
-                fallback = {document, binding: persisted.binding, needsPersistence: false};
+                return {document, binding: persisted.binding};
             } catch (error) {
                 console.warn('⚠️ Lyrics: 已持久化 TTML 无效，将重新匹配', error);
             }
@@ -77,7 +74,7 @@ export class LyricsService {
                 ? this.normalizer.fromTtml(local.content, this.createContext(query, source))
                 : this.normalizer.fromLrc(local.content, this.createContext(query, source));
             if (isWordTimed(document)) return this.persist(query.trackId, document, 'auto');
-            fallback ??= {document, needsPersistence: true};
+            fallback ??= document;
         }
 
         const embedded = await this.embeddedSource.find(query);
@@ -85,10 +82,11 @@ export class LyricsService {
             const source: LyricsSourceRef = {kind: 'embedded', trackId: query.trackId};
             const document = this.normalizer.fromPayload(embedded, this.createContext(query, source));
             if (isWordTimed(document)) return this.persist(query.trackId, document, 'auto');
-            fallback ??= {document, needsPersistence: true};
+            fallback ??= document;
         }
 
         const searchResults = await new LyricsSearchService(this.providers).searchAll(query, signal);
+        if (signal.aborted) throw signal.reason;
         const candidates = searchResults
             .flatMap(result => result.candidates.slice(0, 2))
             .filter(candidate => candidate.identityScore >= AUTO_MATCH_IDENTITY_THRESHOLD)
@@ -107,11 +105,7 @@ export class LyricsService {
             }
         }
 
-        if (fallback) {
-            return fallback.needsPersistence
-                ? this.persist(query.trackId, fallback.document, 'auto')
-                : {document: fallback.document, binding: fallback.binding};
-        }
+        if (fallback) return this.persist(query.trackId, fallback, 'auto');
         if (onlineLineTimed) return this.persist(query.trackId, onlineLineTimed, 'auto');
         return {document: null, error: '未找到歌词'};
     }
@@ -289,10 +283,6 @@ export class LyricsService {
             album: query.album
         };
     }
-}
-
-function isManualBinding(binding: LyricsBinding): boolean {
-    return binding.selectionMode === 'manual';
 }
 
 function isWordTimed(document: LyricsDocument): boolean {
