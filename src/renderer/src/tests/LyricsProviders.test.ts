@@ -25,6 +25,16 @@ function toBase64(value: string): string {
     return btoa(binary);
 }
 
+function isQqSearchRequest(init?: RequestInit): boolean {
+    return Boolean(init?.body && JSON.parse(String(init.body))['music.search.SearchCgiService']);
+}
+
+function qqSearchResponse() {
+    return jsonResponse({code: 0, 'music.search.SearchCgiService': {code: 0, data: {body: {song: {list: [{
+        mid: 'mid', id: 123, name: 'Song', singer: [{name: 'Artist'}], album: {name: 'Album'}, interval: 180
+    }]}}}}});
+}
+
 describe('bundled lyrics providers', () => {
     it('AMLL 搜索 metadata 并延迟获取完整 TTML', async () => {
         const request = vi.fn(async (input: RequestInfo | URL) => {
@@ -65,8 +75,8 @@ describe('bundled lyrics providers', () => {
     });
 
     it('QQ 返回 QRC 及 companion tracks', async () => {
-        const request = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => String(input).includes('client_search')
-            ? jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}], interval: 180}]}}})
+        const request = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => isQqSearchRequest(init)
+            ? qqSearchResponse()
             : jsonResponse({code: 0, req_0: {code: 0, data: {
                 qrc: 1,
                 lyric: toBase64('<LyricInfo LyricContent="[0,100]S(0,100)"/>'),
@@ -77,6 +87,18 @@ describe('bundled lyrics providers', () => {
         const signal = new AbortController().signal;
         const candidates = await provider.search(query, signal);
 
+        expect(candidates[0]).toMatchObject({candidateId: 'mid', title: 'Song', artists: ['Artist'], album: 'Album', durationMs: 180_000});
+        expect(candidates[0].providerData).toEqual({songmid: 'mid', songid: 123});
+        expect(String(request.mock.calls[0][0])).toBe('https://u.y.qq.com/cgi-bin/musicu.fcg');
+        expect(request.mock.calls[0][1]?.method).toBe('POST');
+        expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+            'music.search.SearchCgiService': {
+                module: 'music.search.SearchCgiService',
+                method: 'DoSearchForQQMusicDesktop',
+                param: {query: 'Song Artist', search_type: 0, page_num: 1, num_per_page: 20}
+            }
+        });
+
         await expect(provider.fetch(candidates[0], signal)).resolves.toMatchObject({
             kind: 'qrc',
             lyrics: '[0,100]S(0,100)',
@@ -86,13 +108,17 @@ describe('bundled lyrics providers', () => {
         expect(new Headers(request.mock.calls[1][1]?.headers).get('referer')).toBe('https://y.qq.com/');
     });
 
+    it('QQ 搜索业务错误应报告失败', async () => {
+        const request = vi.fn(async () => jsonResponse({code: 0, 'music.search.SearchCgiService': {code: 2001}}));
+        const provider = new QqMusicLyricsProvider(request);
+
+        await expect(provider.search(query, new AbortController().signal)).rejects.toThrow('2001');
+    });
+
     it('QQ 仅在 musicu 成功响应无歌词时回退网页 LRC 接口', async () => {
-        const request = vi.fn(async (input: RequestInfo | URL) => {
-            const url = String(input);
-            if (url.includes('client_search')) {
-                return jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}]}]}}});
-            }
-            if (url.includes('musicu.fcg')) return jsonResponse({code: 0, req_0: {code: 0, data: null}});
+        const request = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            if (isQqSearchRequest(init)) return qqSearchResponse();
+            if (String(input).includes('musicu.fcg')) return jsonResponse({code: 0, req_0: {code: 0, data: null}});
             return jsonResponse({lyric: '[00:00.000]Song'});
         });
         const provider = new QqMusicLyricsProvider(request);
@@ -108,11 +134,8 @@ describe('bundled lyrics providers', () => {
 
     it('QQ musicu 业务错误重试后仍优先返回 QRC', async () => {
         let musicuAttempts = 0;
-        const request = vi.fn(async (input: RequestInfo | URL) => {
-            const url = String(input);
-            if (url.includes('client_search')) {
-                return jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}]}]}}});
-            }
+        const request = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+            if (isQqSearchRequest(init)) return qqSearchResponse();
             musicuAttempts++;
             return musicuAttempts === 1
                 ? jsonResponse({code: 0, req_0: {code: 24001}})
@@ -131,8 +154,8 @@ describe('bundled lyrics providers', () => {
     });
 
     it('QQ musicu 持续受限时不伪装成 LRC 降级', async () => {
-        const request = vi.fn(async (input: RequestInfo | URL) => String(input).includes('client_search')
-            ? jsonResponse({data: {song: {list: [{songmid: 'mid', songname: 'Song', singer: [{name: 'Artist'}]}]}}})
+        const request = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => isQqSearchRequest(init)
+            ? qqSearchResponse()
             : jsonResponse({code: 0, req_0: {code: 24001}}));
         const provider = new QqMusicLyricsProvider(request);
         const signal = new AbortController().signal;

@@ -4,16 +4,20 @@ import type {LyricsProvider} from '../LyricsProvider';
 import {decodeBase64Text, fetchJson, providerFetch, rankProviderCandidates, type LyricsFetch} from './shared';
 
 interface QqSong {
-    songmid: string;
-    songid?: number;
-    songname: string;
+    mid: string;
+    id?: number;
+    name: string;
     singer?: Array<{name: string}>;
-    albumname?: string;
+    album?: {name?: string};
     interval?: number;
 }
 
 interface QqSearchResponse {
-    data?: {song?: {list?: QqSong[]}};
+    code?: number;
+    'music.search.SearchCgiService'?: {
+        code?: number;
+        data?: {body?: {song?: {list?: QqSong[]}}};
+    };
 }
 
 interface QqLyricResponse {
@@ -44,36 +48,37 @@ export class QqMusicLyricsProvider implements LyricsProvider {
     constructor(private readonly request: LyricsFetch = providerFetch) {}
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
-        const url = new URL('https://c.y.qq.com/soso/fcgi-bin/client_search_cp');
-        url.search = new URLSearchParams({
-            format: 'json',
-            outCharset: 'utf-8',
-            ct: '24',
-            qqmusic_ver: '1298',
-            remoteplace: 'txt.yqq.song',
-            t: '0',
-            aggr: '1',
-            cr: '1',
-            lossless: '0',
-            flag_qc: '0',
-            platform: 'yqq.json',
-            w: [query.title, ...query.artists].join(' '),
-            p: '1',
-            n: '20'
-        }).toString();
-        const response = await fetchJson<QqSearchResponse>(this.request, url.toString(), signal, {
-            headers: qqHeaders('https://y.qq.com/')
+        const body = {
+            'music.search.SearchCgiService': {
+                module: 'music.search.SearchCgiService',
+                method: 'DoSearchForQQMusicDesktop',
+                param: {
+                    query: [query.title, ...query.artists].join(' '),
+                    search_type: 0,
+                    page_num: 1,
+                    num_per_page: 20
+                }
+            }
+        };
+        const response = await fetchJson<QqSearchResponse>(this.request, 'https://u.y.qq.com/cgi-bin/musicu.fcg', signal, {
+            method: 'POST',
+            headers: {...qqHeaders('https://y.qq.com/'), 'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
         });
+        const search = response['music.search.SearchCgiService'];
+        if (response.code !== 0 || search?.code !== 0) {
+            throw new Error(`QQ musicu 搜索请求失败: ${search?.code ?? response.code ?? -1}`);
+        }
 
-        return rankProviderCandidates(query, (response.data?.song?.list ?? []).map(song => ({
+        return rankProviderCandidates(query, (search.data?.body?.song?.list ?? []).filter(song => song.mid).map(song => ({
             providerId: this.id,
-            candidateId: song.songmid,
-            title: song.songname,
+            candidateId: song.mid,
+            title: song.name,
             artists: song.singer?.map(artist => artist.name) ?? [],
-            album: song.albumname,
+            album: song.album?.name,
             durationMs: song.interval ? song.interval * 1000 : undefined,
             capabilities: {lineTimed: true, wordTimed: true, translation: true, romanization: true},
-            providerData: {songmid: song.songmid, songid: song.songid} satisfies QqProviderData
+            providerData: {songmid: song.mid, songid: song.id} satisfies QqProviderData
         })));
     }
 
