@@ -93,15 +93,7 @@ export class NetworkController extends BaseController {
     async testConnection(config: any): Promise<boolean> {
         try {
             if (config.type === 'smb') {
-                const SMB2 = require('node-smb2');
-                const smbClient = new SMB2({
-                    share: `\\\\${config.host}\\${config.share}`,
-                    domain: config.domain || 'WORKGROUP',
-                    username: config.username,
-                    password: config.password,
-                    autoCloseTimeout: 0
-                });
-                await (this.networkDriveManager as any).testSMBConnection(smbClient);
+                await this.networkDriveManager.testSMBConnection(config as SMBConfig);
                 return true;
             } else if (config.type === 'webdav') {
                 const {createClient} = require('webdav');

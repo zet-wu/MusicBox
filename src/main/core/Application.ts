@@ -472,7 +472,7 @@ export class Application {
 
             // 清理网络磁盘
             if (this.container.isInstantiated('networkDriveManager')) {
-                this.container.getSync<any>('networkDriveManager').cleanup();
+                await this.container.getSync<any>('networkDriveManager').cleanup();
             }
 
             // 注销所有控制器

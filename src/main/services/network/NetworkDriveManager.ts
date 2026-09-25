@@ -4,9 +4,9 @@ import {EventEmitter} from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import {app} from 'electron';
-import SMB2 from 'node-smb2';
 import {WebDAVClient, createClient} from 'webdav';
 import {getGlobalDriveRegistry} from './DriveRegistry';
+import {SMBDriveClient} from './SMBDriveClient';
 
 export interface SMBConfig {
     id: string;
@@ -32,12 +32,9 @@ export interface WebDAVConfig {
 
 export type DriveConfig = SMBConfig | WebDAVConfig;
 
-export interface DriveInfo {
-    type: 'smb' | 'webdav';
-    config: DriveConfig;
-    client: SMB2 | WebDAVClient;
-    mountTime: number;
-}
+export type DriveInfo =
+    | {type: 'smb'; config: SMBConfig; client: SMBDriveClient; mountTime: number}
+    | {type: 'webdav'; config: WebDAVConfig; client: WebDAVClient; mountTime: number};
 
 export interface ConnectionStatus {
     connected: boolean;
@@ -104,18 +101,8 @@ export class NetworkDriveManager extends EventEmitter {
     }
 
     async mountSMB(config: SMBConfig): Promise<boolean> {
-        const SMB2Cls = require('node-smb2') as typeof SMB2;
         try {
-            const smbConfig = {
-                share: `\\\\${config.host}\\${config.share}`,
-                domain: config.domain || 'WORKGROUP',
-                username: config.username,
-                password: config.password,
-                autoCloseTimeout: 0
-            };
-
-            const smbClient = new SMB2Cls(smbConfig);
-            await this.testSMBConnection(smbClient);
+            const smbClient = await SMBDriveClient.connect(config);
 
             this.mountedDrives.set(config.id, {
                 type: 'smb',
@@ -129,6 +116,12 @@ export class NetworkDriveManager extends EventEmitter {
                 lastCheck: Date.now(),
                 reconnectAttempts: 0
             });
+
+            this.driveConfigs.set(config.id, config);
+            if (!this.isLoadingState) {
+                await getGlobalDriveRegistry().registerDrive(config.id, config as unknown as import('./DriveRegistry').DriveConfig);
+                await this.saveDriveState();
+            }
 
             this.emit('driveConnected', config.id, config);
             this.startConnectionMonitoring(config.id);
@@ -207,6 +200,9 @@ export class NetworkDriveManager extends EventEmitter {
             this.mountedDrives.delete(driveId);
             this.connectionStatus.delete(driveId);
             this.driveConfigs.delete(driveId);
+            if (driveInfo.type === 'smb') {
+                await driveInfo.client.close().catch(error => console.warn('⚠️ SMB连接关闭失败:', error));
+            }
 
             try {
                 const globalRegistry = getRegistry();
@@ -224,13 +220,9 @@ export class NetworkDriveManager extends EventEmitter {
         }
     }
 
-    private async testSMBConnection(smbClient: SMB2): Promise<void> {
-        return new Promise((resolve, reject) => {
-            smbClient.readdir('', (err) => {
-                if (err) reject(new Error(`SMB连接测试失败: ${err.message}`));
-                else resolve();
-            });
-        });
+    async testSMBConnection(config: SMBConfig): Promise<void> {
+        const client = await SMBDriveClient.connect(config);
+        await client.close();
     }
 
     private async testWebDAVConnection(webdavClient: WebDAVClient): Promise<void> {
@@ -303,9 +295,9 @@ export class NetworkDriveManager extends EventEmitter {
 
         try {
             if (driveInfo.type === 'smb') {
-                await this.testSMBConnection(driveInfo.client as SMB2);
+                await driveInfo.client.probe();
             } else if (driveInfo.type === 'webdav') {
-                await this.testWebDAVConnection(driveInfo.client as WebDAVClient);
+                await this.testWebDAVConnection(driveInfo.client);
             }
 
             if (!status.connected) {
@@ -339,17 +331,10 @@ export class NetworkDriveManager extends EventEmitter {
 
         try {
             if (driveInfo.type === 'smb') {
-                const SMB2Cls = require('node-smb2') as typeof SMB2;
-                const cfg = driveInfo.config as SMBConfig;
-                const smbConfig = {
-                    share: `\\\\${cfg.host}\\${cfg.share}`,
-                    domain: cfg.domain || 'WORKGROUP',
-                    username: cfg.username,
-                    password: cfg.password,
-                    autoCloseTimeout: 0
-                };
-                driveInfo.client = new SMB2Cls(smbConfig);
-                await this.testSMBConnection(driveInfo.client as SMB2);
+                const replacement = await SMBDriveClient.connect(driveInfo.config);
+                const previous = driveInfo.client;
+                driveInfo.client = replacement;
+                await previous.close().catch(error => console.warn('⚠️ SMB旧连接关闭失败:', error));
             } else if (driveInfo.type === 'webdav') {
                 const cfg = driveInfo.config as WebDAVConfig;
                 driveInfo.client = createClient(cfg.url, {
@@ -456,7 +441,7 @@ export class NetworkDriveManager extends EventEmitter {
             if (config.type === 'webdav') {
                 return await this.mountWebDAVDirect(config as WebDAVConfig);
             }
-            return false;
+            return await this.mountSMB(config);
         } catch (error) {
             console.error(`❌ 从状态重新挂载驱动器失败 ${driveId}:`, error);
             return false;
@@ -480,7 +465,7 @@ export class NetworkDriveManager extends EventEmitter {
             let config = this.driveConfigs.get(driveId);
             if (config) {
                 if (config.type === 'webdav') return this.mountWebDAVDirect(config as WebDAVConfig);
-                return false;
+                return this.mountSMB(config);
             }
 
             const globalRegistry = getGlobalDriveRegistry();
@@ -489,7 +474,7 @@ export class NetworkDriveManager extends EventEmitter {
                 const typedConfig = regConfig as unknown as DriveConfig;
                 this.driveConfigs.set(driveId, typedConfig);
                 if (typedConfig.type === 'webdav') return this.mountWebDAVDirect(typedConfig as WebDAVConfig);
-                return false;
+                return this.mountSMB(typedConfig);
             }
 
             console.error(`❌ 找不到驱动器配置: ${driveId}`);
@@ -499,10 +484,15 @@ export class NetworkDriveManager extends EventEmitter {
         }
     }
 
-    cleanup(): void {
+    async cleanup(): Promise<void> {
         for (const driveId of this.reconnectTimers.keys()) {
             this.stopConnectionMonitoring(driveId);
         }
+        await Promise.all(Array.from(this.mountedDrives.values()).map(async drive => {
+            if (drive.type === 'smb') {
+                await drive.client.close().catch(error => console.warn('⚠️ SMB连接关闭失败:', error));
+            }
+        }));
         this.mountedDrives.clear();
         this.connectionStatus.clear();
         this.reconnectTimers.clear();

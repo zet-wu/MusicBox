@@ -1,9 +1,9 @@
 // 网络文件系统适配器
 
 import * as path from 'path';
-import SMB2 from 'node-smb2';
 import {WebDAVClient, FileStat} from 'webdav';
 import {NetworkDriveManager} from './NetworkDriveManager';
+import {SMBDriveClient} from './SMBDriveClient';
 
 interface PathMapping {
     originalPath: string;
@@ -164,24 +164,19 @@ export class NetworkFileAdapter {
 
         try {
             if (driveInfo.type === 'smb') {
-                return this.readSMBFile(driveInfo.client as SMB2, relativePath);
+                return this.readSMBFile(driveInfo.client, relativePath);
             } else if (driveInfo.type === 'webdav') {
                 return this.readWebDAVFile(driveInfo.client as WebDAVClient, relativePath);
             }
-            throw new Error(`不支持的网络磁盘类型: ${driveInfo.type}`);
+            throw new Error('不支持的网络磁盘类型');
         } catch (error) {
             console.error(`❌ NetworkFileAdapter: 读取网络文件失败 ${networkPath}:`, error);
             throw error;
         }
     }
 
-    private readSMBFile(smbClient: SMB2, filePath: string): Promise<Buffer> {
-        return new Promise((resolve, reject) => {
-            smbClient.readFile(filePath, (err, data) => {
-                if (err) reject(new Error(`SMB文件读取失败: ${err.message}`));
-                else resolve(data as Buffer);
-            });
-        });
+    private readSMBFile(smbClient: SMBDriveClient, filePath: string): Promise<Buffer> {
+        return smbClient.readFile(filePath);
     }
 
     private async readWebDAVFile(webdavClient: WebDAVClient, filePath: string): Promise<Buffer> {
@@ -202,25 +197,15 @@ export class NetworkFileAdapter {
         if (!status?.connected) throw new Error(`网络磁盘 ${driveId} 未连接`);
 
         if (driveInfo.type === 'smb') {
-            return this.statSMB(driveInfo.client as SMB2, relativePath);
+            return this.statSMB(driveInfo.client, relativePath);
         } else if (driveInfo.type === 'webdav') {
             return this.statWebDAV(driveInfo.client as WebDAVClient, relativePath);
         }
-        throw new Error(`不支持的网络磁盘类型: ${driveInfo.type}`);
+        throw new Error('不支持的网络磁盘类型');
     }
 
-    private statSMB(smbClient: SMB2, filePath: string): Promise<StatResult> {
-        return new Promise((resolve, reject) => {
-            smbClient.stat(filePath, (err, stats) => {
-                if (err) reject(new Error(`SMB文件信息获取失败: ${err.message}`));
-                else resolve({
-                    size: stats.size,
-                    mtime: stats.mtime,
-                    isDirectory: () => typeof stats.isDirectory === 'function' ? stats.isDirectory() : Boolean(stats.isDirectory),
-                    isFile: () => typeof stats.isFile === 'function' ? stats.isFile() : !Boolean(stats.isDirectory)
-                });
-            });
-        });
+    private statSMB(smbClient: SMBDriveClient, filePath: string): Promise<StatResult> {
+        return smbClient.stat(filePath);
     }
 
     private async statWebDAV(webdavClient: WebDAVClient, filePath: string): Promise<StatResult> {
@@ -262,24 +247,19 @@ export class NetworkFileAdapter {
 
         try {
             if (driveInfo.type === 'smb') {
-                return this.readdirSMB(driveInfo.client as SMB2, relativePath);
+                return this.readdirSMB(driveInfo.client, relativePath);
             } else if (driveInfo.type === 'webdav') {
                 return this.readdirWebDAV(driveInfo.client as WebDAVClient, relativePath);
             }
-            throw new Error(`不支持的网络磁盘类型: ${driveInfo.type}`);
+            throw new Error('不支持的网络磁盘类型');
         } catch (error) {
             console.error(`❌ NetworkFileAdapter: 读取网络目录失败 ${networkPath}:`, error);
             throw error;
         }
     }
 
-    private readdirSMB(smbClient: SMB2, dirPath: string): Promise<string[]> {
-        return new Promise((resolve, reject) => {
-            smbClient.readdir(dirPath, (err, files) => {
-                if (err) reject(new Error(`SMB目录读取失败: ${err.message}`));
-                else resolve((files as any[]).map(f => f.name || f));
-            });
-        });
+    private readdirSMB(smbClient: SMBDriveClient, dirPath: string): Promise<string[]> {
+        return smbClient.readdir(dirPath);
     }
 
     private async readdirWebDAV(webdavClient: WebDAVClient, dirPath: string): Promise<string[]> {
@@ -316,25 +296,20 @@ export class NetworkFileAdapter {
         if (!status?.connected) throw new Error(`网络磁盘 ${driveId} 未连接`);
 
         if (driveInfo.type === 'smb') {
-            return this.writeSMBFile(driveInfo.client as SMB2, relativePath, buffer);
+            return this.writeSMBFile(driveInfo.client, relativePath, buffer);
         } else if (driveInfo.type === 'webdav') {
             return this.writeWebDAVFile(driveInfo.client as WebDAVClient, relativePath, buffer);
         }
-        throw new Error(`不支持的网络磁盘类型: ${driveInfo.type}`);
+        throw new Error('不支持的网络磁盘类型');
     }
 
-    private async writeSMBFile(smbClient: SMB2, filePath: string, buffer: Buffer): Promise<boolean> {
+    private async writeSMBFile(smbClient: SMBDriveClient, filePath: string, buffer: Buffer): Promise<boolean> {
         const maxRetries = 3;
         let lastError: Error | null = null;
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                await new Promise<void>((resolve, reject) => {
-                    smbClient.writeFile(filePath, buffer, (err) => {
-                        if (err) reject(new Error(`SMB文件写入失败: ${err.message}`));
-                        else resolve();
-                    });
-                });
+                await smbClient.writeFile(filePath, buffer);
                 return true;
             } catch (error: any) {
                 lastError = error;
