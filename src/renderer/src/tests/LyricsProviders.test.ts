@@ -108,8 +108,43 @@ describe('bundled lyrics providers', () => {
         expect(new Headers(request.mock.calls[1][1]?.headers).get('referer')).toBe('https://y.qq.com/');
     });
 
-    it('QQ 搜索业务错误应报告失败', async () => {
-        const request = vi.fn(async () => jsonResponse({code: 0, 'music.search.SearchCgiService': {code: 2001}}));
+    it('QQ musicu 搜索返回 2001 时使用备用接口', async () => {
+        const request = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            if (String(input).includes('search_for_qq_cp')) return jsonResponse({code: 0, data: {song: {list: [{
+                songmid: 'legacy-mid', songid: 456, songname: 'Song',
+                singer: [{name: 'Artist'}], albumname: 'Album', interval: 180
+            }]}}});
+            if (isQqSearchRequest(init)) return jsonResponse({code: 0, 'music.search.SearchCgiService': {code: 2001}});
+            return jsonResponse({code: 0, req_0: {code: 0, data: {
+                qrc: 1, lyric: toBase64('<LyricInfo LyricContent="[0,100]S(0,100)"/>')
+            }}});
+        });
+        const provider = new QqMusicLyricsProvider(request);
+
+        const candidates = await provider.search(query, new AbortController().signal);
+
+        expect(candidates[0]).toMatchObject({candidateId: 'legacy-mid', title: 'Song', album: 'Album', durationMs: 180_000});
+        expect(candidates[0].providerData).toEqual({songmid: 'legacy-mid', songid: 456});
+        await expect(provider.fetch(candidates[0], new AbortController().signal))
+            .resolves.toMatchObject({kind: 'qrc', lyrics: '[0,100]S(0,100)'});
+        expect(request).toHaveBeenCalledTimes(3);
+        expect(String(request.mock.calls[1][0])).toContain('search_for_qq_cp');
+    });
+
+    it('QQ musicu 返回空列表时也尝试备用搜索', async () => {
+        const request = vi.fn(async (input: RequestInfo | URL) => String(input).includes('search_for_qq_cp')
+            ? jsonResponse({code: 0, data: {song: {list: [{songmid: 'legacy-mid', songname: 'Song'}]}}})
+            : jsonResponse({code: 0, 'music.search.SearchCgiService': {code: 0, data: {body: {song: {list: []}}}}}));
+        const provider = new QqMusicLyricsProvider(request);
+
+        await expect(provider.search(query, new AbortController().signal))
+            .resolves.toMatchObject([{candidateId: 'legacy-mid'}]);
+    });
+
+    it('QQ 两个搜索接口都失败时保留原始错误码', async () => {
+        const request = vi.fn(async (input: RequestInfo | URL) => String(input).includes('search_for_qq_cp')
+            ? jsonResponse({code: 3001})
+            : jsonResponse({code: 0, 'music.search.SearchCgiService': {code: 2001}}));
         const provider = new QqMusicLyricsProvider(request);
 
         await expect(provider.search(query, new AbortController().signal)).rejects.toThrow('2001');

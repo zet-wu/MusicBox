@@ -4,11 +4,15 @@ import type {LyricsProvider} from '../LyricsProvider';
 import {decodeBase64Text, fetchJson, providerFetch, rankProviderCandidates, type LyricsFetch} from './shared';
 
 interface QqSong {
-    mid: string;
+    mid?: string;
+    songmid?: string;
     id?: number;
-    name: string;
+    songid?: number;
+    name?: string;
+    songname?: string;
     singer?: Array<{name: string}>;
     album?: {name?: string};
+    albumname?: string;
     interval?: number;
 }
 
@@ -18,6 +22,11 @@ interface QqSearchResponse {
         code?: number;
         data?: {body?: {song?: {list?: QqSong[]}}};
     };
+}
+
+interface QqLegacySearchResponse {
+    code?: number;
+    data?: {song?: {list?: QqSong[]}};
 }
 
 interface QqLyricResponse {
@@ -48,12 +57,35 @@ export class QqMusicLyricsProvider implements LyricsProvider {
     constructor(private readonly request: LyricsFetch = providerFetch) {}
 
     async search(query: TrackLyricsQuery, signal: AbortSignal): Promise<LyricsCandidate[]> {
+        const keywords = [query.title, ...query.artists].join(' ');
+        let musicuError: unknown;
+        try {
+            const songs = await this.searchMusicu(keywords, signal);
+            const candidates = this.toCandidates(query, songs);
+            if (candidates.length) return candidates;
+        } catch (error) {
+            if (signal.aborted) throw error;
+            musicuError = error;
+        }
+
+        try {
+            return this.toCandidates(query, await this.searchLegacy(keywords, signal));
+        } catch (error) {
+            if (signal.aborted) throw error;
+            if (musicuError) {
+                throw new Error(`QQ 音乐搜索失败: ${String(musicuError)}；备用接口: ${String(error)}`);
+            }
+            throw error;
+        }
+    }
+
+    private async searchMusicu(keywords: string, signal: AbortSignal): Promise<QqSong[]> {
         const body = {
             'music.search.SearchCgiService': {
                 module: 'music.search.SearchCgiService',
                 method: 'DoSearchForQQMusicDesktop',
                 param: {
-                    query: [query.title, ...query.artists].join(' '),
+                    query: keywords,
                     search_type: 0,
                     page_num: 1,
                     num_per_page: 20
@@ -70,16 +102,47 @@ export class QqMusicLyricsProvider implements LyricsProvider {
             throw new Error(`QQ musicu 搜索请求失败: ${search?.code ?? response.code ?? -1}`);
         }
 
-        return rankProviderCandidates(query, (search.data?.body?.song?.list ?? []).filter(song => song.mid).map(song => ({
-            providerId: this.id,
-            candidateId: song.mid,
-            title: song.name,
-            artists: song.singer?.map(artist => artist.name) ?? [],
-            album: song.album?.name,
-            durationMs: song.interval ? song.interval * 1000 : undefined,
-            capabilities: {lineTimed: true, wordTimed: true, translation: true, romanization: true},
-            providerData: {songmid: song.mid, songid: song.id} satisfies QqProviderData
-        })));
+        return search.data?.body?.song?.list ?? [];
+    }
+
+    private async searchLegacy(keywords: string, signal: AbortSignal): Promise<QqSong[]> {
+        const url = new URL('https://c.y.qq.com/soso/fcgi-bin/search_for_qq_cp');
+        url.search = new URLSearchParams({
+            w: keywords,
+            n: '20',
+            p: '1',
+            format: 'json',
+            remoteplace: 'txt.yqq.song',
+            ct: '24',
+            qqmusic_ver: '1298',
+            platform: 'yqq.json'
+        }).toString();
+        const response = await fetchJson<QqLegacySearchResponse>(this.request, url.toString(), signal, {
+            headers: qqHeaders('https://y.qq.com/')
+        });
+        if (response.code !== 0) {
+            throw new Error(`QQ 备用搜索请求失败: ${response.code ?? -1}`);
+        }
+        if (!Array.isArray(response.data?.song?.list)) throw new Error('QQ 备用搜索响应缺少歌曲列表');
+        return response.data.song.list;
+    }
+
+    private toCandidates(query: TrackLyricsQuery, songs: QqSong[]): LyricsCandidate[] {
+        return rankProviderCandidates(query, songs.flatMap(song => {
+            const mid = song.mid ?? song.songmid;
+            const title = song.name ?? song.songname;
+            if (!mid || !title) return [];
+            return [{
+                providerId: this.id,
+                candidateId: mid,
+                title,
+                artists: song.singer?.map(artist => artist.name) ?? [],
+                album: song.album?.name ?? song.albumname,
+                durationMs: song.interval ? song.interval * 1000 : undefined,
+                capabilities: {lineTimed: true, wordTimed: true, translation: true, romanization: true},
+                providerData: {songmid: mid, songid: song.id ?? song.songid} satisfies QqProviderData
+            }];
+        }));
     }
 
     async fetch(candidate: LyricsCandidate, signal: AbortSignal): Promise<ProviderLyricsPayload> {
